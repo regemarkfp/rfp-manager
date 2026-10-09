@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RFP Manager Timeline</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/timeline.css">
+</head>
+<body>
+<div class="app tl-app">
+  <header class="topbar">
+    <div class="brand">RFP Manager<small>Timeline</small></div>
+    <select id="tl-pick" title="Open another timeline" style="max-width:240px"></select>
+    <div class="tl-transport" id="tl-transport">
+      <button class="btn sm" id="tl-home" title="Stop and back to the start (Home)">⏮</button>
+      <button class="btn sm" id="tl-prev" title="Back to the cue or section before (←, with nothing selected)">◀</button>
+      <button class="btn" id="tl-play" title="Play / pause (Space)">▶</button>
+      <button class="btn go tl-go" id="tl-go" title="GO: release a hold, or jump to the next cue and fire it (Enter)">GO</button>
+    </div>
+    <div class="tl-clock"><b id="tl-time">0:00.0</b><span id="tl-bb" class="muted"></span><span id="tl-state" class="pill">STOPPED</span></div>
+    <div class="matchline" id="tl-next"></div>
+    <div class="pills">
+      <button class="pill" id="tl-mode" style="cursor:pointer" title="Switch between editing the timeline and the crew view">CREW VIEW</button>
+      <details class="pill-menu"><summary class="pill" title="Other screens">OPEN ▾</summary><div class="pill-menu-list">
+        <a class="pm" href="/" title="Back to RFP Manager">RFP Manager</a>
+        <a class="pm" href="control.html">Graphics control</a>
+        <a class="pm" href="#" id="tl-crewlink" target="_blank">Crew view in a new window</a>
+      </div></details>
+      <span class="pill" id="tl-saved">–</span>
+      <span class="pill" id="pill-caspar">CASPAR</span>
+      <span class="pill bad" id="pill-server">SERVER</span>
+    </div>
+  </header>
+
+  <main class="tl-main" id="tl-main">
+    <div class="tl-empty" id="tl-empty">Loading…</div>
+  </main>
+</div>
+<script src="js/common.js"></script>
+<script src="js/actions.js"></script>
+<script src="js/timeline.js"></script>
+<script src="/shared/colorpicker.js"></script>
+</body>
+</html>

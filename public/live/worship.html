@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RFP Manager – Worship</title>
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    .wapp { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
+    .wmain { display: grid; grid-template-columns: 290px 1fr 370px; min-height: 0; }
+    .wmain.wide { grid-template-columns: 290px 1fr 600px; }
+    .wcol { min-height: 0; overflow: auto; border-right: 1px solid var(--line); background: var(--bg2); }
+    .wcol:last-child { border-right: 0; border-left: 1px solid var(--line); }
+    .wcenter { min-height: 0; overflow: auto; padding: 12px; }
+    .sect { padding: 10px; border-bottom: 1px solid var(--line); }
+    .sect h4 { margin: 0 0 8px; font-size: 12px; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; display: flex; align-items: center; gap: 6px; font-weight: 600; }
+    .sect h4 .sp { flex: 1; }
+    .item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+    .item:hover { background: var(--panel2); }
+    .item.sel { background: var(--accent-bg); border-color: var(--accent); }
+    .item.live { box-shadow: inset 3px 0 0 var(--red); }
+    .item .k { width: 8px; height: 22px; border-radius: 2px; flex: none; }
+    .item .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item .t small { color: var(--muted); display: block; font-size: 11px; }
+    .item.head { cursor: default; color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: .08em; padding-top: 10px; }
+    .item .x { opacity: 0; } .item:hover .x { opacity: 1; }
+    .grid-slides { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+    .slide { background: #000; border: 2px solid var(--line2); border-radius: 8px; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; aspect-ratio: 16 / 10.4; position: relative; }
+    .slide:hover { border-color: #888; }
+    .slide.live { border-color: var(--red); box-shadow: 0 0 0 2px var(--red); }
+    .slide.next { border-color: var(--accent); }
+    .slide .body { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px 10px; font-weight: 600; font-size: 13.5px; line-height: 1.25; white-space: pre-line; color: #fff; overflow: hidden; background-size: cover; background-position: center; }
+    .slide .lbl { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; padding: 3px 8px; color: #fff; letter-spacing: .04em; }
+    .slide .lbl span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .slide .foot { position: absolute; left: 6px; right: 6px; bottom: 26px; font-size: 9px; color: #bbb; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .clears { display: flex; gap: 6px; }
+    .clears .btn { font-size: 12px; padding: 6px 10px; }
+    .mon { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border: 1px solid var(--line2); border-radius: 6px; overflow: hidden; }
+    .mon iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    .mon .tag { position: absolute; left: 6px; top: 6px; font-size: 10px; font-weight: 800; letter-spacing: .08em; background: var(--red); color: #fff; padding: 1px 6px; border-radius: 3px; z-index: 2; }
+    .nextbox { background: #000; border: 1px solid var(--line2); border-radius: 6px; padding: 10px; text-align: center; white-space: pre-line; font-weight: 600; min-height: 64px; color: #ddd; font-size: 13px; }
+    .tabs2 { display: flex; gap: 2px; flex-wrap: wrap; margin-bottom: 8px; }
+    .macro { min-width: 110px; padding: 12px 10px; }
+    .res { padding: 6px 8px; border-radius: 6px; cursor: pointer; display: flex; gap: 6px; align-items: center; }
+    .res:hover { background: var(--panel2); }
+    .res .t { flex: 1; min-width: 0; } .res .t small { display: block; color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .thumbs img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 4px; border: 2px solid transparent; cursor: pointer; background: #111; }
+    .thumbs img:hover { border-color: var(--accent); }
+    table.cfg input, table.cfg select { padding: 4px 6px; }
+    .item .x { touch-action: manipulation; }
+    @media (pointer: coarse) { .item .x { opacity: 1; } .item { padding: 9px 8px; } }
+    /* tablets: library and slides side by side, the outputs below; phones: everything in one column */
+    @media (max-width: 1100px) { .wapp { height: auto; min-height: 100vh; } body { overflow: auto; } .wmain, .wmain.wide { grid-template-columns: 240px 1fr; }
+      .wcol:last-child { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); } .wcol, .wcenter { overflow: visible; } }
+    @media (max-width: 700px) { .wmain, .wmain.wide { grid-template-columns: 1fr; } .wcol { border-right: 0; border-bottom: 1px solid var(--line); }
+      .clears { flex-wrap: wrap; order: 6; flex: 1 1 100%; } .clears .btn { flex: 1 1 auto; } .grid-slides { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; } .slide .body { font-size: 12px; } }
+  </style>
+</head>
+<body>
+<div class="wapp">
+  <header class="topbar">
+    <div class="brand">RFP Manager<small>Worship</small></div>
+    <div class="clears">
+      <button class="btn danger" id="c-all" title="F1">Clear all</button>
+      <button class="btn" id="c-slide" title="F2">Clear slide</button>
+      <button class="btn" id="c-blank" title="F3 or B">Blank</button>
+      <button class="btn" id="c-logo" title="F4">Logo</button>
+      <button class="btn" id="c-lt" title="F5">Clear name</button>
+      <button class="btn" id="b-prev" title="Left arrow">◂ Prev</button>
+      <button class="btn primary" id="b-next" title="Right arrow or Space">Next ▸</button>
+    </div>
+    <div class="matchline" id="liveline"></div>
+    <div class="pills">
+      <a class="pill" href="/" title="Back to RFP Manager">RFP MANAGER</a>
+      <a class="pill" id="l-stage" href="stage.html" target="_blank">STAGE ↗</a>
+      <a class="pill" href="output.html?bg=black" target="_blank">OUTPUT ↗</a>
+      <span class="pill" id="pill-caspar">CASPAR</span>
+      <span class="pill bad" id="pill-server">SERVER</span>
+    </div>
+  </header>
+  <div class="wmain">
+    <aside class="wcol">
+      <div class="sect"><h4>Service <span class="sp"></span><button class="btn sm" id="sv-new">New</button></h4>
+        <select id="sv-pick"></select>
+        <div id="sv-items" style="margin-top:8px"></div>
+        <div class="row" style="margin-top:8px"><button class="btn sm" id="sv-head">+ Heading</button></div>
+      </div>
+      <div class="sect"><h4>Library</h4>
+        <div class="tabs2" id="lib-tabs"><button class="tab active" data-lib="songs">Songs</button><button class="tab" data-lib="scripture">Scripture</button><button class="tab" data-lib="text">Text</button><button class="tab" data-lib="media">Media</button></div>
+        <div id="lib"></div>
+      </div>
+    </aside>
+    <main class="wcenter"><div id="deck"></div></main>
+    <aside class="wcol">
+      <div class="sect"><h4>Live <span class="sp"></span><span class="small muted" id="live-pos"></span></h4>
+        <div class="mon"><span class="tag">PGM</span><iframe id="mon" title="Program output" src="about:blank"></iframe></div>
+        <h4 style="margin-top:10px">Next</h4><div class="nextbox" id="next"></div>
+      </div>
+      <div class="sect">
+        <div class="tabs2" id="side-tabs"><button class="tab active" data-side="names">Names</button><button class="tab" data-side="stage">Stage</button><button class="tab" data-side="macros">Buttons</button><button class="tab" data-side="settings">Settings</button></div>
+        <div id="side"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+<div id="toasts" class="toasts"></div>
+<script src="/shared/worship.js"></script>
+<script src="js/worship.js"></script>
+<script src="/shared/tidy.js"></script>
+<script src="/shared/colorpicker.js"></script>
+</body>
+</html>

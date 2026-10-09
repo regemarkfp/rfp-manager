@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RFP Manager Dashboard</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/dash.css">
+</head>
+<body>
+<div class="app dash-app">
+  <header class="topbar">
+    <div class="brand">RFP Manager<small>Dashboard</small></div>
+    <select id="d-pick" title="Open another dashboard" style="max-width:220px"></select>
+    <div class="d-pages" id="d-pages"></div>
+    <div class="matchline" id="d-line"></div>
+    <div class="pills">
+      <button class="pill" id="d-mode" style="cursor:pointer" title="Design this dashboard (drag controls onto it) or use it">✎ DESIGN</button>
+      <span class="pill" id="d-saved" style="display:none">–</span>
+      <details class="pill-menu"><summary class="pill" title="Other screens">OPEN ▾</summary><div class="pill-menu-list">
+        <a class="pm" href="/" title="Back to RFP Manager">RFP Manager</a>
+        <a class="pm" href="control.html">Graphics control</a>
+        <a class="pm" href="/#/automation">Variables &amp; triggers</a>
+        <a class="pm" href="#" id="d-full">Full screen</a>
+      </div></details>
+      <span class="pill" id="pill-caspar">CASPAR</span>
+      <span class="pill bad" id="pill-server">SERVER</span>
+    </div>
+  </header>
+  <main class="d-main" id="d-main"><div class="d-empty">Loading…</div></main>
+</div>
+<script src="js/common.js"></script>
+<script src="js/actions.js"></script>
+<script src="js/dash.js"></script>
+<script src="/shared/colorpicker.js"></script>
+</body>
+</html>

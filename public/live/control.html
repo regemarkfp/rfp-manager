@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RFP Manager Control</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">RFP Manager<small>Graphics control</small></div>
+    <div class="matchline" id="matchline"></div>
+    <div class="pills">
+      <details class="pill-menu"><summary class="pill" title="Other screens">OPEN ▾</summary><div class="pill-menu-list">
+      <a class="pm" href="/" title="Back to RFP Manager">RFP Manager</a>
+      <a class="pm" href="stats.html" data-mode-link data-cricket-href="stats.html" data-sport-href="sport.html" title="Open scorer">Scorer</a>
+      <a class="pm" href="commentary.html" data-mode-link data-cricket-href="commentary.html" data-sport-href="sport-commentary.html" target="_blank" title="Open commentator stats screen">Commentary screen</a>
+      <a class="pm" href="preview.html" target="_blank" title="Browser preview output">Preview output</a>
+      <a class="pm" href="output.html?hud=1&bg=checker" target="_blank" title="Browser program output (for OBS/vMix use output.html with no options)">Program output</a>
+      </div></details>
+      <span class="pill" id="pill-users">–</span>
+      <span class="pill" id="pill-caspar">CASPAR</span>
+      <span class="pill bad" id="pill-server">SERVER</span>
+    </div>
+    <button class="btn danger" id="btn-hideall" title="Take every graphic off program (Shift+Esc)">HIDE ALL</button>
+  </header>
+
+  <div class="ctl">
+    <nav class="side" id="side"></nav>
+
+    <section class="center" id="center"></section>
+
+    <aside class="right">
+      <div class="panel" style="padding:8px">
+        <h4><span id="sel-title">No graphic selected</span><span class="sp"></span><span class="mono small" id="sel-target"></span></h4>
+        <div class="preview" id="preview"><div class="ph" id="preview-ph">Select a graphic to preview it here.<br>Double-click a button to take it straight to air.</div></div>
+        <div id="sel-params" class="row" style="margin-top:8px"></div>
+        <div class="take-row" style="margin-top:8px">
+          <button class="btn go" id="btn-pvw" title="Send to CasparCG preview channel">PVW</button>
+          <button class="btn danger" id="btn-take" title="Take to air (Enter)">TAKE</button>
+          <button class="btn primary" id="btn-update" title="Update on air">UPDATE</button>
+          <button class="btn" id="btn-out" title="Take off air (Esc)">OUT</button>
+        </div>
+        <div id="invokes" style="display:none;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"></div>
+      </div>
+      <div class="panel" style="padding:8px">
+        <h4>On air <span class="sp"></span><button class="btn sm ghost" id="btn-clear-pvw">Clear PVW</button></h4>
+        <div class="onair-list" id="onair"></div>
+      </div>
+      <div class="panel" style="padding:8px">
+        <h4>Data <span class="sp"></span><button class="btn sm" id="btn-save-preset" title="Keep these values under a name, to load with one click next time">Save as preset</button><button class="btn sm ghost" id="btn-reset-ovr" title="Discard edits">Reset edits</button></h4>
+        <div id="presets" style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px"></div>
+        <div class="fields" id="fields"><span class="muted small">—</span></div>
+      </div>
+    </aside>
+  </div>
+</div>
+<script src="js/common.js"></script>
+<script src="/shared/sports.js"></script>
+<script src="js/control.js"></script>
+<script src="/shared/tidy.js"></script>
+<script src="/shared/colorpicker.js"></script>
+</body>
+</html>

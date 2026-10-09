@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RFP Manager Hardware bridge</title>
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    .br { padding: 14px; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); align-content: start; overflow: auto; }
+    .br .panel + .panel { margin-top: 0; }
+    .port { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+    .port:last-child { border-bottom: 0; }
+    .port .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #log { font-family: var(--mono); font-size: 12px; max-height: 50vh; overflow: auto; }
+    #log div { padding: 2px 0; border-bottom: 1px solid #2a2a2a; }
+    #log .o { color: var(--cyan); }
+    .big { font-size: 28px; font-weight: 800; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">RFP Manager<small>Hardware bridge</small></div>
+    <div class="matchline">MIDI and X-keys for RFP Manager – keep this page open</div>
+    <div class="pills"><a class="pill" href="/#/settings">SETTINGS</a><span class="pill bad" id="pill-server">SERVER</span></div>
+  </header>
+  <main class="br" id="br">
+    <div class="panel"><h4>MIDI</h4><div id="midi" class="small muted">Starting…</div></div>
+    <div class="panel"><h4>X-keys<span class="sp"></span><button class="btn sm" id="xk-add">Connect X-keys…</button></h4><div id="xk" class="small muted">–</div>
+      <p class="small muted" style="margin:8px 0 0">Press a key: its number shows below. Use it in Settings → Connections → Input mappings (e.g. <code>xkeys_key5</code>).</p>
+      <div class="big" id="xk-last"></div></div>
+    <div class="panel"><h4>Devices in RFP Manager</h4><div id="devs" class="small muted">–</div></div>
+    <div class="panel" style="grid-column:1/-1"><h4>Activity</h4><div id="log"></div></div>
+  </main>
+</div>
+<script src="js/common.js"></script>
+<script>
+(function () {
+  'use strict';
+  const { $, esc } = CG;
+  let ready = false, midi = null, hids = [];
+  const log = (t, out) => { const d = document.createElement('div'); d.className = out ? 'o' : ''; d.textContent = new Date().toTimeString().slice(0, 8) + '  ' + (out ? '→ ' : '← ') + t; const b = $('#log'); b.prepend(d); while (b.childElementCount > 200) b.lastChild.remove(); };
+  // Web MIDI and WebHID only work on a secure page: https, or this computer's own localhost
+  if (!window.isSecureContext) {
+    const w = document.createElement('div'); w.className = 'panel'; w.style.gridColumn = '1/-1'; w.style.borderColor = 'var(--amber)';
+    w.innerHTML = '<h4>This page cannot reach MIDI or X-keys from this address</h4><p>Browsers only allow MIDI and USB keypads on <b>https</b> pages or on <b>localhost</b>. You do not need this page for MIDI and X-keys plugged into the production PC: RFP Manager connects to them by itself (Settings → Connections). For gear on another computer, open this page there as <code>http://localhost:…</code> through a Tailscale serve / https address, or plug the gear into the production PC.</p>';
+    document.getElementById('br').prepend(w);
+  }
+  const input = (d) => { if (ready) CG.send('bridge', 'input', d).catch(() => {}); };
+
+  // ---------------- MIDI (Web MIDI: Chrome, Edge, Opera)
+  function drawMidi() {
+    const box = $('#midi');
+    if (!midi) return;
+    const ins = [...midi.inputs.values()], outs = [...midi.outputs.values()];
+    box.innerHTML = `<div class="muted" style="margin-bottom:4px">In</div>${ins.map((p) => `<div class="port"><span class="led">●</span><span class="nm">${esc(p.name)}</span></div>`).join('') || '<div>No MIDI inputs</div>'}
+      <div class="muted" style="margin:8px 0 4px">Out</div>${outs.map((p) => `<div class="port"><span class="nm">${esc(p.name)}</span></div>`).join('') || '<div>No MIDI outputs</div>'}`;
+    for (const p of ins) p.onmidimessage = (e) => {
+      const [st, a, b] = e.data, type = st & 0xf0, channel = (st & 0x0f) + 1;
+      let d = null;
+      if (type === 0x90) d = { kind: 'note', note: a, velocity: b, channel };
+      else if (type === 0x80) d = { kind: 'note', note: a, velocity: 0, channel };
+      else if (type === 0xb0) d = { kind: 'cc', cc: a, value: b, channel };
+      else if (type === 0xc0) d = { kind: 'pc', program: a, channel };
+      if (!d) return;
+      d.port = p.name; input(d);
+      log(`${p.name}: ${d.kind} ${d.note !== undefined ? d.note + ' vel ' + d.velocity : d.cc !== undefined ? d.cc + ' = ' + d.value : d.program} ch ${channel}`);
+    };
+  }
+  if (navigator.requestMIDIAccess) navigator.requestMIDIAccess({ sysex: false }).then((m) => { midi = m; m.onstatechange = drawMidi; drawMidi(); }).catch((e) => { $('#midi').textContent = 'MIDI not allowed: ' + e.message; });
+  else $('#midi').textContent = 'This browser has no Web MIDI. Use Chrome or Edge.';
+
+  // ---------------- X-keys (WebHID: Chrome, Edge)
+  const prevBits = new Map();
+  async function useHid(dev) {
+    if (!dev.opened) await dev.open();
+    if (!hids.includes(dev)) hids.push(dev);
+    dev.oninputreport = (e) => {
+      const bytes = new Uint8Array(e.data.buffer), prev = prevBits.get(dev) || new Uint8Array(bytes.length);
+      // key columns from byte 2 on: one bit per row; key number = column × 8 + row + 1
+      for (let i = 2; i < Math.min(bytes.length, 14); i++) {
+        const ch = bytes[i] ^ prev[i]; if (!ch) continue;
+        for (let bit = 0; bit < 8; bit++) if (ch & (1 << bit)) {
+          const key = (i - 2) * 8 + bit + 1, down = !!(bytes[i] & (1 << bit));
+          input({ kind: 'xkeys', key, down, unit: dev.productName });
+          if (down) { $('#xk-last').textContent = 'Key ' + key; log(`${dev.productName}: key ${key}`); }
+        }
+      }
+      prevBits.set(dev, bytes.slice());
+    };
+    drawHid();
+  }
+  function drawHid() { $('#xk').innerHTML = hids.map((d) => `<div class="port"><span class="nm">${esc(d.productName)}</span><span class="pill ok">OPEN</span></div>`).join('') || 'No X-keys connected yet.'; }
+  if (navigator.hid) {
+    navigator.hid.getDevices().then((l) => l.filter((d) => d.vendorId === 0x05f3).forEach((d) => useHid(d).catch((e) => log('X-keys: ' + e.message))));
+    $('#xk-add').onclick = async () => { try { const l = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x05f3 }] }); for (const d of l) await useHid(d); } catch (e) { CG.toast(e.message, 'err'); } };
+    navigator.hid.addEventListener('disconnect', (e) => { hids = hids.filter((d) => d !== e.device); drawHid(); });
+  } else { $('#xk').textContent = 'This browser has no WebHID. Use Chrome or Edge.'; $('#xk-add').disabled = true; }
+
+  // ---------------- out: MIDI messages and X-keys backlights from RFP Manager
+  CG.on('bridgeOut', (m) => {
+    if (m.kind === 'midi' && midi) {
+      const outs = [...midi.outputs.values()].filter((p) => !m.port || p.name.toLowerCase().includes(String(m.port).toLowerCase()));
+      for (const p of outs) { p.send(m.bytes); if (m.pulse) setTimeout(() => p.send([0x80 | (m.bytes[0] & 15), m.bytes[1], 0]), m.pulse); }
+      log(`MIDI ${m.bytes.join(' ')} to ${outs.map((p) => p.name).join(', ') || 'no output'}`, true);
+    }
+    if (m.kind === 'xkeys') {
+      for (const d of hids) {
+        const r = new Uint8Array(35), idx = Math.max(0, m.key - 1) + (m.color === 'red' ? 80 : 0);
+        if (m.what === 'lights-off') { r[0] = 182; r[1] = 0; r[2] = 0; d.sendReport(0, r).catch(() => {}); const r2 = new Uint8Array(35); r2[0] = 182; r2[1] = 1; d.sendReport(0, r2).catch(() => {}); }
+        else { r[0] = 181; r[1] = idx; r[2] = m.what === 'light-on' ? 1 : m.what === 'light-flash' ? 2 : 0; d.sendReport(0, r).catch((e) => log('X-keys: ' + e.message)); }
+      }
+      log(`X-keys ${m.what} ${m.key || ''}`, true);
+    }
+  });
+  CG.on('bridgeDevices', (m) => { $('#devs').innerHTML = (m.list || []).map((d) => `<div class="port"><span class="nm"><b>${esc(d.name)}</b> <span class="muted">${esc(d.type)} · live values ${esc(d.id)}_…${d.port ? ' · port “' + esc(d.port) + '”' : ''}</span></span></div>`).join('') || 'No MIDI or X-keys devices yet. Add them in Settings → Connections.'; });
+  CG.on('connected', () => { CG.send('bridge', 'hello', {}).then(() => { ready = true; }).catch((e) => { ready = false; CG.toast(e.message, 'err'); }); });
+  CG.connect('bridge');
+})();
+</script>
+<script src="/shared/colorpicker.js"></script>
+</body>
+</html>

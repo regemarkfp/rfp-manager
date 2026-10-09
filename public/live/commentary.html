@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+  <title>RFP Manager Commentary</title>
+  <style>
+    :root { --bg:#070b12; --panel:#0f1622; --panel2:#152033; --line:#223049; --text:#eef3fa; --muted:#8fa0b8; --gold:#f4c20d; --cyan:#39c5cf;
+            --green:#2ecc71; --red:#ff4d55; --blue:#2f81f7; --purple:#a371f7; --font:"Barlow Condensed","Roboto Condensed","Arial Narrow","Segoe UI",Arial,sans-serif; }
+    html, body { margin:0; height:100%; background:#000; overflow:hidden; }
+    #stage { position:absolute; left:0; top:0; width:1920px; height:1080px; transform-origin:0 0; background:var(--bg); color:var(--text);
+             font-family:var(--font); display:grid; grid-template-rows:176px 1fr 236px; gap:14px; padding:14px; box-sizing:border-box; }
+    * { box-sizing:border-box; }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 18px; min-height:0; overflow:hidden; position:relative; }
+    .ttl { font-size:18px; letter-spacing:.18em; color:var(--muted); font-weight:700; text-transform:uppercase; margin-bottom:6px; display:flex; gap:12px; align-items:center; }
+    .ttl .sp { flex:1; }
+    .num { font-variant-numeric:tabular-nums; }
+    .up { text-transform:uppercase; }
+    .muted { color:var(--muted); }
+    .gold { color:var(--gold); }
+
+    /* header */
+    #head { display:grid; grid-template-columns:auto 1fr auto; gap:24px; align-items:center; background:linear-gradient(90deg,var(--team,#12305c),#0f1622 65%); }
+    #head .team { font-size:34px; font-weight:800; letter-spacing:.02em; line-height:1.05; }
+    #head .inn { font-size:17px; color:var(--muted); letter-spacing:.12em; font-weight:700; margin-bottom:2px; }
+    #head .score { font-size:92px; font-weight:800; line-height:.95; }
+    #head .ov { font-size:40px; font-weight:700; color:var(--cyan); margin-left:18px; }
+    .kpis { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+    .kpi { background:rgba(0,0,0,.35); border:1px solid var(--line); border-radius:8px; padding:8px 18px; text-align:center; min-width:150px; }
+    .kpi b { display:block; font-size:44px; line-height:1.05; font-weight:800; }
+    .kpi span { font-size:17px; letter-spacing:.14em; color:var(--muted); font-weight:700; }
+    .kpi.hl { border-color:var(--gold); } .kpi.hl b { color:var(--gold); }
+    .kpi.good b { color:var(--green); } .kpi.bad b { color:var(--red); }
+    .right { text-align:right; }
+    .clock { font-size:46px; font-weight:800; }
+    .badge { display:inline-block; font-size:20px; font-weight:800; letter-spacing:.1em; padding:3px 12px; border-radius:5px; margin-left:8px; }
+    .badge.fh { background:var(--gold); color:#111; } .badge.pp { background:var(--blue); }
+    .status { font-size:24px; font-weight:700; color:var(--gold); letter-spacing:.04em; margin-top:4px; }
+
+    /* middle */
+    #mid { display:grid; grid-template-columns:1.12fr 1fr 0.95fr; gap:14px; min-height:0; }
+    .col { display:flex; flex-direction:column; gap:14px; min-height:0; }
+    .bat { flex:1; }
+    .bat.on { border-color:var(--gold); box-shadow:inset 4px 0 0 var(--gold); }
+    .bat .nm { font-size:44px; font-weight:800; display:flex; align-items:baseline; gap:12px; }
+    .bat .nm .st { color:var(--gold); font-size:30px; }
+    .bat .rb { font-size:80px; font-weight:800; line-height:.95; }
+    .bat .rb small { font-size:38px; color:var(--muted); font-weight:700; margin-left:8px; }
+    .grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:6px 14px; margin-top:6px; }
+    .stat b { display:block; font-size:32px; font-weight:800; line-height:1.05; }
+    .stat span { font-size:15px; letter-spacing:.12em; color:var(--muted); font-weight:700; }
+    .last { display:flex; gap:5px; margin-top:10px; flex-wrap:wrap; align-items:center; }
+    .last .lbl { font-size:15px; letter-spacing:.12em; color:var(--muted); font-weight:700; margin-right:6px; }
+    .chip { min-width:34px; height:34px; border-radius:17px; background:#1d2a40; display:inline-flex; align-items:center; justify-content:center; font-size:20px; font-weight:800; padding:0 7px; }
+    .chip.dot { color:#6f819c; } .chip.b4 { background:var(--blue); } .chip.b6 { background:var(--purple); } .chip.w { background:var(--red); } .chip.x { background:#5c4a10; color:#ffe38a; }
+    .note { margin-top:8px; font-size:22px; color:var(--gold); font-weight:700; letter-spacing:.03em; min-height:28px; }
+
+    .pship .bar { display:flex; height:18px; border-radius:9px; overflow:hidden; margin:8px 0 6px; background:#1d2a40; }
+    .pship .bar i { display:block; height:100%; }
+    .pship .big { font-size:52px; font-weight:800; line-height:1; }
+
+    .bowler .nm { font-size:40px; font-weight:800; }
+    .bowler .fig { font-size:64px; font-weight:800; color:var(--gold); line-height:1; }
+    .bowler .fig small { font-size:30px; color:var(--muted); margin-left:10px; font-weight:700; }
+    .over-row { display:flex; align-items:center; gap:8px; margin-top:6px; font-size:20px; }
+    .over-row .no { width:44px; color:var(--muted); font-weight:700; }
+    .over-row .r { margin-left:auto; font-weight:800; font-size:22px; }
+
+    /* fruit machine */
+    #reel-wrap { flex:1; display:flex; flex-direction:column; }
+    #reel { position:relative; flex:1; overflow:hidden; border-radius:8px; background:linear-gradient(180deg,#0b111b,#18243a 50%,#0b111b); border:2px solid var(--gold); }
+    #reel .strip { position:absolute; left:0; right:0; top:0; transition:transform .9s cubic-bezier(.3,1.4,.4,1); }
+    #reel .card { height:var(--h); display:flex; flex-direction:column; justify-content:center; padding:10px 26px; }
+    #reel .card .cat { font-size:20px; letter-spacing:.2em; color:var(--gold); font-weight:800; }
+    #reel .card .big { font-size:64px; font-weight:800; line-height:1.02; margin:6px 0; }
+    #reel .card .txt { font-size:30px; font-weight:600; line-height:1.15; }
+    #reel::before, #reel::after { content:""; position:absolute; left:0; right:0; height:26px; z-index:2; pointer-events:none; }
+    #reel::before { top:0; background:linear-gradient(#0b111b,transparent); } #reel::after { bottom:0; background:linear-gradient(transparent,#0b111b); }
+    .dots { display:flex; gap:6px; justify-content:center; margin-top:8px; }
+    .dots i { width:9px; height:9px; border-radius:50%; background:#2a3a55; } .dots i.on { background:var(--gold); }
+    .quick { display:grid; grid-template-columns:1fr 1fr; gap:6px 18px; }
+    .quick div { display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:23px; border-bottom:1px solid #1a2436; padding:3px 0; white-space:nowrap; }
+    .quick div span { color:var(--muted); letter-spacing:.04em; font-size:17px; }
+    .quick div b { font-weight:800; }
+
+    /* bottom */
+    #bot { display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:14px; min-height:0; }
+    table { width:100%; border-collapse:collapse; font-size:24px; }
+    th { font-size:16px; letter-spacing:.12em; color:var(--muted); text-align:right; font-weight:700; padding:2px 8px; }
+    th:first-child, td:first-child { text-align:left; }
+    td { text-align:right; padding:3px 8px; border-bottom:1px solid #1a2436; font-variant-numeric:tabular-nums; font-weight:700; }
+    td.m { color:var(--muted); font-weight:600; }
+    .fow { font-size:22px; line-height:1.5; }
+    .fow b { color:var(--gold); }
+    .proj { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; text-align:center; margin-top:4px; }
+    .proj div { background:#131d2e; border-radius:6px; padding:6px 0; }
+    .proj b { display:block; font-size:34px; font-weight:800; }
+    .proj span { font-size:15px; color:var(--muted); letter-spacing:.1em; font-weight:700; }
+    #offline { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.7); font-size:48px; font-weight:800; color:var(--red); z-index:9; }
+  </style>
+  <link rel="stylesheet" href="css/narrow-stage.css">
+</head>
+<body>
+<div id="stage">
+  <div class="panel" id="head">
+    <div>
+      <div class="team up" id="h-team">—</div>
+      <div class="inn" id="h-inn"></div>
+      <div><span class="score num" id="h-score">–</span><span class="ov num" id="h-ov"></span></div>
+    </div>
+    <div>
+      <div class="kpis" id="kpis"></div>
+      <div class="status up" id="h-status" style="text-align:center"></div>
+    </div>
+    <div class="right">
+      <div class="clock num" id="clock"></div>
+      <div id="badges" style="margin-top:6px"></div>
+      <div class="muted" style="font-size:20px;margin-top:6px" id="h-match"></div>
+    </div>
+  </div>
+
+  <div id="mid">
+    <div class="col">
+      <div class="panel bat" id="bat1"></div>
+      <div class="panel bat" id="bat2"></div>
+      <div class="panel pship" id="pship"></div>
+    </div>
+    <div class="col">
+      <div class="panel bowler" id="bowler" style="flex:1.25"></div>
+      <div class="panel" id="overs" style="flex:1"></div>
+    </div>
+    <div class="col">
+      <div class="panel" id="reel-wrap">
+        <div class="ttl">Fruit machine <span class="sp"></span><span id="reel-count" class="muted"></span></div>
+        <div id="reel"><div class="strip" id="strip"></div></div>
+        <div class="dots" id="dots"></div>
+      </div>
+      <div class="panel"><div class="ttl">Innings numbers</div><div class="quick" id="quick"></div></div>
+    </div>
+  </div>
+
+  <div id="bot">
+    <div class="panel"><div class="ttl">Phases <span class="sp"></span><span class="muted" id="phase-note"></span></div><table id="phases"></table></div>
+    <div class="panel"><div class="ttl">Fall of wickets</div><div class="fow" id="fow"></div></div>
+    <div class="panel"><div class="ttl" id="proj-title">Projections</div><div class="proj" id="proj"></div><div class="note" id="compare" style="margin-top:12px"></div></div>
+  </div>
+  <div id="offline">SERVER OFFLINE – RECONNECTING…</div>
+</div>
+<script src="js/common.js"></script>
+<script src="js/commentary.js"></script>
+<script>
+  // RFP Manager: a monitor that follows the match on air switches screen when the sport changes.
+  if (/[?&]auto=1/.test(location.search)) CG.on('state', function (s) { if ((s.mode === 'sport' ? 'sport' : 'cricket') !== 'cricket') location.replace('sport-commentary.html' + (CG.query ? CG.query + '&auto=1' : '?auto=1')); });
+</script>
+<script src="/shared/colorpicker.js"></script>
+</body>
+</html>

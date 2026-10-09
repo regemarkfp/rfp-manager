@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RFP Manager Stats</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">RFP Manager<small>Cricket scorer</small></div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-page="score">Score</button>
+      <button class="tab" data-page="setup">Match Setup</button>
+      <button class="tab" data-page="teams">Teams</button>
+      <button class="tab" data-page="card">Scorecard</button>
+      <button class="tab" data-page="balls">Ball Log</button>
+      <button class="tab" data-page="dls">Rain / DLS</button>
+    </nav>
+    <div class="matchline" id="matchline"></div>
+    <div class="pills">
+      <a class="pill" href="/" title="Back to RFP Manager">RFP MANAGER</a>
+      <a class="pill" href="control.html" title="Open graphics control">CONTROL ↗</a>
+      <a class="pill" href="commentary.html" data-mode-link data-cricket-href="commentary.html" data-sport-href="sport-commentary.html" target="_blank" title="Open commentator stats screen">COMMS ↗</a>
+      <span class="pill" id="pill-users">–</span>
+      <span class="pill" id="pill-caspar">CASPAR</span>
+      <span class="pill bad" id="pill-server">SERVER</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- ======================================================== SCORE -->
+    <section class="page active" id="page-score">
+      <div class="vsline"></div>
+      <div id="score-banner" class="stack" style="margin-bottom:12px"></div>
+      <div class="grid cols-3">
+        <div>
+          <div class="panel">
+            <h4>Innings <span class="sp"></span><span id="badges"></span></h4>
+            <div class="scorebox" id="scorebox"></div>
+          </div>
+          <div class="panel">
+            <h4>At the crease <span class="sp"></span>
+              <button class="btn sm" id="btn-swap" title="Swap strike (S)">⇄ Swap <span class="kbd">S</span></button></h4>
+            <div class="crease" id="crease"></div>
+          </div>
+          <div class="panel">
+            <h4>Bowler</h4>
+            <div class="row"><select id="sel-bowler" class="grow"></select></div>
+            <div class="row small muted" id="bowler-fig" style="margin-top:6px"></div>
+          </div>
+          <div class="panel">
+            <h4>This over <span class="sp"></span><span id="over-runs" class="muted"></span></h4>
+            <div class="chips" id="this-over"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel">
+            <h4>Delivery</h4>
+            <div class="mods" id="mods">
+              <button class="btn on" data-extra="">Legal</button>
+              <button class="btn" data-extra="wd">Wide <span class="kbd">D</span></button>
+              <button class="btn" data-extra="nb">No ball <span class="kbd">N</span></button>
+              <button class="btn" data-extra="b">Bye <span class="kbd">B</span></button>
+              <button class="btn" data-extra="lb">Leg bye <span class="kbd">L</span></button>
+            </div>
+            <div class="small muted" id="mod-hint" style="margin:8px 0 10px">Runs off the bat.</div>
+            <div class="pad" id="pad">
+              <button class="btn" data-runs="0">0</button>
+              <button class="btn" data-runs="1">1</button>
+              <button class="btn" data-runs="2">2</button>
+              <button class="btn" data-runs="3">3</button>
+              <button class="btn b4" data-runs="4" data-boundary="1">4</button>
+              <button class="btn b6" data-runs="6" data-boundary="1">6</button>
+              <button class="btn" data-runs="5">5</button>
+              <button class="btn wk" id="btn-wicket">WICKET <span class="kbd">W</span></button>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <label class="chk small"><input type="checkbox" id="chk-allrun"> 4 / 6 were run (not a boundary)</label>
+            </div>
+            <hr>
+            <div class="row">
+              <button class="btn" id="btn-undo">↶ Undo <span class="kbd">Ctrl+Z</span></button>
+              <button class="btn" id="btn-penalty">+5 Penalty</button>
+              <span class="grow"></span>
+              <button class="btn" id="btn-declare" title="Two-innings matches: declare the innings closed">Declare</button>
+              <button class="btn warn" id="btn-end">End innings</button>
+            </div>
+            <p class="small muted" style="margin:10px 0 0">Keys: <span class="kbd">0-6</span> runs · <span class="kbd">D N B L</span> extras · <span class="kbd">W</span> wicket · <span class="kbd">S</span> swap · <span class="kbd">Ctrl+Z</span> undo</p>
+          </div>
+          <div class="panel">
+            <h4>Partnership</h4>
+            <div id="pship" class="small"></div>
+          </div>
+          <div class="panel">
+            <h4>Overs</h4>
+            <div class="overs-list" id="overs-list"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel">
+            <h4>Batting</h4>
+            <table class="t" id="mini-bat"></table>
+          </div>
+          <div class="panel">
+            <h4>Bowling</h4>
+            <table class="t" id="mini-bowl"></table>
+          </div>
+          <div class="panel">
+            <h4>Fall of wickets</h4>
+            <div id="mini-fow" class="small"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================== SETUP -->
+    <section class="page" id="page-setup">
+      <div class="grid cols-2">
+        <div>
+          <div class="panel">
+            <h4>Match</h4>
+            <p class="small muted" style="margin:0 0 8px">Tournament, venue, teams, squads and format come from the match in RFP Manager and are filled in for you. Change them there; the boxes here are for match-day details only.</p>
+            <div class="form-grid" id="form-setup">
+              <label class="f"><span>Tournament</span><input type="text" name="tournament"></label>
+              <label class="f"><span>Match title (optional)</span><input type="text" name="matchTitle"></label>
+              <label class="f"><span>Match number</span><input type="text" name="matchNumber"></label>
+              <label class="f"><span>Venue</span><input type="text" name="venue"></label>
+              <label class="f"><span>City</span><input type="text" name="city"></label>
+              <label class="f"><span>Format</span><select name="format"><option value="T20">T20 (ICC: 20 overs, powerplay 6, 4 per bowler)</option><option value="ODI">ODI / 50 over (powerplays 1-10, 11-40, 41-50, 10 per bowler)</option><option value="T10">T10 (powerplay 3, 2 per bowler)</option><option value="100">100-ball (20 sets of 5)</option><option value="TEST">Test (two innings, follow-on 200)</option><option value="FC">First-class 3-4 day (two innings, follow-on 150)</option><option value="OTHER">Other (set the numbers yourself)</option></select></label>
+              <label class="f"><span>Overs per innings</span><input type="number" name="oversPerInnings" min="0" max="100" title="0 = no limit (Test / first-class)"></label>
+              <label class="f"><span>Powerplay overs</span><input type="number" name="powerplayOvers" min="0" max="50"></label>
+              <label class="f"><span>Balls per over</span><input type="number" name="ballsPerOver" min="1" max="10"></label>
+            </div>
+            <div class="row" style="margin-top:10px"><button class="btn primary" id="save-setup">Save match details</button></div>
+          </div>
+          <div class="panel">
+            <h4>Toss</h4>
+            <div class="form-grid">
+              <label class="f"><span>Won by</span><select id="toss-winner"></select></label>
+              <label class="f"><span>Elected to</span><select id="toss-decision"><option value="">—</option><option value="bat">Bat</option><option value="field">Field</option></select></label>
+            </div>
+            <div class="row" style="margin-top:10px"><button class="btn primary" id="save-toss">Save toss</button><span class="muted small" id="toss-text"></span></div>
+          </div>
+          <div class="panel">
+            <h4>Innings</h4>
+            <div class="stack">
+              <div class="row" id="innings-start"></div>
+              <div class="row" id="innings-list"></div>
+              <p class="small muted" style="margin:0">Rain, reduced overs and revised targets are on the <b>Rain / DLS</b> tab.</p>
+              <label class="f"><span>Result override (e.g. "NO RESULT", DLS result)</span><input type="text" id="result-override"></label>
+              <div class="row"><button class="btn" id="save-result">Save result text</button></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="panel">
+            <h4>Officials</h4>
+            <div class="form-grid" id="form-officials">
+              <label class="f"><span>Umpire 1</span><input type="text" name="umpire1"></label>
+              <label class="f"><span>Umpire 2</span><input type="text" name="umpire2"></label>
+              <label class="f"><span>TV umpire</span><input type="text" name="tvUmpire"></label>
+              <label class="f"><span>4th umpire</span><input type="text" name="fourthUmpire"></label>
+              <label class="f"><span>Match referee</span><input type="text" name="referee"></label>
+            </div>
+            <div class="row" style="margin-top:10px"><button class="btn primary" id="save-officials">Save officials</button></div>
+          </div>
+          <div class="panel">
+            <h4>Commentators</h4>
+            <textarea id="commentators" rows="4" placeholder="One per line"></textarea>
+            <div class="row" style="margin-top:8px"><button class="btn primary" id="save-comms">Save commentators</button></div>
+          </div>
+          <div class="panel">
+            <h4>Files</h4>
+            <div class="stack">
+              <div class="row hidden">
+                <input type="text" id="save-name" class="grow" placeholder="Save match as…">
+                <button class="btn" id="btn-save-match">Save</button>
+              </div>
+              <div class="row hidden">
+                <select id="load-name" class="grow"></select>
+                <button class="btn" id="btn-load-match">Load</button>
+              </div>
+              <div class="row">
+                <a class="btn" href="api/export" id="export-link">Export JSON</a>
+                <label class="btn">Import JSON<input type="file" id="import-file" accept=".json" hidden></label>
+                <span class="grow"></span>
+                <button class="btn danger" id="btn-new-match">Start scoring again…</button>
+              </div>
+              <p class="small muted" style="margin:0">This match saves itself into its fixture in RFP Manager after every ball. Export gives you a file copy.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================== TEAMS -->
+    <section class="page" id="page-teams">
+      <div class="grid cols-2" id="teams-wrap"></div>
+    </section>
+
+    <!-- ======================================================== CARD -->
+    <section class="page" id="page-card">
+      <div class="vsline"></div>
+      <div class="row" style="margin-bottom:12px" id="card-innings"></div>
+      <div class="grid cols-2">
+        <div>
+          <div class="panel"><h4>Batting</h4><table class="t" id="full-bat"></table><div id="full-bat-foot" class="small" style="margin-top:8px"></div></div>
+          <div class="panel"><h4>Fall of wickets</h4><div id="full-fow" class="small"></div></div>
+        </div>
+        <div>
+          <div class="panel"><h4>Bowling</h4><table class="t" id="full-bowl"></table></div>
+          <div class="panel"><h4>Partnerships</h4><table class="t" id="full-pship"></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================== DLS -->
+    <section class="page" id="page-dls">
+      <div class="grid cols-2">
+        <div>
+          <div class="panel">
+            <h4>DLS summary <span class="sp"></span><span class="small muted" id="dls-source"></span></h4>
+            <div id="dls-summary"></div>
+          </div>
+          <div class="panel">
+            <h4>Overs lost (rain / bad light)</h4>
+            <div class="row" style="margin-bottom:8px" id="dls-innings"></div>
+            <p class="small muted" style="margin:0 0 8px">When play stops and overs are lost, enter the <b>new total overs</b> for the innings being played.
+              Before the first ball it simply sets the innings length; mid-innings it records the score, wickets and overs at the stoppage for DLS.</p>
+            <div class="form-grid">
+              <label class="f"><span>New total overs for this innings</span><input type="number" id="int-overs" min="0"></label>
+              <label class="f"><span>Note (optional)</span><input type="text" id="int-note" placeholder="Rain 14:32"></label>
+            </div>
+            <div class="row" style="margin-top:8px"><button class="btn warn" id="int-add">Record overs lost</button></div>
+            <table class="t" id="int-table" style="margin-top:10px"></table>
+            <hr>
+            <div class="form-grid">
+              <label class="f"><span>Overs allocated at start of this innings</span><input type="number" id="start-overs" min="1" placeholder="match default"></label>
+            </div>
+            <div class="row" style="margin-top:8px"><button class="btn" id="start-overs-save">Set start overs</button></div>
+          </div>
+        </div>
+        <div>
+          <div class="panel">
+            <h4>Settings & manual overrides</h4>
+            <div class="form-grid">
+              <label class="chk"><input type="checkbox" id="dls-enabled"> Use DLS target & show par score</label>
+              <label class="f"><span>G50 (245 full members / first-class, 200 lower levels)</span><input type="number" id="dls-g50" step="1"></label>
+              <label class="f"><span>Team 1 resources % (blank = calculated)</span><input type="number" id="dls-r1" step="0.1"></label>
+              <label class="f"><span>Team 2 resources % (blank = calculated)</span><input type="number" id="dls-r2" step="0.1"></label>
+              <label class="f"><span>Par score (blank = calculated)</span><input type="number" id="dls-par" step="1"></label>
+              <label class="f"><span>Target (blank = calculated)</span><input type="number" id="opt-target" min="1"></label>
+            </div>
+            <div class="row" style="margin-top:10px"><button class="btn primary" id="dls-save">Save DLS settings</button>
+              <button class="btn ghost" id="dls-clear">Clear manual overrides</button></div>
+            <p class="small muted">A manual target always wins. Use it for the officials' Professional Edition target; the par score then still comes from the table unless you override it too.</p>
+          </div>
+          <div class="panel">
+            <h4>Resource table <span class="sp"></span><button class="btn sm" id="dls-table-btn">View / import official table</button></h4>
+            <p class="small muted" style="margin:0">The built-in table is an approximation of the Standard Edition generated from the published D/L model.
+              Paste the official Standard Edition table (51 rows: 0–50 overs left, 10 columns: 0–9 wickets lost) for exact Standard Edition figures.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================== BALLS -->
+    <section class="page" id="page-balls">
+      <div class="row" style="margin-bottom:12px" id="balls-innings"></div>
+      <div class="panel"><table class="t" id="ball-log"></table></div>
+    </section>
+  </main>
+</div>
+<script src="js/common.js"></script>
+<script src="js/stats.js"></script>
+<script src="js/actions.js"></script>
+<script src="js/padkit.js"></script>
+<script src="/shared/tidy.js"></script>
+<script src="/shared/colorpicker.js"></script>
+</body>
+</html>

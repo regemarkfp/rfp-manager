@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>RFP Manager – rundown monitor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<style>
+  :root { --bg: #161616; --panel: #232323; --line: #3a3a3a; --text: #f4f4f4; --dim: #a5a5a5; --ok: #00e676; --warn: #ffc94d; --bad: #ff5252; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, Arial, sans-serif; overflow: hidden; }
+  .wrap { height: 100vh; display: grid; grid-template-rows: auto auto 1fr auto; gap: 1.2vh; padding: 1.4vh 1.4vw; }
+  .top { display: flex; align-items: baseline; gap: 2vw; }
+  .top .ev { font-size: 2.2vh; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
+  .top .tt { font-size: 3vh; font-weight: 800; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .top .clock { font-size: 5.2vh; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .now { display: grid; grid-template-columns: 1fr auto; gap: 1.4vw; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 1vh; padding: 1.6vh 1.6vw; min-width: 0; }
+  .lab { font-size: 1.8vh; color: var(--dim); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .6vh; }
+  .cur { border-left: 1.2vh solid var(--ok); }
+  .cur .name { font-size: 6.4vh; font-weight: 800; line-height: 1.05; text-transform: uppercase; }
+  .cur .desc { font-size: 3vh; color: var(--dim); margin-top: .6vh; text-transform: uppercase; }
+  .tags { display: flex; gap: 1vw; margin-top: 1.4vh; flex-wrap: wrap; }
+  .tag { background: #111; border: 1px solid var(--line); border-radius: .6vh; padding: .5vh .9vw; font-size: 2.3vh; white-space: pre-line; }
+  .tag b { color: var(--dim); font-weight: 600; font-size: 1.6vh; display: block; letter-spacing: .08em; }
+  .timer { text-align: center; min-width: 30vw; display: flex; flex-direction: column; justify-content: center; }
+  .timer .big { font-size: 15vh; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ok); }
+  .timer.warn .big { color: var(--warn); } .timer.over .big { color: var(--bad); }
+  .bar { height: 1.2vh; background: #111; border-radius: 1vh; overflow: hidden; margin-top: 1.4vh; }
+  .bar i { display: block; height: 100%; background: var(--ok); width: 0; }
+  .timer.warn .bar i { background: var(--warn); } .timer.over .bar i { background: var(--bad); }
+  .list { overflow: hidden; display: flex; flex-direction: column; }
+  table { width: 100%; border-collapse: collapse; font-size: 2.6vh; }
+  th { text-align: left; color: var(--dim); font-size: 1.6vh; letter-spacing: .1em; text-transform: uppercase; padding: .4vh .8vw; font-weight: 600; }
+  td { padding: .75vh .8vw; border-top: 1px solid #303030; vertical-align: middle; }
+  td.n, td.t, td.d { font-variant-numeric: tabular-nums; white-space: nowrap; } td.n { width: 4vw; color: var(--dim); }
+  td.c b { text-transform: uppercase; } td.c span { color: var(--dim); font-size: 2vh; margin-left: 1vw; text-transform: uppercase; }
+  tr.done td { opacity: .35; } tr.now td { background: rgba(0, 230, 118, .16); font-weight: 700; }
+  td.sw { width: 1vw; padding: 0; }
+  .foot { display: flex; gap: 1.4vw; align-items: stretch; }
+  .foot .card { flex: 1; padding: 1vh 1.4vw; }
+  .foot .v { font-size: 3.6vh; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .ahead { color: var(--ok); } .behind { color: var(--bad); }
+  .hint { position: fixed; right: 1vw; bottom: .6vh; font-size: 1.4vh; color: #666; }
+  .msg { height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 3vh; color: var(--dim); padding: 6vw; }
+  .msg a { color: var(--ok); }
+  /* phone or tablet held upright */
+  @media (max-width: 900px) and (orientation: portrait) {
+    html, body { overflow: auto; height: auto; }
+    .wrap { height: auto; min-height: 100vh; grid-template-rows: auto; padding: 10px; gap: 10px; }
+    .top { flex-wrap: wrap; gap: 6px 12px; }
+    .top .tt { flex: 1 1 100%; order: 2; white-space: normal; font-size: 5vw; }
+    .top .ev { font-size: 3.4vw; } .top .clock { font-size: 7vw; margin-left: auto; }
+    .now { grid-template-columns: 1fr; gap: 10px; }
+    .card { padding: 12px 14px; border-radius: 10px; }
+    .lab { font-size: 3vw; }
+    .cur { border-left-width: 8px; }
+    .cur .name { font-size: 8vw; } .cur .desc { font-size: 4vw; }
+    .tag { font-size: 3.6vw; padding: 4px 8px; } .tag b { font-size: 2.6vw; }
+    .timer { min-width: 0; } .timer .big { font-size: 20vw; }
+    .bar { height: 8px; }
+    table { font-size: 3.8vw; } th { font-size: 2.6vw; padding: 4px 6px; } td { padding: 6px; } td.n { width: auto; }
+    td.c span { display: block; margin: 2px 0 0; font-size: 3vw; }
+    .foot { flex-wrap: wrap; gap: 10px; } .foot .card { flex: 1 1 40%; } .foot .v { font-size: 6vw; }
+    .hint { display: none; }
+    .msg { font-size: 5vw; }
+  }
+</style></head>
+<body>
+<div id="root"><div class="msg">Loading the rundown…</div></div>
+<script>
+(function () {
+  'use strict';
+  var q = new URLSearchParams(location.search), keep = new URLSearchParams();
+  ['key', 'fixture', 'production'].forEach(function (k) { if (q.get(k)) keep.set(k, q.get(k)); });
+  var qs = keep.toString() ? '?' + keep.toString() : '';
+  var root = document.getElementById('root'), data = null, offset = 0, shape = '';
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var two = function (n) { return (n < 10 ? '0' : '') + n; };
+  var dur = function (sec) { sec = Math.max(0, Math.round(sec)); var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60; return (h ? h + ':' + two(m) : m) + ':' + two(s); };
+  var tod = function (sec) { sec = ((Math.round(sec) % 86400) + 86400) % 86400; return two(Math.floor(sec / 3600)) + ':' + two(Math.floor((sec % 3600) / 60)) + ':' + two(sec % 60); };
+  var now = function () { return Date.now() + offset; };
+  var secOfDay = function (ms) { var d = new Date(ms); return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds(); };
+
+  function build() {
+    var d = data, at = d.live ? d.live.index : -1, cur = d.rows[at], next = d.rows[at + 1];
+    var rows = d.rows.map(function (r, i) {
+      return '<tr class="' + (i === at ? 'now' : i < at ? 'done' : '') + '" data-i="' + i + '"><td class="sw" style="background:' + esc(r.color || 'transparent') + '"></td><td class="n">' + (i + 1) + '</td><td class="t">' + esc(r.startText) + '</td>' +
+        '<td class="c"><b>' + esc(r.content) + '</b>' + (r.description ? '<span>' + esc(r.description) + '</span>' : '') + '</td><td>' + esc(r.source) + '</td><td class="d">' + (r.seconds ? dur(r.seconds) : '') + '</td></tr>';
+    }).join('');
+    var tag = function (l, v) { return v ? '<div class="tag"><b>' + l + '</b>' + esc(v) + '</div>' : ''; };
+    root.innerHTML = '<div class="wrap">' +
+      '<div class="top"><span class="ev">' + esc(d.header.event) + '</span><span class="tt">' + esc(d.header.teams) + (d.header.start ? ' &nbsp;·&nbsp; ' + esc(d.header.start) : '') + '</span><span class="clock" id="clock"></span></div>' +
+      '<div class="now"><div class="card cur" style="' + (cur && cur.color ? 'border-left-color:' + esc(cur.color) : '') + '"><div class="lab">' + (cur ? 'On air · item ' + (at + 1) + ' of ' + d.rows.length : 'Rundown not started') + '</div>' +
+        '<div class="name">' + esc(cur ? cur.content : d.rows.length ? 'Standing by' : 'No rundown yet') + '</div>' + (cur && cur.description ? '<div class="desc">' + esc(cur.description) + '</div>' : '') +
+        (cur ? '<div class="tags">' + tag('SOURCE', cur.source) + tag('SOUND', cur.audio) + tag('GRAPHICS', cur.graphics) + '</div>' : '') + '</div>' +
+        '<div class="card timer" id="timer"><div class="lab" id="tlab">Time left</div><div class="big" id="big">--:--</div><div class="bar"><i id="bar"></i></div></div></div>' +
+      '<div class="card list"><table><thead><tr><th></th><th>#</th><th>Time</th><th>Content</th><th>Source</th><th>Dur</th></tr></thead><tbody id="rows">' + rows + '</tbody></table></div>' +
+      '<div class="foot"><div class="card"><div class="lab">Next</div><div class="v" style="text-transform:uppercase">' + esc(next ? next.content : cur ? 'End of rundown' : d.rows[0] ? d.rows[0].content : '–') + (next && next.seconds ? ' <span style="color:var(--dim);font-weight:500">' + dur(next.seconds) + '</span>' : '') + '</div></div>' +
+        '<div class="card"><div class="lab">Against the schedule</div><div class="v" id="sched">–</div></div><div class="card"><div class="lab">Off air (projected)</div><div class="v" id="off">–</div></div></div></div>' +
+      '<div class="hint">' + (d.canCue ? '→ / Space next · ← previous · click a line to jump · ' : '') + 'F full screen</div>';
+    var body = document.getElementById('rows'), rowEl = body.querySelector('tr.now');
+    if (rowEl) { var box = body.closest('.list'); box.scrollTop = Math.max(0, rowEl.offsetTop - box.clientHeight / 3); }
+    if (d.canCue) Array.prototype.forEach.call(body.querySelectorAll('tr'), function (tr) { tr.style.cursor = 'pointer'; tr.onclick = function () { cue(Number(tr.getAttribute('data-i'))); }; });
+  }
+
+  function tick() {
+    var c = document.getElementById('clock');
+    if (!data || data.empty || !c) return;
+    var t = now(), d = data, at = d.live ? d.live.index : -1, cur = d.rows[at];
+    c.textContent = tod(secOfDay(t));
+    var timer = document.getElementById('timer'), big = document.getElementById('big'), lab = document.getElementById('tlab'), bar = document.getElementById('bar');
+    var sched = document.getElementById('sched'), off = document.getElementById('off'), last = d.rows[d.rows.length - 1];
+    if (!cur) {
+      var first = d.rows[0];
+      if (first && first.start) { var days = 0; if (d.date) { var dd = new Date(d.date + 'T00:00:00'), tn = new Date(t), td = new Date(tn.getFullYear(), tn.getMonth(), tn.getDate()); if (!isNaN(dd)) days = Math.round((dd - td) / 86400000); } var wait = first.start - secOfDay(t) + days * 86400; lab.textContent = wait >= 0 ? 'First item in' : 'First item was due'; big.textContent = Math.abs(wait) >= 86400 ? Math.floor(Math.abs(wait) / 86400) + 'd ' + dur(Math.abs(wait) % 86400) : dur(Math.abs(wait)); timer.className = 'card timer' + (wait < 0 ? ' over' : wait < 60 ? ' warn' : ''); }
+      else { lab.textContent = 'Waiting'; big.textContent = '--:--'; timer.className = 'card timer'; }
+      bar.style.width = '0'; sched.textContent = '–'; sched.className = 'v';
+      off.textContent = last ? tod(last.start + last.seconds) : '–';
+      return;
+    }
+    var gone = Math.max(0, (t - d.live.startedAt) / 1000), left = cur.seconds - gone;
+    if (cur.seconds) {
+      lab.textContent = left >= 0 ? 'Time left on this item' : 'Over time';
+      big.textContent = dur(Math.abs(left));
+      timer.className = 'card timer' + (left < 0 ? ' over' : left <= 15 ? ' warn' : '');
+      bar.style.width = Math.min(100, gone * 100 / cur.seconds) + '%';
+    } else { lab.textContent = 'On this item for'; big.textContent = dur(gone); timer.className = 'card timer'; bar.style.width = '0'; }
+    // Ahead or behind: when this item really started against when the rundown said it should.
+    if (!d.anchored) { sched.textContent = '–'; sched.className = 'v'; off.textContent = '–'; return; }      // no clock times in this rundown
+    var drift = secOfDay(d.live.startedAt) - cur.start;
+    if (drift > 43200) drift -= 86400; if (drift < -43200) drift += 86400;
+    var extra = Math.max(0, -left) * (cur.seconds ? 1 : 0), total = drift + extra;
+    sched.textContent = Math.abs(total) < 2 ? 'On time' : dur(Math.abs(total)) + (total > 0 ? ' behind' : ' ahead');
+    sched.className = 'v ' + (Math.abs(total) < 2 ? '' : total > 0 ? 'behind' : 'ahead');
+    off.textContent = last ? tod(last.start + last.seconds + total) : '–';
+  }
+
+  function cue(i) {
+    if (!data || !data.canCue) return;
+    fetch('api/rundown-cue' + qs, { method: 'POST', headers: { 'content-type': 'application/json', 'x-rfp': '1' }, body: JSON.stringify({ index: i }) }).then(load);
+  }
+  function load() {
+    return fetch('api/rundown' + qs, { cache: 'no-store' }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (x) {
+      if (!x.ok) { data = null; shape = ''; root.innerHTML = '<div class="msg"><div>' + esc(x.j.error || 'Cannot load the rundown') + '<br><br><a href="/">Open RFP Manager</a></div></div>'; return; }
+      var d = x.j;
+      offset = d.now - Date.now();
+      if (d.empty) { data = d; shape = ''; root.innerHTML = '<div class="msg">' + esc(d.reason) + '</div>'; return; }
+      var s = JSON.stringify([d.id, d.rows, d.live, d.header, d.canCue]);
+      data = d;
+      if (s !== shape) { shape = s; build(); }
+      tick();
+    }).catch(function () { /* server away: keep showing the last rundown and keep the clocks running */ });
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'f' || e.key === 'F') { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }
+    if (!data || !data.canCue || data.empty) return;
+    var at = data.live ? data.live.index : -1;
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); if (at < data.rows.length - 1) cue(at + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); if (at > 0) cue(at - 1); }
+  });
+  load(); setInterval(load, 1000); setInterval(tick, 250);
+})();
+</script>
+<script src="/shared/colorpicker.js"></script>
+</body></html>

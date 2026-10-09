@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>RFP Manager – commentary monitor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>html, body { height: 100%; margin: 0; background: #262626; color: #a8a8a8; font: 18px system-ui, sans-serif; display: flex; align-items: center; justify-content: center; }</style></head>
+<body><div id="msg">Finding the match on air…</div>
+<script src="js/common.js"></script>
+<script>
+  // Sends the commentary box to the right screen for the match on air: cricket or any other sport.
+  // Both screens come back here if the sport on air changes.
+  CG.on('state', function (s) { location.replace((s.mode === 'sport' ? 'sport-commentary.html' : 'commentary.html') + (CG.query ? CG.query + '&auto=1' : '?auto=1')); });
+  CG.connect('commentary');
+</script><script src="/shared/colorpicker.js"></script>
+</body></html>

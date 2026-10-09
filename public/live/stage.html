@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1"><title>RFP Manager – Stage display</title>
+<style>
+  html, body { height: 100%; margin: 0; background: #000; color: #f2f2f2; font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif; overflow: hidden; }
+  .st { display: grid; grid-template-rows: auto 1fr auto auto; height: 100vh; padding: 2.2vh 2.4vw; box-sizing: border-box; gap: 1.6vh; }
+  .top { display: flex; align-items: baseline; gap: 2vw; }
+  .top .ttl { flex: 1; font-size: 3vh; color: #a8a8a8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .top .ttl b { color: #fff; }
+  .clock { font-size: 6.5vh; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .timer { font-size: 6.5vh; font-weight: 800; font-variant-numeric: tabular-nums; color: #00ff82; }
+  .timer.warn { color: #ffc94d; } .timer.over { color: #ff5a5a; }
+  .timer small { font-size: 2.2vh; color: #a8a8a8; font-weight: 600; margin-right: .8vw; text-transform: uppercase; letter-spacing: .06em; }
+  .cur { display: flex; flex-direction: column; justify-content: center; min-height: 0; border-left: .8vw solid #00ff82; padding-left: 2vw; }
+  .cur .lbl { font-size: 2.6vh; color: #00ff82; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; margin-bottom: 1vh; }
+  .cur .txt { font-weight: 800; line-height: 1.16; white-space: pre-line; }
+  .nxt { border-top: 1px solid #3d3d3d; padding-top: 1.4vh; color: #a8a8a8; }
+  .nxt .lbl { font-size: 2vh; text-transform: uppercase; letter-spacing: .1em; }
+  .nxt .txt { font-size: 3.6vh; line-height: 1.2; white-space: pre-line; max-height: 13vh; overflow: hidden; }
+  .msg { background: #ff5a5a; color: #fff; font-size: 5.4vh; font-weight: 800; text-align: center; padding: 1.4vh 2vw; border-radius: 1vh; display: none; }
+  .msg.on { display: block; animation: pulse 1.2s ease-in-out 3; }
+  @keyframes pulse { 50% { opacity: .55; } }
+  .off { position: fixed; right: 1vw; bottom: 1vh; font-size: 1.6vh; color: #ff5a5a; display: none; } .off.on { display: block; }
+  .wall { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 2.4vh; color: #a8a8a8; padding: 4vw; }
+  .wall a { color: #00ff82; }
+</style></head>
+<body>
+<div class="st" id="st">
+  <div class="top"><div class="ttl" id="ttl"></div><div class="timer" id="timer"></div><div class="clock" id="clock">--:--</div></div>
+  <div class="cur"><div class="lbl" id="lbl"></div><div class="txt" id="txt"></div></div>
+  <div class="nxt"><div class="lbl">Next</div><div class="txt" id="nxt"></div></div>
+  <div class="msg" id="msg"></div>
+</div>
+<div class="off" id="off">Connection lost – reconnecting…</div>
+<script>
+(function () {
+  'use strict';
+  var q = new URLSearchParams(location.search), key = q.get('key'), s = null, skew = 0, lastMsg = '';
+  var $ = function (id) { return document.getElementById(id); };
+  var two = function (n) { return (n < 10 ? '0' : '') + n; };
+  function fit() {
+    var t = $('txt'), box = t.parentNode, size = Math.round(window.innerHeight * 0.13);
+    t.style.fontSize = size + 'px';
+    for (var i = 0; i < 40 && (box.scrollHeight > box.clientHeight + 2 || t.scrollWidth > box.clientWidth + 2) && size > 18; i++) { size -= 4; t.style.fontSize = size + 'px'; }
+  }
+  function paint() {
+    if (!s) return;
+    var sl = s.slide;
+    $('ttl').innerHTML = ''; var b = document.createElement('b'); b.textContent = s.title || ''; $('ttl').appendChild(b);
+    if (s.index >= 0) $('ttl').appendChild(document.createTextNode('   ' + (s.index + 1) + ' / ' + s.count));
+    $('lbl').textContent = s.logo ? 'Logo on screen' : s.blank ? 'Screen is blank' : sl ? sl.label || '' : 'Nothing on screen';
+    $('txt').textContent = sl ? (sl.lines || []).join('\n') : '';
+    $('nxt').textContent = s.next ? (s.next.lines || []).join('\n') || s.next.label || '' : '';
+    var m = $('msg'); m.textContent = s.message || '';
+    if ((s.message || '') !== lastMsg) { m.className = 'msg'; void m.offsetWidth; lastMsg = s.message || ''; }
+    m.className = 'msg' + (s.message ? ' on' : '');
+    fit();
+  }
+  function tick() {
+    var d = new Date(Date.now() + skew);
+    $('clock').textContent = two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds());
+    var el = $('timer');
+    if (!s || (!s.timer.running && !s.timer.leftMs)) { el.textContent = ''; return; }
+    var ms = s.timer.running ? s.timer.endsAt - (Date.now() + skew) : s.timer.leftMs, neg = ms < 0, x = Math.round(Math.abs(ms) / 1000);
+    el.innerHTML = ''; if (s.timer.label) { var sm = document.createElement('small'); sm.textContent = s.timer.label; el.appendChild(sm); }
+    el.appendChild(document.createTextNode((neg ? '+' : '') + (Math.floor(x / 3600) ? Math.floor(x / 3600) + ':' : '') + two(Math.floor((x % 3600) / 60)) + ':' + two(x % 60)));
+    el.className = 'timer' + (neg ? ' over' : ms < 120000 ? ' warn' : '');
+  }
+  function wall(text) { document.body.innerHTML = '<div class="wall"><div><p></p><p><a href="/">Open RFP Manager</a></p></div></div>'; document.querySelector('.wall p').textContent = text; }
+  fetch('/worship/api/state' + (key ? '?key=' + encodeURIComponent(key) : '')).then(function (r) {
+    if (r.status === 401) { wall('This stage display needs its link from the Monitors page in RFP Manager (or a signed-in browser).'); return; }
+    var es = new EventSource('/worship/api/events' + (key ? '?key=' + encodeURIComponent(key) : ''));
+    es.onmessage = function (ev) { s = JSON.parse(ev.data); skew = s.now - Date.now(); $('off').className = 'off'; paint(); };
+    es.onerror = function () { $('off').className = 'off on'; };
+    setInterval(tick, 250);
+    window.addEventListener('resize', fit);
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'f' || e.key === 'F') { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } });
+})();
+</script>
+</body></html>

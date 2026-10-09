@@ -1,0 +1,16 @@
+{
+  "name": "rfp-manager",
+  "version": "0.14.1",
+  "description": "All-in-one live production tool: assets, fixtures, productions, crew, live scoring and CasparCG graphics.",
+  "main": "server.js",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"tests/*.test.js\""
+  },
+  "optionalDependencies": {
+    "mongodb": "^6.10.0"
+  }
+}

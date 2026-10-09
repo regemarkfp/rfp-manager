@@ -1,0 +1,10 @@
+{
+  "mode": "local",
+  "port": 8090,
+  "access": "lan",
+  "mediaFolder": "C:/CasparCG/rfp-images",
+  "syncSeconds": 5,
+  "cloud": { "url": "https://your-site.onrender.com", "key": "mk_paste-your-machine-key" },
+  "caspar": { "enabled": true, "host": "127.0.0.1", "port": 5250, "channel": 1, "format": "json", "images": "file", "templateFolder": "rfp" },
+  "google": { "clientId": "" }
+}

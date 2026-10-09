@@ -1,0 +1,15 @@
+/* Commentary monitors on a phone or a tablet held upright: the 1920×1080 screen becomes one column you scroll,
+   600 px wide and scaled to the width of the screen (js: body.narrow, set in fit()). */
+html.narrow, body.narrow { height: auto; overflow-x: hidden; overflow-y: auto; }
+body.narrow #stage { height: auto !important; grid-template-rows: none !important; grid-auto-rows: auto; }
+body.narrow #head { grid-template-columns: 1fr !important; text-align: center; gap: 10px; }
+body.narrow #head > * { justify-content: center; text-align: center; margin-left: auto; margin-right: auto; }
+body.narrow #mid, body.narrow #bot { grid-template-columns: 1fr !important; }
+body.narrow .col, body.narrow .panel { min-height: auto; }
+body.narrow .bat, body.narrow .col > .panel { flex: none !important; }
+body.narrow #reel { height: 300px; flex: none; }
+body.narrow #reel-wrap { flex: none; }
+body.narrow .grid4 { grid-template-columns: repeat(2, 1fr); }
+body.narrow .quick { grid-template-columns: 1fr; }
+body.narrow .proj { grid-template-columns: repeat(3, 1fr); }
+body.narrow #bot .grid2 { grid-template-columns: 1fr; }
