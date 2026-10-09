@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Blue Slate Cricket – Score Bug</title>
+<link rel="stylesheet" href="lib/cgx.css">
+<style>
+  /* The bar itself is art/bug.png (1920x1080, transparent). Every box below sits on one of its panels. */
+  #bug { position: absolute; inset: 0; transform: translateY(150px); opacity: 0; transition: transform .55s cubic-bezier(.2,.9,.2,1), opacity .35s; }
+  .cg-in #bug { transform: none; opacity: 1; }
+  .cg-out #bug { transform: translateY(150px); opacity: 0; transition-duration: .4s; }
+  #bug > img.art { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+  .f { position: absolute; display: flex; align-items: center; white-space: nowrap; overflow: hidden; font-weight: 800; line-height: 1; }
+  .r1 { top: 960px; height: 48px; } .r2 { top: 1009px; height: 45px; }
+  .wing { top: 962px; height: 90px; justify-content: center; }
+  .wing img { max-width: 170px; height: 80px; object-fit: contain; }
+  #wl { left: 20px; width: 190px; } #wr { left: 1722px; width: 180px; }
+  #team { left: 246px; width: 128px; justify-content: center; font-size: 36px; letter-spacing: .02em; }
+  #score { left: 404px; width: 190px; top: 946px; height: 62px; justify-content: center; font-size: 54px; color: #0c0c0d; letter-spacing: -.01em; }
+  #overs { left: 622px; width: 158px; justify-content: center; font-size: 32px; gap: 8px; }
+  #overs small { font-size: 16px; font-weight: 700; letter-spacing: .12em; opacity: .85; }
+  #pp { background: #fff; color: #1a1cff; font-size: 15px; padding: 2px 5px; margin-left: 2px; }
+  .bn { font-size: 29px; font-weight: 700; padding-left: 26px; text-transform: uppercase; }
+  .bn .mk { width: 20px; font-size: 16px; flex: none; }
+  .bn .n { overflow: hidden; text-overflow: ellipsis; }
+  .br { justify-content: center; gap: 7px; font-size: 31px; }
+  .br small { font-size: 19px; font-weight: 600; color: #c8ccd6; }
+  .off .n { font-weight: 600; opacity: .88; }
+  #b1n { left: 812px; width: 262px; } #b1r { left: 1090px; width: 124px; }
+  #b2n { left: 798px; width: 262px; } #b2r { left: 1076px; width: 124px; }
+  #bwn { left: 1236px; width: 250px; font-size: 29px; font-weight: 700; padding-left: 14px; text-transform: uppercase; }
+  #bwf { left: 1536px; width: 152px; justify-content: center; gap: 7px; font-size: 30px; }
+  #bwf small { font-size: 19px; font-weight: 600; color: #c8ccd6; }
+  #over { left: 1214px; width: 462px; gap: 7px; padding-left: 12px; }
+  .ball { min-width: 32px; height: 32px; border-radius: 16px; background: #2a2a2c; border: 1px solid #55555a; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; padding: 0 6px; }
+  .ball.dot { color: #9a9ca6; } .ball.b4 { background: #1a1cff; border-color: #2f6bff; } .ball.b6 { background: #fff; color: #0c0c0d; border-color: #fff; }
+  .ball.w { background: #d92d34; border-color: #ff6a70; } .ball.x { background: #55555a; }
+  #strip { left: 262px; width: 516px; justify-content: center; text-align: center; font-size: 21px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+  #fh { left: 404px; width: 190px; top: 908px; height: 34px; justify-content: center; background: #fff; color: #0c0c0d; font-size: 22px; letter-spacing: .06em; animation: pulse 1s infinite alternate; }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.05); } }
+</style>
+</head>
+<body>
+<div id="bug">
+  <img class="art" src="art/bug.png" alt="">
+  <div class="f" id="fh" data-show="free_hit">FREE HIT</div>
+  <div class="f wing" id="wl"><img class="logo" data-src="logos/{bat_logo}.png" onerror="this.style.visibility='hidden'"></div>
+  <div class="f r1 upper" id="team" data-f="bat_short"></div>
+  <div class="f num" id="score"></div>
+  <div class="f r1 num" id="overs"><span data-f="overs"></span><small>OV</small><span id="pp" data-show="powerplay">P</span></div>
+  <div class="f r1 bn" id="b1n"><span class="mk"></span><span class="n" data-f="bat1_name"></span></div><div class="f r1 br num" id="b1r"></div>
+  <div class="f r2 bn" id="b2n"><span class="mk"></span><span class="n" data-f="bat2_name"></span></div><div class="f r2 br num" id="b2r"></div>
+  <div class="f r1" id="bwn"><span class="n ell" data-f="bowler_name"></span></div>
+  <div class="f r1 num" id="bwf"><span data-f="bowler_figures"></span><small data-f="bowler_overs"></small></div>
+  <div class="f r2" id="over"></div>
+  <div class="f r2" id="strip"></div>
+  <div class="f wing" id="wr"><img class="logo" data-src="logos/{bowl_logo}.png" onerror="this.style.visibility='hidden'"></div>
+</div>
+<script src="lib/cgx.js"></script>
+<script>
+  window.CGX_DEMO = {
+    bat_short: 'TUS', bat_logo: '', bowl_logo: '', runs: '87', wickets: '3', overs: '11.4', powerplay: '',
+    bat1_name: 'MOKOENA', bat1_runs: '42', bat1_balls: '29', bat1_onstrike: '1', bat2_name: 'VAN WYK', bat2_runs: '8', bat2_balls: '6', bat2_onstrike: '',
+    bowler_name: 'NTULI', bowler_figures: '1-24', bowler_overs: '2.4', ball1: '1', ball2: '4', ball3: '•', ball4: 'W', free_hit: '',
+    need_text: 'NEED 59 FROM 50 BALLS', strip_text: ''
+  };
+  function chip(l) {
+    var c = 'ball';
+    if (l === '•') c += ' dot'; else if (l.indexOf('W') >= 0) c += ' w'; else if (l === '4') c += ' b4'; else if (l === '6') c += ' b6';
+    else if (/wd|nb|b|lb|p/.test(l)) c += ' x';
+    var s = document.createElement('span'); s.className = c; s.textContent = l; return s;
+  }
+  CGX.on('update', function (d) {
+    document.getElementById('score').textContent = d.runs === undefined || d.runs === '' ? (d.score || '') : d.runs + '-' + d.wickets;
+    [['bat1', 'b1'], ['bat2', 'b2']].forEach(function (p) {
+      var n = document.getElementById(p[1] + 'n'), r = document.getElementById(p[1] + 'r'), on = !!d[p[0] + '_onstrike'], has = !!d[p[0] + '_name'];
+      n.classList.toggle('off', !on);
+      n.querySelector('.mk').textContent = on ? '▶' : '';
+      r.innerHTML = '';
+      if (has) { r.appendChild(document.createTextNode(d[p[0] + '_runs'] == null ? '' : d[p[0] + '_runs'])); var s = document.createElement('small'); s.textContent = d[p[0] + '_balls'] == null || d[p[0] + '_balls'] === '' ? '' : d[p[0] + '_balls']; r.appendChild(s); }
+      n.style.visibility = has ? '' : 'hidden';
+    });
+    var over = document.getElementById('over'); over.innerHTML = '';
+    for (var i = 1; i <= 10; i++) if (d['ball' + i]) over.appendChild(chip(d['ball' + i]));
+    document.getElementById('strip').textContent = d.strip_text || d.need_text || '';
+    ['#b1n .n', '#b2n .n', '#bwn .n', '#strip'].forEach(function (q) { var el = document.querySelector(q); if (el) CGX.fit(el, 15); });
+  });
+</script>
+</body>
+</html>

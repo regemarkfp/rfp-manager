@@ -1,0 +1,14 @@
+/* Shared look for the reference "rfp" theme. Copy this folder, rename it, restyle it, and point a Theme at the new folder. */
+:root { --accent: #00ff82; --on-accent: #111; --c1: #101010; --c2: #262626; --a1: #ffffff; --a2: #262626; --b1: #ffffff; --b2: #262626; --panel: #1b1b1b; --text: #ffffff; --dim: #b9b9b9; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; color: var(--text); font-weight: 600; -webkit-font-smoothing: antialiased; }
+.num { font-variant-numeric: tabular-nums; }
+img.logo { object-fit: contain; }
+/* in / out */
+.anim { opacity: 0; transform: translateY(24px); transition: opacity .35s ease, transform .45s cubic-bezier(.2, .8, .2, 1); }
+body.cg-in .anim { opacity: 1; transform: none; }
+body.cg-out .anim { opacity: 0; transform: translateY(24px); transition-duration: .3s; }
+.anim.left { transform: translateX(-40px); } body.cg-out .anim.left { transform: translateX(-40px); }
+.anim.down { transform: translateY(-24px); } body.cg-out .anim.down { transform: translateY(-24px); }
+.anim.fade { transform: none; } body.cg-out .anim.fade { transform: none; }

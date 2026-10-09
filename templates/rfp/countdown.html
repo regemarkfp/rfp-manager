@@ -1,0 +1,13 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>RFP countdown</title>
+<link rel="stylesheet" href="lib/rfx.css">
+<style>
+  .count { position: absolute; right: 80px; top: 60px; display: flex; align-items: stretch; height: 64px; filter: drop-shadow(0 6px 16px rgba(0,0,0,.45)); }
+  .count .label { background: var(--panel); padding: 0 20px; display: flex; align-items: center; font-size: 24px; border-left: 6px solid var(--accent); }
+  .count .time { background: var(--accent); color: var(--on-accent); padding: 0 20px; display: flex; align-items: center; font-size: 36px; font-weight: 800; }
+</style></head>
+<body>
+  <div class="count anim down"><div class="label" data-f="label"></div><div class="time num" data-countdown>00:00</div></div>
+  <script>window.CG_DEMO = { label: 'KICK-OFF IN', countdown_ms: '754000' };</script>
+  <script src="lib/rfx.js"></script>
+</body></html>

@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Blue Slate Cricket – Lower Third</title>
+<link rel="stylesheet" href="lib/cgx.css">
+<style>
+  /* Two bars: art/lt-a.png (blue over charcoal, taller) for players, art/lt-b.png (charcoal over blue) for everything else. */
+  #lt { position: absolute; inset: 0; clip-path: inset(0 100% 0 0); transition: clip-path .6s cubic-bezier(.2,.9,.2,1); }
+  .cg-in #lt { clip-path: inset(0 0 0 0); }
+  .cg-out #lt { clip-path: inset(0 0 0 100%); transition-duration: .35s; }
+  #lt img.art { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; display: none; }
+  body.art-a #lt #artA, body.art-b #lt #artB { display: block; }
+  .f { position: absolute; left: 458px; display: flex; align-items: center; white-space: nowrap; overflow: hidden; line-height: 1; text-transform: uppercase; }
+  #logo { position: absolute; object-fit: contain; }
+  .art-a #logo { left: 1338px; top: 800px; width: 132px; height: 126px; }
+  .art-b #logo { left: 1346px; top: 832px; width: 124px; height: 98px; }
+
+  /* A: name in the blue bar, detail in the charcoal bar */
+  .art-a .l1 { top: 786px; height: 70px; width: 840px; font-size: 48px; font-weight: 800; }
+  .art-a .l2 { top: 857px; height: 83px; width: 800px; font-size: 38px; font-weight: 600; letter-spacing: .02em; }
+  /* B: name in the charcoal bar, detail in the blue bar */
+  .art-b .l1 { top: 826px; height: 69px; width: 840px; font-size: 46px; font-weight: 800; }
+  .art-b .l2 { top: 899px; height: 41px; width: 810px; font-size: 25px; font-weight: 700; letter-spacing: .05em; }
+
+  .dbl, .batters { display: none; }
+  .layout-double .l1, .layout-double .l2, .layout-batters .l1, .layout-batters .l2 { display: none; }
+  .layout-double .dbl, .layout-batters .batters { display: block; }
+  .dbl .t { top: 786px; height: 70px; font-size: 26px; font-weight: 700; letter-spacing: .1em; width: 400px; }
+  .dbl .n { top: 857px; height: 83px; font-size: 40px; font-weight: 800; width: 400px; }
+  .dbl .c2 { left: 880px; }
+  .batters .row { width: 830px; gap: 16px; font-weight: 700; }
+  .batters .r1 { top: 786px; height: 70px; font-size: 44px; }
+  .batters .r2 { top: 857px; height: 52px; font-size: 40px; width: 800px; }
+  .batters .row .n { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .batters .row .r { font-weight: 800; }
+  .batters .row .b { font-size: 28px; color: #d5d8e0; width: 78px; }
+  .batters .row .x { font-size: 24px; color: #d5d8e0; width: 170px; text-align: right; }
+  .batters .foot { top: 909px; height: 30px; font-size: 22px; font-weight: 700; letter-spacing: .06em; color: #c8ccd6; width: 800px; }
+</style>
+</head>
+<body class="art-a">
+<div id="lt">
+  <img class="art" id="artA" src="art/lt-a.png" alt=""><img class="art" id="artB" src="art/lt-b.png" alt="">
+  <img class="logo" id="logo">
+  <div class="f l1"><span data-f="line1"></span></div>
+  <div class="f l2"><span data-f="line2"></span></div>
+  <div class="dbl">
+    <div class="f t" data-f="left_title"></div><div class="f n" data-f="left_name"></div>
+    <div class="f t c2" data-f="right_title"></div><div class="f n c2" data-f="right_name"></div>
+  </div>
+  <div class="batters">
+    <div class="f row r1"><span class="n" data-f="bat1_name"></span><span class="r num" id="b1r"></span><span class="b num" id="b1b"></span><span class="x num" id="b1x"></span></div>
+    <div class="f row r2"><span class="n" data-f="bat2_name"></span><span class="r num" id="b2r"></span><span class="b num" id="b2b"></span><span class="x num" id="b2x"></span></div>
+    <div class="f foot" data-f="partnership"></div>
+  </div>
+</div>
+<script src="lib/cgx.js"></script>
+<script>
+  window.CGX_DEMO = { layout: 'batter', line1: 'MOKOENA', line2: '42* (29)   4s 5   6s 1   SR 144.82' };
+  var TALL = { batter: 1, bowler: 1, batters: 1, double: 1, player: 1 };
+  CGX.on('update', function (d) {
+    var layout = d.layout || 'text';
+    document.body.className = document.body.className.replace(/\b(layout|art)-\S+/g, '').trim() + ' layout-' + layout + (TALL[layout] ? ' art-a' : ' art-b');
+    var logoKey = d.player_logo || d.winner_logo || d.team_logo || (layout === 'bowler' ? d.bowl_logo : d.bat_logo) || '';
+    var img = document.getElementById('logo');
+    img.style.visibility = logoKey ? '' : 'hidden';
+    img.onerror = function () { img.style.visibility = 'hidden'; };
+    if (logoKey) img.src = CGX.logo(logoKey);
+    ['1', '2'].forEach(function (n) {
+      var p = 'bat' + n + '_';
+      var live = d[p + 'status'] === 'batting' || d[p + 'status'] === 'notout';
+      document.getElementById('b' + n + 'r').textContent = d[p + 'name'] ? d[p + 'runs'] + (live ? '*' : '') : '';
+      document.getElementById('b' + n + 'b').textContent = d[p + 'name'] ? '(' + d[p + 'balls'] + ')' : '';
+      document.getElementById('b' + n + 'x').textContent = d[p + 'name'] ? '4s ' + (d[p + 'fours'] || 0) + '  6s ' + (d[p + 'sixes'] || 0) : '';
+    });
+    document.querySelectorAll('.l1, .l2, .dbl .f').forEach(function (el) { CGX.fit(el, 18); });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>RFP advert</title>
+<link rel="stylesheet" href="lib/rfx.css">
+<style>
+  .ad { position: absolute; overflow: hidden; display: flex; align-items: center; justify-content: center; background: transparent; }
+  .ad img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  body[data-layout="full"] .ad { inset: 0; background: #000; }
+  body[data-layout="lower"] .ad { left: 160px; right: 160px; bottom: 70px; height: 190px; filter: drop-shadow(0 8px 20px rgba(0,0,0,.5)); }
+  body[data-layout="bug"] .ad { right: 80px; top: 60px; width: 260px; height: 150px; filter: drop-shadow(0 6px 16px rgba(0,0,0,.45)); }
+  body[data-layout="side"] .ad { right: 0; top: 0; width: 520px; height: 1080px; background: #000; }
+  .tag { position: absolute; left: 160px; bottom: 30px; font-size: 22px; background: var(--panel); padding: 6px 16px; border-left: 6px solid var(--accent); }
+  body:not([data-layout="lower"]) .tag { display: none !important; }
+  .clip { position: absolute; inset: 0; background: #000; flex-direction: column; align-items: center; justify-content: center; gap: 14px; display: none; color: var(--dim); font-size: 30px; }
+  .clip b { color: #fff; font-size: 54px; } .clip i { font-style: normal; color: var(--accent); }
+  body[data-layout="clip"] .clip { display: flex; } body[data-layout="clip"] .ad { display: none; }
+  body[data-layout="custom"] .ad { left: var(--x, 0); top: var(--y, 0); width: var(--w, 1920px); height: var(--h, 1080px); }
+  .ad img { object-fit: var(--fit, contain); }
+  .ad { background: var(--bg, transparent); }
+  body[data-layout="full"] .ad, body[data-layout="side"] .ad { background: var(--bg, #000); }
+  body[data-trans="cut"] .anim { transition: none !important; }
+  body[data-trans="fade"] .anim { transform: none !important; }
+  body[data-trans="left"] .anim:not(.tag) { transform: translateX(-120px); } body[data-trans="right"] .anim:not(.tag) { transform: translateX(120px); }
+  body.cg-in[data-trans="left"] .anim, body.cg-in[data-trans="right"] .anim { transform: none; }
+  .anim { transition-duration: var(--t, .4s) !important; }
+</style></head>
+<body>
+  <div class="ad anim fade"><img data-src="image" alt=""></div>
+  <div class="tag anim" data-show="text" data-f="text"></div>
+  <!-- Only seen on browser outputs: CasparCG plays the real video clip itself. -->
+  <div class="clip anim fade"><i>VIDEO ADVERT</i><b data-f="name"></b><span data-f="clip"></span></div>
+  <script>window.CG_DEMO = { layout: 'lower', text: 'Proud sponsor of the 2026 season' };</script>
+  <script src="lib/rfx.js"></script>
+  <script>
+  // position, fit, background and transition of the advert (JSON data; set by RFP Manager → Adverts)
+  (function () {
+    var up = window.update, b = document.body;
+    window.update = function (raw) {
+      if (up) up(raw);
+      var d = {}; try { d = typeof raw === 'object' ? raw : JSON.parse(String(raw || '{}')); } catch (e) { return; }
+      var px = function (v, dflt) { var n = parseFloat(v); return (isFinite(n) ? n : dflt) + 'px'; };
+      b.style.setProperty('--x', px(d.x, 0)); b.style.setProperty('--y', px(d.y, 0)); b.style.setProperty('--w', px(d.w, 1920)); b.style.setProperty('--h', px(d.h, 1080));
+      b.style.setProperty('--fit', d.fit || 'contain');
+      if (d.bg) b.style.setProperty('--bg', d.bg); else b.style.removeProperty('--bg');
+      var t = parseFloat(d.tsecs); b.style.setProperty('--t', (isFinite(t) ? t : 0.4) + 's');
+      b.setAttribute('data-trans', d.trans || 'fade');
+    };
+  })();
+  </script>
+</body></html>

@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>CricketCG Score Bug</title>
+<link rel="stylesheet" href="lib/cgx.css">
+<style>
+  #bug { position: absolute; left: 110px; bottom: 54px; width: 1700px; transform: translateY(160px); opacity: 0;
+         transition: transform .55s cubic-bezier(.2,.9,.2,1), opacity .35s; }
+  .cg-in #bug { transform: translateY(0); opacity: 1; }
+  .cg-out #bug { transform: translateY(160px); opacity: 0; transition-duration: .4s; }
+
+  .bar { display: flex; height: 78px; box-shadow: 0 8px 30px rgba(0,0,0,.45); border-radius: 4px; overflow: hidden; }
+  .seg { display: flex; align-items: center; height: 100%; }
+
+  .team { width: 250px; background: var(--team); padding: 0 16px 0 10px; gap: 12px; position: relative; }
+  .team::after { content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: 6px; background: var(--team2); }
+  .team img { width: 60px; height: 60px; }
+  .team .nm { font-size: 38px; font-weight: 800; letter-spacing: .02em; }
+
+  .score { width: 205px; background: var(--white); color: var(--ink); justify-content: center; font-size: 56px; font-weight: 800; letter-spacing: -.01em; }
+  .overs { width: 140px; background: #e9eef5; color: var(--ink); flex-direction: column; justify-content: center; line-height: 1; position: relative; }
+  .overs .v { font-size: 36px; font-weight: 800; }
+  .overs .l { font-size: 14px; font-weight: 700; letter-spacing: .14em; color: #5b6880; margin-top: 3px; }
+  .pp { position: absolute; top: 6px; right: 6px; background: var(--navy2); color: var(--gold); font-size: 14px; font-weight: 800; padding: 1px 5px; border-radius: 3px; }
+
+  .bats { width: 470px; background: var(--navy); flex-direction: column; justify-content: center; padding: 0 18px; }
+  .bat { display: flex; width: 100%; align-items: baseline; gap: 10px; height: 34px; }
+  .bat .mk { width: 14px; color: var(--gold); font-size: 20px; }
+  .bat .n { flex: 1; font-size: 28px; font-weight: 700; }
+  .bat .r { font-size: 30px; font-weight: 800; }
+  .bat .b { font-size: 20px; color: var(--grey); width: 50px; }
+  .bat.off .n { color: var(--grey); font-weight: 600; }
+
+  .bowl { width: 340px; background: var(--navy2); flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 18px; line-height: 1.05; }
+  .bowl .n { font-size: 28px; font-weight: 700; width: 100%; }
+  .bowl .f { font-size: 26px; font-weight: 800; color: var(--gold); }
+  .bowl .f small { color: var(--grey); font-weight: 600; font-size: 20px; margin-left: 8px; }
+
+  .over { flex: 1; background: var(--navy); padding: 0 14px; gap: 7px; }
+  .ball { min-width: 34px; height: 34px; border-radius: 17px; background: #25375c; display: inline-flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 800; padding: 0 6px; }
+  .ball.dot { color: #8ea0c0; }
+  .ball.b4 { background: #1d7be0; }
+  .ball.b6 { background: #7b3fe4; }
+  .ball.w { background: #e3262d; }
+  .ball.x { background: #6a5410; color: #ffe38a; }
+
+  .strip { margin-top: 4px; height: 38px; display: flex; align-items: center; background: rgba(8,16,32,.92); border-left: 8px solid var(--gold);
+           padding: 0 16px; font-size: 24px; font-weight: 700; letter-spacing: .04em; border-radius: 3px; max-width: 1700px; width: fit-content; min-width: 600px;
+           transition: opacity .3s; }
+  .strip.empty { opacity: 0; }
+  .fh { position: absolute; left: 395px; top: -40px; background: var(--gold); color: var(--ink); font-weight: 800; font-size: 24px; padding: 2px 14px; border-radius: 3px;
+        letter-spacing: .06em; animation: pulse 1s infinite alternate; }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.06); } }
+</style>
+</head>
+<body>
+<div id="bug" data-css="--team:{bat_color1};--team2:{bat_color2}">
+  <div class="fh" data-show="free_hit">FREE HIT</div>
+  <div class="bar">
+    <div class="seg team"><img class="logo" data-src="logos/{bat_logo}.png" onerror="this.style.visibility='hidden'"><span class="nm upper" data-f="bat_short"></span></div>
+    <div class="seg score num" id="score"></div>
+    <div class="seg overs num"><span class="v" data-f="overs"></span><span class="l">OVERS</span><span class="pp" data-show="powerplay">P</span></div>
+    <div class="seg bats">
+      <div class="bat" id="bat1"><span class="mk"></span><span class="n ell upper" data-f="bat1_name"></span><span class="r num" data-f="bat1_runs"></span><span class="b num"></span></div>
+      <div class="bat" id="bat2"><span class="mk"></span><span class="n ell upper" data-f="bat2_name"></span><span class="r num" data-f="bat2_runs"></span><span class="b num"></span></div>
+    </div>
+    <div class="seg bowl"><span class="n ell upper" data-f="bowler_name"></span><span class="f num"><span data-f="bowler_figures"></span><small data-f="bowler_overs"></small></span></div>
+    <div class="seg over" id="over"></div>
+  </div>
+  <div class="strip upper" id="strip"></div>
+</div>
+<script src="lib/cgx.js"></script>
+<script>
+  window.CGX_DEMO = {
+    bat_short: 'TUS', bat_logo: 'TUSKERS', bat_color1: '#1846b8', bat_color2: '#f4c20d', runs: '87', wickets: '3', overs: '11.4', powerplay: '',
+    bat1_name: 'MOKOENA', bat1_runs: '42', bat1_balls: '29', bat1_onstrike: '1', bat2_name: 'VAN WYK', bat2_runs: '8', bat2_balls: '6', bat2_onstrike: '',
+    bowler_name: 'NTULI', bowler_figures: '1-24', bowler_overs: '2.4', ball1: '1', ball2: '4', ball3: '•', ball4: 'W', free_hit: '',
+    need_text: 'TUSKERS NEED 59 RUNS FROM 50 BALLS', strip_text: ''
+  };
+  function chip(l) {
+    var c = 'ball';
+    if (l === '•') c += ' dot'; else if (l.indexOf('W') >= 0) c += ' w'; else if (l === '4') c += ' b4'; else if (l === '6') c += ' b6';
+    else if (/wd|nb|b|lb|p/.test(l)) c += ' x';
+    var s = document.createElement('span'); s.className = c; s.textContent = l; return s;
+  }
+  CGX.on('update', function (d) {
+    document.getElementById('score').textContent = d.runs === undefined || d.runs === '' ? '' : d.runs + '-' + d.wickets;
+    ['bat1', 'bat2'].forEach(function (b) {
+      var row = document.getElementById(b), on = !!d[b + '_onstrike'];
+      row.classList.toggle('off', !on);
+      row.querySelector('.mk').textContent = on ? '▶' : '';
+      row.querySelector('.b').textContent = d[b + '_name'] ? '(' + (d[b + '_balls'] || 0) + ')' : '';
+      row.style.visibility = d[b + '_name'] ? '' : 'hidden';
+    });
+    var over = document.getElementById('over'); over.innerHTML = '';
+    for (var i = 1; i <= 10; i++) if (d['ball' + i]) over.appendChild(chip(d['ball' + i]));
+    var strip = document.getElementById('strip');
+    var text = d.strip_text || d.need_text || '';
+    strip.textContent = text;
+    strip.classList.toggle('empty', !text);
+    document.querySelectorAll('.bat .n, .bowl .n').forEach(function (el) { CGX.fit(el, 18); });
+  });
+</script>
+</body>
+</html>

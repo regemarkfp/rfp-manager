@@ -1,0 +1,78 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>RFP score bug</title>
+<link rel="stylesheet" href="rfp.css">
+<style>
+  .bug { position: absolute; left: 80px; top: 60px; display: flex; align-items: stretch; height: 64px; filter: drop-shadow(0 6px 16px rgba(0,0,0,.45)); }
+  .comp { display: flex; align-items: center; padding: 0 14px; background: var(--c1); border-left: 6px solid var(--accent); }
+  .comp img { height: 44px; max-width: 90px; }
+  .team { display: flex; align-items: center; gap: 12px; padding: 0 16px; background: var(--panel); min-width: 150px; }
+  .team img { height: 46px; width: 46px; }
+  .team .short { font-size: 30px; letter-spacing: 1px; }
+  .strip { width: 8px; }
+  .score { min-width: 76px; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 800; background: #fff; color: #111; padding: 0 12px; }
+  .mid { display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--accent); color: var(--on-accent); padding: 0 16px; min-width: 120px; }
+  .mid .clock { font-size: 28px; font-weight: 800; line-height: 1; }
+  .mid .per { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-top: 3px; }
+  .cards { font-size: 13px; background: #ffd400; color: #111; border-radius: 3px; padding: 1px 6px; margin-left: 4px; }
+  .under { position: absolute; left: 80px; top: 128px; background: rgba(20,20,20,.92); font-size: 20px; padding: 6px 16px; border-left: 6px solid var(--accent); font-weight: 500; }
+  /* sets sports */
+  .sets { position: absolute; left: 80px; top: 60px; background: var(--panel); border-left: 6px solid var(--accent); filter: drop-shadow(0 6px 16px rgba(0,0,0,.45)); }
+  .sets .row { display: flex; align-items: center; height: 50px; border-bottom: 1px solid #333; }
+  .sets .row:last-of-type { border-bottom: 0; }
+  .sets .name { width: 260px; padding: 0 14px; font-size: 26px; display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; }
+  .sets .name img { height: 32px; width: 32px; }
+  .sets .serve { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); }
+  .sets .cell { width: 46px; text-align: center; font-size: 26px; color: var(--dim); }
+  .sets .cell.won { color: #fff; }
+  .sets .pts { width: 64px; text-align: center; font-size: 28px; font-weight: 800; background: var(--accent); color: var(--on-accent); align-self: stretch; display: flex; align-items: center; justify-content: center; }
+  .sets .flag { background: var(--accent); color: var(--on-accent); font-size: 16px; letter-spacing: 1px; padding: 3px 14px; }
+  /* cricket */
+  .score.cric { min-width: 130px; }
+  .ov { font-size: 22px; padding: 0 14px; display: flex; align-items: center; background: var(--panel); color: var(--dim); white-space: nowrap; }
+  /* countdown */
+  .count { position: absolute; right: 80px; top: 60px; display: flex; align-items: stretch; height: 64px; filter: drop-shadow(0 6px 16px rgba(0,0,0,.45)); }
+  .count .label { background: var(--panel); padding: 0 20px; display: flex; align-items: center; font-size: 24px; border-left: 6px solid var(--accent); }
+  .count .time { background: var(--accent); color: var(--on-accent); padding: 0 20px; display: flex; align-items: center; font-size: 36px; font-weight: 800; }
+  body:not([data-layout="countdown"]) .count, body[data-layout="countdown"] .bug, body[data-layout="countdown"] .sets, body[data-layout="countdown"] .under { display: none !important; }
+  body[data-kind="sets"] .bug, body:not([data-kind="sets"]) .sets { display: none !important; }
+  body[data-kind="cricket"] .timed, body:not([data-kind="cricket"]) .cricket { display: none !important; }
+</style></head>
+<body>
+  <div class="bug anim down">
+    <div class="comp" data-show="competition_logo" data-bg="color1"><img class="logo" data-src="competition_logo" alt=""></div>
+    <!-- timed sports (and matches not yet started) -->
+    <div class="team timed"><img class="logo" data-src="teamA_logo" alt=""><span class="short" data-f="teamA_short"></span><span class="cards" data-show="sinbinsA" data-f="sinbinsA"></span></div>
+    <div class="strip timed" data-bg="teamA_color1"></div>
+    <div class="score num timed" data-f="scoreA"></div>
+    <div class="mid timed"><span class="clock num" data-show="clock_show" data-clock>00:00</span><span class="per" data-f="period_text"></span></div>
+    <div class="score num timed" data-f="scoreB"></div>
+    <div class="strip timed" data-bg="teamB_color1"></div>
+    <div class="team timed"><span class="cards" data-show="sinbinsB" data-f="sinbinsB"></span><span class="short" data-f="teamB_short"></span><img class="logo" data-src="teamB_logo" alt=""></div>
+    <!-- cricket -->
+    <div class="team cricket cric"><span class="short" data-f="bat_short"></span></div>
+    <div class="score num cricket cric" data-f="bat_score"></div>
+    <div class="ov num cricket cric"><span data-f="overs"></span>&nbsp;ov</div>
+    <div class="mid cricket"><span class="per" data-f="period_text"></span><span class="per num" data-f="this_over"></span></div>
+  </div>
+  <div class="under anim down cricket" data-show="need_text" data-f="need_text"></div>
+  <div class="sets anim down">
+    <div class="row"><div class="name"><img class="logo" data-src="teamA_logo" alt=""><span data-f="teamA_name"></span><span class="serve" data-show="serverA"></span></div><span id="setsA" style="display:flex"></span><div class="pts num" data-f="pointsA"></div></div>
+    <div class="row"><div class="name"><img class="logo" data-src="teamB_logo" alt=""><span data-f="teamB_name"></span><span class="serve" data-show="serverB"></span></div><span id="setsB" style="display:flex"></span><div class="pts num" data-f="pointsB"></div></div>
+    <div class="flag" data-show="flag" data-f="flag"></div>
+  </div>
+  <div class="count anim down"><div class="label" data-f="label"></div><div class="time num" data-countdown>00:00</div></div>
+  <script>
+    window.CG_DEMO = { layout: 'score', kind: 'timed', teamA_short: 'CHE', teamB_short: 'BUL', teamA_color1: '#ff8a00', teamB_color1: '#0055ff', scoreA: '17', scoreB: '13', period_text: '2nd Half', clock_show: '1', clock_ms: '2532000', clock_running: '1', clock_dir: 'up', sinbinsB: '1' };
+    window.onCgData = function (d) {
+      ['A', 'B'].forEach(function (L) {
+        var box = document.getElementById('sets' + L), n = Number(d.set_count) || 0, html = '';
+        for (var i = 1; i <= n; i++) {
+          var a = Number(d['set' + i + 'A']), b = Number(d['set' + i + 'B']), mine = L === 'A' ? a : b, other = L === 'A' ? b : a;
+          html += '<div class="cell num' + (mine > other ? ' won' : '') + '">' + mine + '</div>';
+        }
+        if (box.innerHTML !== html) box.innerHTML = html;
+      });
+    };
+  </script>
+  <script src="lib/cgx.js"></script>
+</body></html>

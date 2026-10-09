@@ -1,0 +1,90 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>RFP match statistics</title>
+<meta name="rfp-fields" content="layout, title, teamA_name, teamB_name, teamA_short, teamB_short, teamA_logo:image, teamB_logo:image, teamA_color1:color, teamB_color1:color, rows, row1_label, row1_a, row1_b, player_name, player_number, player_team, player_logo:image, player_color:color">
+<style>
+  /* Match statistics with team badges.  data.layout:
+       compare  – lower third: badge · value · LABEL + bar · value · badge, 1 to 4 rows (rows, rowN_label, rowN_a, rowN_b)
+       player   – lower third: badge, number and name, then up to 8 stat boxes (boxes, boxN_label, boxN_value) */
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+  body { font-family: 'Segoe UI', system-ui, Arial, sans-serif; color: #fff; --a: #1f6feb; --b: #e3262d; --accent: #00ff82; }
+  .card { position: absolute; left: 50%; bottom: 80px; transform: translate(-50%, 40px); opacity: 0; transition: transform .35s cubic-bezier(.2,.8,.2,1), opacity .3s; min-width: 1100px; max-width: 1600px;
+    background: rgba(16,18,22,.94); border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.5); overflow: hidden; }
+  body.on .card { transform: translate(-50%, 0); opacity: 1; }
+  .head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; padding: 14px 28px; background: rgba(255,255,255,.06); }
+  .head .tm { display: flex; align-items: center; gap: 14px; font-size: 30px; font-weight: 800; text-transform: uppercase; }
+  .head .tm.b { justify-content: flex-end; }
+  .head img { height: 58px; max-width: 96px; object-fit: contain; }
+  .head .ttl { font-size: 20px; letter-spacing: .14em; text-transform: uppercase; opacity: .75; font-weight: 700; }
+  .sw { width: 8px; height: 42px; border-radius: 3px; }
+  .rows { padding: 10px 28px 16px; }
+  .row { display: grid; grid-template-columns: 170px 1fr 170px; align-items: center; gap: 22px; padding: 9px 0; }
+  .row + .row { border-top: 1px solid rgba(255,255,255,.08); }
+  .row .v { font-size: 42px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .row .v.b { text-align: right; }
+  .row .v small { font-size: 22px; opacity: .7; font-weight: 600; margin-left: 6px; }
+  .row .lbl { text-align: center; font-size: 22px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 7px; }
+  .bars { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: rgba(255,255,255,.12); gap: 3px; }
+  .bars i { display: block; height: 100%; transition: width .5s ease; }
+  /* player */
+  .pl { display: flex; align-items: stretch; }
+  .pl .who { display: flex; align-items: center; gap: 18px; padding: 16px 28px; min-width: 430px; border-left: 12px solid var(--a); background: rgba(255,255,255,.06); }
+  .pl .who img { height: 84px; max-width: 120px; object-fit: contain; }
+  .pl .num { font-size: 56px; font-weight: 800; opacity: .55; }
+  .pl .nm { font-size: 40px; font-weight: 800; text-transform: uppercase; line-height: 1.05; }
+  .pl .tm { font-size: 20px; opacity: .75; letter-spacing: .08em; text-transform: uppercase; margin-top: 4px; }
+  .pl .boxes { display: flex; align-items: center; gap: 4px; padding: 0 18px; }
+  .pl .box { text-align: center; padding: 10px 20px; min-width: 96px; }
+  .pl .box + .box { border-left: 1px solid rgba(255,255,255,.12); }
+  .pl .box b { display: block; font-size: 46px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .pl .box span { display: block; font-size: 16px; letter-spacing: .1em; text-transform: uppercase; opacity: .75; margin-top: 6px; white-space: nowrap; }
+</style></head>
+<body>
+<div class="card" id="card"></div>
+<script>
+(function () {
+  'use strict';
+  var data = {};
+  function parse(raw) {
+    if (!raw) return {};
+    if (typeof raw === 'object') return raw;
+    raw = String(raw).trim();
+    if (raw.charAt(0) === '{') { try { return JSON.parse(raw); } catch (e) { return {}; } }
+    if (raw.charAt(0) === '<') {
+      var out = {}, nodes = new DOMParser().parseFromString(raw, 'text/xml').getElementsByTagName('componentData');
+      for (var i = 0; i < nodes.length; i++) { var d = nodes[i].getElementsByTagName('data')[0]; out[nodes[i].getAttribute('id')] = d ? d.getAttribute('value') || '' : ''; }
+      return out;
+    }
+    return {};
+  }
+  var E = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }).replace(/\r?\n/g, '<br>'); };
+  var img = function (u) { return u ? '<img src="' + E(u) + '" alt="">' : ''; };
+  // "7/9 (78%)" -> 78, "55%" -> 55, "12" -> 12
+  var num = function (s) { s = String(s || ''); var p = /\((\d+)%\)/.exec(s) || /(\d+(?:\.\d+)?)%/.exec(s); if (p) return +p[1]; var m = /-?\d+(\.\d+)?/.exec(s); return m ? +m[0] : 0; };
+  var val = function (s) { s = String(s == null ? '' : s); var m = /^(.*?)\s*(\(\d+%\))$/.exec(s); return m ? E(m[1]) + '<small>' + E(m[2]) + '</small>' : E(s); };
+  function render() {
+    var d = data, c = document.getElementById('card'), st = document.body.style;
+    if (d.teamA_color1) st.setProperty('--a', d.teamA_color1); if (d.teamB_color1) st.setProperty('--b', d.teamB_color1);
+    if (d.layout === 'player') {
+      if (d.player_color) st.setProperty('--a', d.player_color);
+      var boxes = '';
+      for (var i = 1; i <= Math.min(+d.boxes || 0, 8); i++) boxes += '<div class="box"><b>' + E(d['box' + i + '_value']) + '</b><span>' + E(d['box' + i + '_label']) + '</span></div>';
+      c.innerHTML = '<div class="pl"><div class="who">' + img(d.player_logo) + (d.player_number ? '<div class="num">' + E(d.player_number) + '</div>' : '') + '<div><div class="nm">' + E(d.player_name) + '</div><div class="tm">' + E(d.player_team) + (d.player_position ? ' · ' + E(d.player_position) : '') + '</div></div></div><div class="boxes">' + boxes + '</div></div>';
+      return;
+    }
+    var rows = '';
+    for (var r = 1; r <= Math.min(+d.rows || 0, 4); r++) {
+      var a = d['row' + r + '_a'], b = d['row' + r + '_b'], pa = num(a), pb = num(b), tot = pa + pb;
+      rows += '<div class="row"><div class="v">' + val(a) + '</div><div><div class="lbl">' + E(d['row' + r + '_label']) + '</div><div class="bars"><i style="width:' + (tot ? pa * 100 / tot : 50) + '%;background:var(--a)"></i><i style="width:' + (tot ? pb * 100 / tot : 50) + '%;background:var(--b)"></i></div></div><div class="v b">' + val(b) + '</div></div>';
+    }
+    c.innerHTML = '<div class="head"><div class="tm">' + img(d.teamA_logo) + '<span class="sw" style="background:var(--a)"></span>' + E(d.teamA_short || d.teamA_name) + '</div><div class="ttl">' + E(d.title || 'MATCH STATS') + '</div><div class="tm b">' + E(d.teamB_short || d.teamB_name) + '<span class="sw" style="background:var(--b)"></span>' + img(d.teamB_logo) + '</div></div><div class="rows">' + rows + '</div>';
+  }
+  window.update = function (raw) { data = parse(raw); render(); };
+  window.play = function () { render(); requestAnimationFrame(function () { document.body.classList.add('on'); }); };
+  window.stop = function () { document.body.classList.remove('on'); };
+  window.next = function () {};
+  window.CG_DEMO = { layout: 'compare', title: 'MATCH STATS', teamA_short: 'CHE', teamB_short: 'GRI', teamA_color1: '#ff8c00', teamB_color1: '#285aff', rows: '3', row1_label: 'POSSESSION', row1_a: '58%', row1_b: '42%', row2_label: 'TACKLES MADE', row2_a: '61/70 (87%)', row2_b: '74/88 (84%)', row3_label: 'LINE BREAKS', row3_a: '6', row3_b: '3' };
+  if (location.hash.length > 2) { try { window.update(decodeURIComponent(location.hash.slice(1))); window.play(); } catch (e) { /* ignore */ } }
+  else if (/[?&]demo/.test(location.search)) { window.update(window.CG_DEMO); window.play(); }
+})();
+</script>
+</body></html>

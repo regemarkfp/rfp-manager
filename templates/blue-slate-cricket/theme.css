@@ -1,0 +1,63 @@
+/* Blue Slate Cricket – cricket theme for RFP Manager.
+   The score bug and lower thirds are drawn on the bar artwork in the art folder (replace those PNGs to change them).
+   This file styles the full screens to match; their colours are below. */
+:root {
+  --bs-blue1: #2f6bff; --bs-blue2: #1a1cff;
+  --bs-char1: #3d3d3f; --bs-char2: #0c0c0d;
+  --bs-white1: #ffffff; --bs-white2: #dedede;
+  --bs-ink: #0c0c0d; --bs-line: #1a1cff;
+  --bs-blue: linear-gradient(180deg, var(--bs-blue1), var(--bs-blue2));
+  --bs-char: linear-gradient(180deg, var(--bs-char1), var(--bs-char2));
+  --bs-white: linear-gradient(180deg, var(--bs-white1) 35%, var(--bs-white2));
+  --bs-slant: 26px;
+  --gold: #ffffff; --grey: #c8ccd6; --navy: #151516; --navy2: #2452ff;
+}
+
+/* ------------------------------------------------------------------ full frames */
+html body #ff { left: 300px; top: 110px; width: 1320px; height: 860px; background: none; border-radius: 0; overflow: visible; box-shadow: none; filter: drop-shadow(0 16px 36px rgba(0,0,0,.5)); }
+html body header { height: 118px; padding: 0 250px 0 34px; background: var(--bs-blue); border: 2px solid var(--bs-line); overflow: hidden; }
+html body header::after { left: auto; right: 0; top: 0; bottom: 0; width: 236px; height: auto; background: var(--bs-white); clip-path: polygon(46px 0, 100% 0, 100% 100%, 0 100%); z-index: 1; }
+html body header::before { content: ""; position: absolute; right: 190px; top: 0; bottom: 0; width: 60px; background: var(--bs-ink); clip-path: polygon(46px 0, 56px 0, 10px 100%, 0 100%); z-index: 2; }
+html body header img { position: absolute; right: 48px; top: 9px; width: 100px; height: 100px; z-index: 3; }
+html body header .t1 { font-size: 58px; }
+html body header .t2 { font-size: 26px; font-style: italic; color: #fff; }
+html body header .rt { position: relative; z-index: 1; margin-right: 18px; }
+html body main { padding: 10px 0 0; background: none; }
+html body table { border-collapse: separate; border-spacing: 0 5px; }
+html body th { background: none; color: #fff; font-size: 22px; height: 38px; text-shadow: 0 2px 6px rgba(0,0,0,.9); padding: 0 18px; }
+html body td { background: var(--bs-char); border-bottom: 0; height: 50px; padding: 0 18px; }
+html body td.nm { color: #fff; }
+html body td.how { color: #d3d6de; }
+html body tr.live td { background: var(--bs-blue); }
+html body tr.live td.nm { color: #fff; }
+html body tr.dim td { color: rgba(255,255,255,.6); }
+html body .tot { background: var(--bs-white); color: var(--bs-ink); padding: 6px 22px; margin-top: 6px; align-items: center; }
+html body .tot .muted, html body .tot .grey { color: #44464d; }
+html body .muted { color: #cfd3dc; }
+html body footer { height: 60px; margin-top: 6px; background: var(--bs-white); color: var(--bs-ink); border-top: 0; justify-content: center; padding: 0 34px; }
+html body .intro { background: var(--bs-char); }
+html body .intro .vs { color: #fff; background: var(--bs-blue); padding: 6px 34px; font-size: 64px; clip-path: polygon(22px 0, 100% 0, calc(100% - 22px) 100%, 0 100%); }
+html body .introfoot { background: var(--bs-blue); color: #fff; padding: 10px 0; margin-top: 6px; }
+html body .sum { gap: 10px; }
+html body .sum .inn { background: none; border-left: 0; padding: 0; }
+html body .sum .hd { background: var(--bs-blue); padding: 6px 22px; }
+html body .sum .hd .sc { background: var(--bs-white); color: var(--bs-ink); padding: 0 34px 0 46px; margin-right: -22px; align-self: stretch; display: flex; align-items: center; clip-path: polygon(26px 0, 100% 0, 100% 100%, 0 100%); }
+html body .sum .hd .ov { color: #fff; }
+html body .sum .cols { gap: 0 12px; margin-top: 5px; }
+html body .sum .ln { background: var(--bs-char); border-bottom: 0; padding: 0 18px; height: 42px; margin-bottom: 5px; }
+html body .squad { column-gap: 12px; }
+html body .squad div { background: var(--bs-char); border-bottom: 0; padding: 0 18px; height: 54px; margin-bottom: 5px; font-size: 34px; }
+html body .squad .tag { color: #fff; opacity: .8; }
+html body .text { background: var(--bs-char); padding: 0 40px; }
+html body svg { background: var(--bs-char); }
+
+/* panels are as tall as their content, with the footer bar straight under it */
+html body #ff { height: auto; }
+html body main { flex: none; }
+html body .intro { height: 560px; }
+html body .text { min-height: 300px; }
+html body .tot span, html body .tot small, html body .tot .muted { color: #44464d; }
+html body .tot b { color: var(--bs-ink); }
+html body main > div:not([class]), html body .ytb { text-shadow: 0 2px 6px rgba(0,0,0,.9); }
+html body .sum .hd .ov { order: 1; margin-left: auto; }
+html body .sum .hd .sc { order: 2; margin-left: 16px; }

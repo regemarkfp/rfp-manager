@@ -1,0 +1,25 @@
+/* Shared look for the CricketCG reference templates (1920x1080, transparent background) */
+:root {
+  --navy: #0b1a33;
+  --navy2: #12264a;
+  --ink: #0a0f1a;
+  --gold: #f4c20d;
+  --white: #ffffff;
+  --grey: #c9d3e0;
+  --team: #1f6f3f;
+  --team2: #f2c500;
+  --font: "Barlow Condensed", "Roboto Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+}
+html, body {
+  margin: 0; padding: 0; width: 1920px; height: 1080px; overflow: hidden;
+  background: transparent; font-family: var(--font); color: var(--white);
+  -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;
+}
+* { box-sizing: border-box; }
+.upper { text-transform: uppercase; }
+.num { font-variant-numeric: tabular-nums; }
+.logo { object-fit: contain; }
+.ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* text sent with line breaks (a "Text, several lines" field) keeps them */
+.cg-ml { white-space: pre-line !important; text-overflow: clip !important; }

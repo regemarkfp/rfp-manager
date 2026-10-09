@@ -1,0 +1,70 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>RFP table</title>
+<link rel="stylesheet" href="lib/rfx.css">
+<style>
+  .ff { position: absolute; left: 260px; top: 110px; width: 1400px; max-height: 880px; background: rgba(22,22,22,.96); border-top: 10px solid var(--accent); filter: drop-shadow(0 16px 40px rgba(0,0,0,.6)); display: flex; flex-direction: column; }
+  .head { display: flex; align-items: center; gap: 22px; padding: 22px 36px; background: var(--c1); }
+  .head img { height: 84px; max-width: 160px; }
+  .head .t { font-size: 48px; font-weight: 800; line-height: 1.1; }
+  .head .s { font-size: 24px; opacity: .72; font-weight: 500; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+  .body { padding: 26px 36px 34px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 30px; }
+  th { font-size: 20px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; text-align: center; padding: 4px 12px 10px; font-weight: 600; }
+  td { padding: 9px 12px; border-top: 1px solid #343434; text-align: center; }
+  td.wide, th.wide { text-align: left; width: 60%; }
+  table.center td { width: 33%; } table.center td:first-child { text-align: right; } table.center td:last-child { text-align: left; } table.center td:nth-child(2) { color: var(--accent); font-weight: 800; }
+  tr.hl td { background: rgba(255,255,255,.08); }
+  tr.hl td:first-child { box-shadow: inset 6px 0 0 var(--accent); }
+  .versus { display: flex; align-items: center; justify-content: space-between; gap: 30px; padding: 20px 10px; }
+  .side { flex: 1; text-align: center; }
+  .side img { height: 220px; width: 220px; }
+  .side .n { font-size: 44px; font-weight: 800; margin-top: 14px; }
+  .side .who { font-size: 24px; font-weight: 500; color: var(--dim); white-space: pre-line; margin-top: 12px; line-height: 1.5; }
+  .centre { text-align: center; min-width: 300px; }
+  .centre .big { font-size: 110px; font-weight: 800; line-height: 1; }
+  .centre .vs { font-size: 60px; font-weight: 800; color: var(--accent); }
+  .centre .info { font-size: 26px; color: var(--dim); font-weight: 500; margin-top: 14px; }
+  .foot { text-align: center; font-size: 24px; color: var(--dim); font-weight: 500; padding-top: 10px; }
+  .copy { font-size: 40px; font-weight: 500; line-height: 1.45; white-space: pre-line; padding: 10px 6px; }
+  /* which parts show for which layout */
+  body:not([data-layout="table"]) .only-table, body:not([data-layout="ident"]) .only-ident, body:not([data-layout="summary"]) .only-summary, body:not([data-layout="title"]) .only-title,
+  body:not([data-layout="ident"]):not([data-layout="summary"]) .match { display: none !important; }
+</style></head>
+<body>
+  <div class="ff anim">
+    <div class="head" data-bg="color1" data-contrast><img class="logo" data-src="logo" alt=""><img class="logo match" data-src="competition_logo" alt=""><div><div class="t" data-f="title"></div><div class="s" data-show="subtitle" data-f="subtitle"></div></div></div>
+    <div class="body">
+      <div class="only-table"><table id="tbl"></table></div>
+      <div class="match versus">
+        <div class="side"><img class="logo" data-src="teamA_logo" alt=""><div class="n" data-f="teamA_full"></div><div class="who only-summary" data-f="scorersA"></div></div>
+        <div class="centre">
+          <div class="vs only-ident">VS</div>
+          <div class="big num only-summary"><span data-f="scoreA"></span> – <span data-f="scoreB"></span></div>
+          <div class="info only-ident" data-f="venue"></div><div class="info only-ident" data-f="venue_city"></div>
+          <div class="info only-summary" data-f="status_text"></div>
+        </div>
+        <div class="side"><img class="logo" data-src="teamB_logo" alt=""><div class="n" data-f="teamB_full"></div><div class="who only-summary" data-f="scorersB"></div></div>
+      </div>
+      <div class="foot only-summary" data-f="periods_text"></div>
+      <div class="only-title copy" data-f="body"></div>
+    </div>
+  </div>
+  <script>
+    window.CG_DEMO = { layout: 'table', title: 'Carling Currie Cup', subtitle: '2026 · Log', cols: '4', rows: '3', h1: '', h2: 'Team', h3: 'P', h4: 'Pts', r1_c1: '1', r1_c2: 'Cheetahs', r1_c3: '4', r1_c4: '18', r1_hl: '1', r2_c1: '2', r2_c2: 'Bulls', r2_c3: '4', r2_c4: '14', r3_c1: '3', r3_c2: 'Sharks', r3_c3: '4', r3_c4: '9' };
+    window.onCgData = function (d) {
+      if (d.layout !== 'table') return;
+      var cols = Number(d.cols) || 0, rows = Number(d.rows) || 0, html = '', wide = 0, best = -1, i, j;
+      // The widest text column is left-aligned and takes the spare room (usually the team or player name).
+      for (j = 1; j <= cols; j++) { var len = 0; for (i = 1; i <= rows; i++) len = Math.max(len, String(d['r' + i + '_c' + j] || '').length); if (len > best) { best = len; wide = j; } }
+      if (!d.noheader) { html += '<tr>'; for (j = 1; j <= cols; j++) html += '<th' + (j === wide ? ' class="wide"' : '') + '></th>'; html += '</tr>'; }
+      for (i = 1; i <= rows; i++) { html += '<tr' + (d['r' + i + '_hl'] ? ' class="hl"' : '') + '>'; for (j = 1; j <= cols; j++) html += '<td' + (j === wide && !d.center ? ' class="wide"' : '') + '></td>'; html += '</tr>'; }
+      var t = document.getElementById('tbl');
+      t.className = d.center ? 'center num' : 'num';
+      if (t.getAttribute('data-shape') !== html) { t.innerHTML = html; t.setAttribute('data-shape', html); }
+      var trs = t.getElementsByTagName('tr'), off = d.noheader ? 0 : 1;
+      if (!d.noheader) for (j = 1; j <= cols; j++) trs[0].children[j - 1].textContent = d['h' + j] || '';
+      for (i = 1; i <= rows; i++) for (j = 1; j <= cols; j++) trs[i - 1 + off].children[j - 1].textContent = d['r' + i + '_c' + j] || '';
+    };
+  </script>
+  <script src="lib/rfx.js"></script>
+</body></html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>CricketCG Lower Third</title>
+<link rel="stylesheet" href="lib/cgx.css">
+<style>
+  #lt { position: absolute; left: 160px; bottom: 236px; display: flex; align-items: stretch; filter: drop-shadow(0 10px 24px rgba(0,0,0,.45)); }
+  #lt .logo-box { width: 132px; background: var(--white); display: flex; align-items: center; justify-content: center; clip-path: inset(0 100% 0 0);
+                  transition: clip-path .45s cubic-bezier(.2,.9,.2,1) .05s; }
+  #lt .logo-box img { width: 104px; height: 104px; }
+  #lt .body { min-width: 760px; max-width: 1450px; clip-path: inset(0 100% 0 0); transition: clip-path .6s cubic-bezier(.2,.9,.2,1) .15s; }
+  .cg-in #lt .logo-box, .cg-in #lt .body { clip-path: inset(0 0 0 0); }
+  .cg-out #lt .logo-box, .cg-out #lt .body { clip-path: inset(0 0 0 100%); transition-duration: .35s; transition-delay: 0s; }
+
+  .l1 { background: var(--navy); padding: 10px 28px 6px; font-size: 54px; font-weight: 800; letter-spacing: .01em; line-height: 1.05; border-top: 6px solid var(--team, var(--gold)); }
+  .l2 { background: var(--team, var(--navy2)); padding: 6px 28px 8px; font-size: 32px; font-weight: 600; letter-spacing: .03em; }
+  .l2:empty { display: none; }
+
+  /* double (umpires etc) */
+  .dbl { display: none; background: var(--navy); border-top: 6px solid var(--gold); }
+  .dbl .col { padding: 12px 34px 14px; }
+  .dbl .col + .col { border-left: 2px solid rgba(255,255,255,.15); }
+  .dbl .t { font-size: 24px; color: var(--gold); font-weight: 700; letter-spacing: .1em; }
+  .dbl .n { font-size: 48px; font-weight: 800; }
+  .layout-double .dbl { display: flex; }
+  .layout-double .l1, .layout-double .l2 { display: none; }
+
+  /* batters */
+  .batters { display: none; background: var(--navy); border-top: 6px solid var(--team, var(--gold)); padding: 8px 0; }
+  .batters .row { display: flex; align-items: baseline; gap: 18px; padding: 4px 28px; font-size: 44px; font-weight: 700; }
+  .batters .row .n { flex: 1; }
+  .batters .row .r { font-weight: 800; }
+  .batters .row .b { font-size: 30px; color: var(--grey); width: 80px; }
+  .batters .row .x { font-size: 26px; color: var(--grey); width: 180px; text-align: right; }
+  .batters .foot { font-size: 28px; color: var(--gold); padding: 4px 28px 2px; font-weight: 700; letter-spacing: .05em; }
+  .layout-batters .batters { display: block; }
+  .layout-batters .l1, .layout-batters .l2 { display: none; }
+</style>
+</head>
+<body>
+<div id="lt">
+  <div class="logo-box" id="logoBox"><img class="logo" id="logo"></div>
+  <div class="body" id="body">
+    <div class="l1 upper ell" data-f="line1"></div>
+    <div class="l2 upper ell" data-f="line2"></div>
+    <div class="dbl">
+      <div class="col"><div class="t upper" data-f="left_title"></div><div class="n upper" data-f="left_name"></div></div>
+      <div class="col"><div class="t upper" data-f="right_title"></div><div class="n upper" data-f="right_name"></div></div>
+    </div>
+    <div class="batters">
+      <div class="row"><span class="n upper" data-f="bat1_name"></span><span class="r num" id="b1r"></span><span class="b num" id="b1b"></span><span class="x num" id="b1x"></span></div>
+      <div class="row"><span class="n upper" data-f="bat2_name"></span><span class="r num" id="b2r"></span><span class="b num" id="b2b"></span><span class="x num" id="b2x"></span></div>
+      <div class="foot upper" data-f="partnership"></div>
+    </div>
+  </div>
+</div>
+<script src="lib/cgx.js"></script>
+<script>
+  window.CGX_DEMO = { layout: 'batter', line1: 'MOKOENA', line2: '42* (29)   4s 5   6s 1   SR 144.82', player_logo: 'TUSKERS', bat_color1: '#1846b8' };
+  CGX.on('update', function (d) {
+    document.body.className = document.body.className.replace(/\blayout-\S+/g, '').trim() + ' layout-' + (d.layout || 'text');
+    var team = d.bat_color1 || d.team_color1 || '';
+    if (d.layout === 'bowler' && d.bowl_color1) team = d.bowl_color1;
+    document.getElementById('lt').style.setProperty('--team', team || '');
+    var logoKey = d.player_logo || d.winner_logo || d.team_logo || (d.layout === 'bowler' ? d.bowl_logo : d.bat_logo) || '';
+    var img = document.getElementById('logo');
+    document.getElementById('logoBox').style.display = logoKey ? '' : 'none';
+    img.onerror = function () { document.getElementById('logoBox').style.display = 'none'; };
+    if (logoKey) img.src = CGX.logo(logoKey);
+    ['1', '2'].forEach(function (n) {
+      var p = 'bat' + n + '_';
+      var live = d[p + 'status'] === 'batting' || d[p + 'status'] === 'notout';
+      document.getElementById('b' + n + 'r').textContent = d[p + 'name'] ? d[p + 'runs'] + (live ? '*' : '') : '';
+      document.getElementById('b' + n + 'b').textContent = d[p + 'name'] ? '(' + d[p + 'balls'] + ')' : '';
+      document.getElementById('b' + n + 'x').textContent = d[p + 'name'] ? '4s ' + (d[p + 'fours'] || 0) + '  6s ' + (d[p + 'sixes'] || 0) : '';
+    });
+    CGX.fit(document.querySelector('.l1'), 30);
+    CGX.fit(document.querySelector('.l2'), 20);
+  });
+</script>
+</body>
+</html>

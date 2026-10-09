@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>CricketCG Debug Template</title>
+<link rel="stylesheet" href="lib/cgx.css">
+<style>
+  /* Point any graphic at "cricketcg/debug" in config.json to see exactly what data it receives. */
+  #d { position: absolute; left: 60px; top: 60px; right: 60px; bottom: 60px; background: rgba(0,0,0,.82); border: 2px solid #f4c20d; border-radius: 8px;
+       padding: 20px 26px; font-family: Consolas, "Courier New", monospace; font-size: 20px; color: #e6ebf1; overflow: hidden; columns: 3; column-gap: 40px;
+       opacity: 0; transition: opacity .25s; }
+  .cg-in #d { opacity: 1; }
+  .k { color: #f4c20d; }
+  .r { break-inside: avoid; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35; }
+  h1 { column-span: all; margin: 0 0 12px; font-size: 26px; color: #fff; }
+</style>
+</head>
+<body>
+<div id="d"></div>
+<script src="lib/cgx.js"></script>
+<script>
+  window.CGX_DEMO = { layout: 'debug', line1: 'HELLO', line2: 'WORLD' };
+  CGX.on('update', function (d) {
+    var box = document.getElementById('d');
+    box.innerHTML = '';
+    var h = document.createElement('h1');
+    h.textContent = 'DATA  ·  ' + (d.graphic_id || '') + '  ·  ' + Object.keys(d).length + ' fields  ·  ' + new Date().toLocaleTimeString();
+    box.appendChild(h);
+    Object.keys(d).sort().forEach(function (k) {
+      var r = document.createElement('div'); r.className = 'r';
+      var s = document.createElement('span'); s.className = 'k'; s.textContent = k + ' ';
+      r.appendChild(s); r.appendChild(document.createTextNode(String(d[k])));
+      box.appendChild(r);
+    });
+  });
+  CGX.on('next', function () { document.getElementById('d').style.borderColor = '#39c5cf'; });
+</script>
+</body>
+</html>

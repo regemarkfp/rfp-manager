@@ -1,0 +1,174 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>CricketCG Sport Bug</title>
+<link rel="stylesheet" href="lib/cgx.css">
+<style>
+  /* One template, four looks: timed team sports, set sports (tennis/padel/badminton/volleyball), baseball, athletics/clock. */
+  #bug { position: absolute; left: 80px; top: 56px; transform: translateY(-40px); opacity: 0; transition: transform .5s cubic-bezier(.2,.9,.2,1), opacity .35s; }
+  .cg-in #bug { transform: none; opacity: 1; }
+  .cg-out #bug { transform: translateY(-40px); opacity: 0; transition-duration: .3s; }
+  .box { background: var(--navy); color: #fff; box-shadow: 0 8px 26px rgba(0,0,0,.45); border-radius: 4px; overflow: hidden; }
+  .v { display: none; } .show { display: block; }
+
+  /* ---- timed */
+  .timed { display: flex; height: 64px; align-items: stretch; }
+  .tm { display: flex; align-items: center; gap: 10px; padding: 0 14px 0 0; position: relative; }
+  .tm .chip { width: 10px; align-self: stretch; }
+  .tm img { width: 44px; height: 44px; }
+  .tm .nm { font-size: 34px; font-weight: 800; letter-spacing: .03em; min-width: 76px; }
+  .sc { min-width: 70px; background: #fff; color: var(--ink); font-size: 44px; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 12px; }
+  .per { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 18px; background: var(--navy2); min-width: 150px; }
+  .per .p { font-size: 18px; font-weight: 700; letter-spacing: .12em; color: var(--gold); }
+  .per .c { font-size: 36px; font-weight: 800; line-height: 1; }
+  .shot { display: flex; align-items: center; justify-content: center; min-width: 72px; background: #d92d34; font-size: 34px; font-weight: 800; }
+  .under { display: flex; gap: 8px; margin-top: 6px; }
+  .tag { background: rgba(8,16,32,.92); border-radius: 3px; padding: 3px 10px; font-size: 20px; font-weight: 700; display: flex; gap: 8px; align-items: center; }
+  .tag i { width: 12px; height: 16px; border-radius: 2px; display: inline-block; }
+  .tag .t { color: var(--gold); }
+
+  /* ---- sets */
+  .sets .row { display: flex; align-items: stretch; height: 52px; }
+  .sets .row + .row { border-top: 1px solid rgba(255,255,255,.12); }
+  .sets .chip { width: 8px; }
+  .sets .srv { width: 26px; display: flex; align-items: center; justify-content: center; color: var(--gold); font-size: 18px; }
+  .sets .nm { font-size: 30px; font-weight: 800; padding-right: 20px; min-width: 260px; display: flex; align-items: center; white-space: nowrap; }
+  .sets .s { width: 44px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; color: #c9d3e0; }
+  .sets .s.won { color: #fff; }
+  .sets .s sup { font-size: 14px; margin-left: 1px; color: #c9d3e0; }
+  .sets .g { width: 52px; background: var(--navy2); display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 800; }
+  .sets .pt { width: 70px; background: #fff; color: var(--ink); display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 800; }
+  .flag { margin-top: 6px; display: inline-block; background: var(--gold); color: var(--ink); font-weight: 800; font-size: 22px; padding: 3px 14px; border-radius: 3px; letter-spacing: .06em; }
+  .flag:empty { display: none; }
+
+  /* ---- baseball */
+  .bb { display: flex; align-items: stretch; }
+  .bb .teams .row { display: flex; height: 50px; align-items: stretch; }
+  .bb .teams .row + .row { border-top: 1px solid rgba(255,255,255,.12); }
+  .bb .chip { width: 8px; }
+  .bb .nm { font-size: 30px; font-weight: 800; min-width: 110px; padding: 0 12px; display: flex; align-items: center; }
+  .bb .r { width: 62px; background: #fff; color: var(--ink); font-size: 34px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+  .bb .bat { width: 22px; display: flex; align-items: center; justify-content: center; color: var(--gold); }
+  .bb .state { display: flex; align-items: center; gap: 14px; padding: 0 16px; background: var(--navy2); }
+  .bb .inn { font-size: 30px; font-weight: 800; text-align: center; line-height: 1; }
+  .bb .inn small { display: block; font-size: 16px; color: var(--gold); letter-spacing: .1em; }
+  .bb svg rect { fill: none; stroke: #8fa0b8; stroke-width: 3; }
+  .bb svg rect.on { fill: var(--gold); stroke: var(--gold); }
+  .bb .cnt { font-size: 28px; font-weight: 800; text-align: center; line-height: 1.1; }
+  .bb .outs { display: flex; gap: 5px; justify-content: center; margin-top: 4px; }
+  .bb .outs i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #8fa0b8; }
+  .bb .outs i.on { background: #d92d34; border-color: #d92d34; }
+
+  /* ---- athletics / clock only */
+  .ck { display: flex; align-items: stretch; height: 64px; }
+  .ck .lbl { font-size: 26px; font-weight: 800; padding: 0 18px; display: flex; align-items: center; background: var(--navy2); letter-spacing: .04em; }
+  .ck .lbl:empty { display: none; }
+  .ck .c { font-size: 40px; font-weight: 800; min-width: 150px; padding: 0 18px; display: flex; align-items: center; justify-content: center; }
+</style>
+</head>
+<body>
+<div id="bug">
+  <!-- TIMED -->
+  <div class="v" id="v-timed">
+    <div class="box timed">
+      <div class="tm"><span class="chip" data-bg="teamA_color1"></span><img class="logo" data-src="logos/{teamA_logo}.png" onerror="this.style.display='none'"><span class="nm upper" data-f="teamA_short"></span></div>
+      <div class="sc num" data-f="scoreA"></div>
+      <div class="sc num" data-f="scoreB" style="border-left:2px solid #d0d6df"></div>
+      <div class="tm" style="padding:0 0 0 14px"><span class="nm upper" data-f="teamB_short"></span><img class="logo" data-src="logos/{teamB_logo}.png" onerror="this.style.display='none'"><span class="chip" data-bg="teamB_color1"></span></div>
+      <div class="per"><span class="p upper" data-f="period"></span><span class="c num" data-clock="clock" id="gameclock"></span></div>
+      <div class="shot num" id="shot" style="display:none"><span data-clock="shot" data-tenths="10"></span></div>
+    </div>
+    <div class="under" id="under"></div>
+  </div>
+
+  <!-- SETS -->
+  <div class="v" id="v-sets">
+    <div class="box sets">
+      <div class="row"><span class="chip" data-bg="teamA_color1"></span><span class="srv" data-f="serveA"></span><span class="nm upper" data-f="teamA_name"></span><span id="setsA" style="display:flex"></span><span class="g num" id="gA" data-f="gamesA"></span><span class="pt num" data-f="pointsA"></span></div>
+      <div class="row"><span class="chip" data-bg="teamB_color1"></span><span class="srv" data-f="serveB"></span><span class="nm upper" data-f="teamB_name"></span><span id="setsB" style="display:flex"></span><span class="g num" id="gB" data-f="gamesB"></span><span class="pt num" data-f="pointsB"></span></div>
+    </div>
+    <div class="flag upper" data-f="flag"></div>
+  </div>
+
+  <!-- BASEBALL -->
+  <div class="v" id="v-baseball">
+    <div class="box bb">
+      <div class="teams">
+        <div class="row"><span class="chip" data-bg="teamA_color1"></span><span class="bat" id="batA"></span><span class="nm upper" data-f="teamA_short"></span><span class="r num" data-f="scoreA"></span></div>
+        <div class="row"><span class="chip" data-bg="teamB_color1"></span><span class="bat" id="batB"></span><span class="nm upper" data-f="teamB_short"></span><span class="r num" data-f="scoreB"></span></div>
+      </div>
+      <div class="state">
+        <div class="inn num"><small data-f="half"></small><span data-f="inning"></span></div>
+        <svg width="70" height="62" viewBox="0 0 70 62">
+          <rect id="b2" x="26" y="4" width="18" height="18" transform="rotate(45 35 13)"/>
+          <rect id="b3" x="6" y="24" width="18" height="18" transform="rotate(45 15 33)"/>
+          <rect id="b1" x="46" y="24" width="18" height="18" transform="rotate(45 55 33)"/>
+        </svg>
+        <div><div class="cnt num" data-f="count"></div><div class="outs"><i id="o1"></i><i id="o2"></i></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLOCK / ATHLETICS -->
+  <div class="v" id="v-clock">
+    <div class="box ck"><span class="lbl upper" id="cklbl"></span><span class="c num" data-clock="clock"></span></div>
+  </div>
+</div>
+<script src="lib/cgx.js"></script>
+<script src="lib/cgx-clock.js"></script>
+<script>
+  const TIMED = ['rugby', 'hockey', 'netball', 'basketball'], SETS = ['tennis', 'padel', 'badminton', 'volleyball'];
+  window.CGX_DEMO = { sport: 'rugby', layout: 'bug', teamA_short: 'BUL', teamB_short: 'STO', teamA_color1: '#1f6feb', teamB_color1: '#e3262d', scoreA: '17', scoreB: '10',
+    period: 'SECOND HALF', clock_ms: '2890000', clock_running: '1', clock_dir: '1', sinbin_count: '1', sinbin1_team: 'B', sinbin1_name: 'SMITH', sinbin1_number: '7', sinbin1_card: 'yellow', sinbin1_ms: '412000' };
+  CGX.on('update', d => {
+    const kind = d.layout === 'clock' || d.sport === 'athletics' ? 'clock' : TIMED.includes(d.sport) ? 'timed' : SETS.includes(d.sport) ? 'sets' : d.sport === 'baseball' ? 'baseball' : 'timed';
+    ['timed', 'sets', 'baseball', 'clock'].forEach(k => document.getElementById('v-' + k).classList.toggle('show', k === kind));
+    if (kind === 'timed') {
+      document.getElementById('shot').style.display = d.sport === 'basketball' && d.shot_ms ? '' : 'none';
+      const under = document.getElementById('under');
+      let h = '';
+      const n = +d.sinbin_count || 0;
+      for (let i = 1; i <= n; i++) {
+        const col = { yellow: '#f4c20d', green: '#2ecc71', red: '#e3262d' }[d['sinbin' + i + '_card']] || '#f4c20d';
+        h += `<div class="tag" data-sinbin-box><i style="background:${col}"></i><span>${d['sinbin' + i + '_number'] ? '#' + d['sinbin' + i + '_number'] + ' ' : ''}${d['sinbin' + i + '_name'] || d['team' + d['sinbin' + i + '_team'] + '_short']}</span><span class="t num" data-sinbin="${i}"></span></div>`;
+      }
+      if (d.bonusA) h += `<div class="tag">${d.teamA_short} <span class="t">BONUS</span></div>`;
+      if (d.bonusB) h += `<div class="tag">${d.teamB_short} <span class="t">BONUS</span></div>`;
+      if (d.sport === 'basketball' && (d.teamfoulsA || d.teamfoulsB)) h += `<div class="tag">FOULS <span class="t">${d.teamfoulsA || 0} – ${d.teamfoulsB || 0}</span></div>`;
+      if (d.sport === 'netball' && d.centre_pass) h += `<div class="tag">CENTRE <span class="t">${d['team' + d.centre_pass + '_short']}</span></div>`;
+      if (d.shootoutA || d.shootoutB) h += `<div class="tag">SHOOT-OUT <span class="t">${d.shootoutA || 0} – ${d.shootoutB || 0}</span></div>`;
+      under.innerHTML = h;
+      const gc = document.getElementById('gameclock');
+      if (d.sport === 'basketball' && d.clock_dir === '-1') gc.setAttribute('data-tenths', '60'); else gc.removeAttribute('data-tenths');
+      const noClock = !d.clock_ms && !d.clock_running;
+      document.getElementById('gameclock').style.display = noClock ? 'none' : '';
+    }
+    if (kind === 'sets') {
+      const n = +d.sets_played || 0;
+      ['A', 'B'].forEach(k => {
+        const box = document.getElementById('sets' + k); box.innerHTML = '';
+        for (let i = 1; i <= n; i++) {
+          const raw = d['set' + i + k] || '', m = raw.match(/^(\d+)(?:\((\d+)\))?$/);
+          const other = (d['set' + i + (k === 'A' ? 'B' : 'A')] || '').match(/^(\d+)/);
+          const won = m && other && +m[1] > +other[1];
+          const s = document.createElement('span'); s.className = 's num' + (won ? ' won' : '');
+          s.innerHTML = m ? `${m[1]}${m[2] ? `<sup>${m[2]}</sup>` : ''}` : raw;
+          box.appendChild(s);
+        }
+        document.getElementById('g' + k).style.display = d['games' + k] === '' || d['games' + k] === undefined ? 'none' : '';
+      });
+    }
+    if (kind === 'baseball') {
+      document.getElementById('batA').textContent = d.batting === 'A' ? '▶' : '';
+      document.getElementById('batB').textContent = d.batting === 'B' ? '▶' : '';
+      ['1', '2', '3'].forEach(b => document.getElementById('b' + b).setAttribute('class', d['base' + b] ? 'on' : ''));
+      const outs = +d.outs || 0;
+      document.getElementById('o1').className = outs >= 1 ? 'on' : '';
+      document.getElementById('o2').className = outs >= 2 ? 'on' : '';
+    }
+    if (kind === 'clock') document.getElementById('cklbl').textContent = d.clock_label || d.ath_event || d.period || '';
+  });
+</script>
+</body>
+</html>

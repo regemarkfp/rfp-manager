@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>CricketCG Lottie Template</title>
+<!--
+  HOW TO USE WITH A LOTTIEFILES ANIMATION
+  1. Copy this file, e.g. to  bug_lottie.html  (one HTML file per animation).
+  2. Export your animation as Lottie JSON. Wrap it so it loads from file:// inside CasparCG:
+        window.LOTTIE_DATA = { ...contents of your .json... };
+     and save it as  lottie/bug_lottie.js   (tools/wrap-lottie.ps1 does this for you).
+  3. Set "animation" below to that file.
+  4. Name text layers after CricketCG data keys (striker_name, runs, overs, bowler_figures …)
+     or use patterns like "{runs}-{wickets}". Add markers "in", "loop", "out" if you want.
+  5. In config.json point a graphic at it:
+        "graphics": { "scorebug": { "template": "cricketcg/bug_lottie" } }
+  lottie.min.js must be in lib/ (CasparCG machines are often offline); the CDN is only a fallback.
+-->
+<link rel="stylesheet" href="lib/cgx.css">
+<style>
+  #lottie { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+</style>
+<script>
+  window.LOTTIE_CONFIG = {
+    animation: 'lottie/example.js',   // or 'lottie/example.json' if your CasparCG allows file fetches
+    renderer: 'svg',
+    assetsPath: 'lottie/images/',
+    map: {
+      // "Text Layer Name In AE": "data_key"
+    }
+  };
+</script>
+</head>
+<body>
+<div id="lottie"></div>
+<script src="lib/lottie.min.js"></script>
+<script>
+  if (!window.lottie) document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"><\/script>');
+</script>
+<script src="lib/cgx.js"></script>
+<script src="lib/cgx-lottie.js"></script>
+</body>
+</html>

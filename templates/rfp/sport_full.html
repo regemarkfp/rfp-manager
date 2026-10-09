@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>CricketCG Sport Full Frame</title>
+<link rel="stylesheet" href="lib/cgx.css">
+<style>
+  #ff { position: absolute; left: 260px; top: 110px; width: 1400px; height: 860px; display: flex; flex-direction: column;
+        background: linear-gradient(180deg, rgba(11,26,51,.97), rgba(7,16,33,.97)); border-radius: 6px; overflow: hidden;
+        box-shadow: 0 30px 80px rgba(0,0,0,.55); opacity: 0; transform: scale(.96); transition: opacity .45s, transform .55s cubic-bezier(.2,.9,.2,1); }
+  .cg-in #ff { opacity: 1; transform: none; }
+  .cg-out #ff { opacity: 0; transform: scale(1.02); transition-duration: .35s; }
+  header { flex: none; height: 110px; display: flex; align-items: center; gap: 24px; padding: 0 40px; background: var(--team, var(--navy2)); position: relative; }
+  header::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--gold); }
+  header img { width: 80px; height: 80px; }
+  header .t1 { font-size: 56px; font-weight: 800; line-height: 1; }
+  header .t2 { font-size: 26px; font-weight: 600; color: rgba(255,255,255,.85); letter-spacing: .05em; margin-top: 4px; }
+  main { flex: 1; padding: 24px 40px 12px; overflow: hidden; }
+  footer { flex: none; height: 60px; display: flex; align-items: center; padding: 0 40px; background: rgba(255,255,255,.06); font-size: 26px; font-weight: 700; color: var(--gold); letter-spacing: .04em; }
+  footer:empty { display: none; }
+  .muted { color: var(--grey); }
+
+  /* score header used by summary / stats */
+  .score { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 30px; margin-bottom: 22px; }
+  .score .tm { display: flex; align-items: center; gap: 18px; font-size: 42px; font-weight: 800; }
+  .score .tm.b { justify-content: flex-end; }
+  .score .tm img { width: 90px; height: 90px; }
+  .score .big { font-size: 110px; font-weight: 800; line-height: 1; letter-spacing: -.02em; }
+  .score .big span { color: var(--gold); padding: 0 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 20px; color: var(--grey); letter-spacing: .12em; font-weight: 700; padding: 6px 10px; text-align: center; }
+  td { font-size: 34px; font-weight: 700; padding: 6px 10px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.08); font-variant-numeric: tabular-nums; }
+  td.nm, th.nm { text-align: left; }
+  td.tot { background: rgba(244,194,13,.15); color: var(--gold); font-weight: 800; }
+  .scorers { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 20px; font-size: 24px; line-height: 1.4; color: var(--grey); }
+  .scorers b { color: #fff; }
+  /* stats bars */
+  .st { display: grid; grid-template-columns: 140px 1fr 140px; align-items: center; gap: 16px; margin: 10px 0; }
+  .st .v { font-size: 38px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+  .st .lbl { text-align: center; font-size: 22px; letter-spacing: .12em; color: var(--grey); font-weight: 700; margin-bottom: 6px; }
+  .st .bars { display: flex; height: 16px; border-radius: 8px; overflow: hidden; background: #1d2a40; }
+  .st .bars i { display: block; height: 100%; }
+  /* timeline */
+  .ev { display: grid; grid-template-columns: 110px 16px 1fr; gap: 16px; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.07); font-size: 30px; font-weight: 700; }
+  .ev.off { grid-template-columns: 520px 1fr; padding: 16px 0; font-size: 40px; }
+  .ev.off .t { font-size: 28px; letter-spacing: .1em; }
+  .ev .t { color: var(--gold); font-variant-numeric: tabular-nums; }
+  .ev .c { width: 16px; height: 40px; border-radius: 3px; }
+  /* lineup */
+  .lu { columns: 2; column-gap: 60px; }
+  .lu div { display: flex; gap: 18px; align-items: center; height: 50px; font-size: 30px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,.07); break-inside: avoid; }
+  .lu .n { width: 60px; text-align: right; color: var(--gold); font-weight: 800; }
+  .lu small { margin-left: auto; font-size: 20px; color: var(--grey); }
+</style>
+</head>
+<body>
+<div id="ff">
+  <header><img class="logo" id="hlogo"><div style="flex:1;min-width:0"><div class="t1 upper ell" id="t1"></div><div class="t2 upper ell" id="t2"></div></div></header>
+  <main id="main"></main>
+  <footer class="upper" id="foot"></footer>
+</div>
+<script src="lib/cgx.js"></script>
+<script>
+(function () {
+  const E = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])).replace(/\r?\n/g, '<br>');
+  const logo = k => CGX.logo(k);
+  const img = k => (k ? `<img class="logo" src="${E(logo(k))}" onerror="this.style.visibility='hidden'">` : '');
+  window.CGX_DEMO = { layout: 'summary', sport: 'rugby', title: 'CURRIE CUP', teamA_name: 'BULLS', teamB_name: 'SHARKS', scoreA: '24', scoreB: '17', period: 'SECOND HALF',
+    table_title: 'SCORE BY HALF', table_cols: '2', col1: '1H', col1A: '10', col1B: '7', col2: '2H', col2A: '14', col2B: '10', scorersA: '#11 SMITH 12:04, #10 POLLARD', scorersB: '#9 JONES 33:10', status_text: 'BULLS LEAD BY 7' };
+
+  function header(d, t1, t2, logoKey, color) {
+    document.getElementById('t1').textContent = t1 || '';
+    document.getElementById('t2').textContent = t2 || '';
+    const h = document.getElementById('hlogo'); h.style.display = logoKey ? '' : 'none'; if (logoKey) h.src = logo(logoKey);
+    document.getElementById('ff').style.setProperty('--team', color || '');
+    document.getElementById('foot').textContent = d.footer != null ? d.footer : (d.status_text || '');
+  }
+  function scoreHead(d) {
+    if (d.sport === 'athletics') return '';
+    return `<div class="score"><div class="tm">${img(d.teamA_logo)}<span class="upper">${E(d.teamA_name)}</span></div>
+      <div class="big num">${E(d.scoreA)}<span>–</span>${E(d.scoreB)}</div>
+      <div class="tm b"><span class="upper">${E(d.teamB_name)}</span>${img(d.teamB_logo)}</div></div>`;
+  }
+  const R = {};
+  R.summary = d => {
+    header(d, d.title || d.sport_name, `${d.period || ''}${d.venue ? ' · ' + d.venue : ''}`, '', '');
+    const n = +d.table_cols || 0;
+    let h = scoreHead(d);
+    if (n) {
+      const xn = [1, 2, 3].filter(i => d['xcol' + i]);
+      h += `<table><tr><th class="nm">${E(d.table_title)}</th>${Array.from({ length: n }, (_, i) => `<th>${E(d['col' + (i + 1)])}</th>`).join('')}<th>${d.sport === 'baseball' ? '' : 'T'}</th>${xn.map(i => `<th>${E(d['xcol' + i])}</th>`).join('')}</tr>`;
+      ['A', 'B'].forEach(k => {
+        h += `<tr><td class="nm upper">${E(d['team' + k + '_short'] || d['team' + k + '_name'])}</td>${Array.from({ length: n }, (_, i) => `<td>${E(d['col' + (i + 1) + k])}</td>`).join('')}`;
+        h += d.sport === 'baseball' ? '<td></td>' : `<td class="tot">${E(d['score' + k])}</td>`;
+        h += xn.map(i => `<td class="tot">${E(d['xcol' + i + k])}</td>`).join('') + '</tr>';
+      });
+      h += '</table>';
+    }
+    if (d.scorersA || d.scorersB) h += `<div class="scorers"><div><b class="upper">${E(d.teamA_short)}</b> ${E(d.scorersA)}</div><div><b class="upper">${E(d.teamB_short)}</b> ${E(d.scorersB)}</div></div>`;
+    return h;
+  };
+  const first = s => { const m = String(s || '').match(/-?\d+(\.\d+)?/); return m ? +m[0] : 0; };
+  R.stats = d => {
+    header(d, d.title || 'MATCH STATS', d.period || '', '', '');
+    let h = scoreHead(d).replace('class="score"', 'class="score" style="margin-bottom:6px;transform:scale(.7);transform-origin:top center;height:120px"');
+    const from = Math.max(1, +d.stats_from || 1), n = Math.min(+d.stats_count || 0, from + 8);
+    for (let i = from; i <= n; i++) {
+      const a = d[`stat${i}_a`], b = d[`stat${i}_b`];
+      const pa = /%\)?$/.test(a) ? first((a.match(/\((\d+)%\)/) || [0, first(a)])[1]) : first(a), pb = /%\)?$/.test(b) ? first((b.match(/\((\d+)%\)/) || [0, first(b)])[1]) : first(b);
+      const tot = Math.max(1, pa + pb);
+      h += `<div class="st"><div class="v">${E(a)}</div><div><div class="lbl">${E(d[`stat${i}_label`])}</div><div class="bars"><i style="width:${pa * 100 / tot}%;background:${E(d.teamA_color1 || '#1f6feb')}"></i><i style="width:${pb * 100 / tot}%;background:${E(d.teamB_color1 || '#e3262d')}"></i></div></div><div class="v">${E(b)}</div></div>`;
+    }
+    return h;
+  };
+  R.officials = d => {
+    header(d, d.title || 'MATCH OFFICIALS', d.competition || '', '', '');
+    let h = '';
+    for (let i = 1; i <= 6; i++) if (d[`official${i}_name`]) h += `<div class="ev off"><span class="t">${E(d[`official${i}_role`])}</span><span class="upper">${E(d[`official${i}_name`])}</span></div>`;
+    if (d.commentators) h += `<div class="ev off"><span class="t">${+d.commentators_count === 1 ? 'COMMENTATOR' : 'COMMENTATORS'}</span><span class="upper">${E(d.commentators)}</span></div>`;
+    return h || '<div class="muted" style="font-size:34px">NO OFFICIALS ENTERED</div>';
+  };
+  R.timeline = d => {
+    header(d, d.title || 'KEY MOMENTS', `${d.teamA_name || ''} ${d.scoreA || ''} – ${d.scoreB || ''} ${d.teamB_name || ''}`, '', '');
+    let h = '';
+    const n = Math.min(+d.events_count || 0, 11);
+    for (let i = 1; i <= n; i++) {
+      const t = d[`ev${i}_team`];
+      h += `<div class="ev"><span class="t">${E(d[`ev${i}_time`])}</span><span class="c" style="background:${t ? E(d['team' + t + '_color1']) : '#556'}"></span><span class="upper">${E(d[`ev${i}_text`])}${t ? ` <span class="muted">(${E(d['team' + t + '_short'])})</span>` : ''}</span></div>`;
+    }
+    return h || '<div class="muted" style="font-size:34px">NO EVENTS YET</div>';
+  };
+  R.leaders = d => {
+    header(d, d.title || 'LEADERS', d.period || '', '', '');
+    let h = scoreHead(d);
+    for (let i = 1; i <= 6; i++) if (d[`leader${i}_name`]) h += `<div class="ev"><span class="t">${E(d[`leader${i}_value`])}</span><span class="c" style="background:#556"></span><span class="upper">${E(d[`leader${i}_label`])}: ${E(d[`leader${i}_name`])} <span class="muted">(${E(d[`leader${i}_team`])})</span></span></div>`;
+    return h;
+  };
+  R.lineup = d => {
+    header(d, d.team_name, d.title + (d.coach ? ' · COACH ' + d.coach : ''), d.team_logo, d.team_color1);
+    let h = '<div class="lu">';
+    for (let i = 1; i <= Math.min(+d.rows || 0, 24); i++) h += `<div><span class="n">${E(d[`p${i}_number`])}</span><span class="upper">${E(d[`p${i}_fullname`] || d[`p${i}_name`])}</span><small class="upper">${E(d[`p${i}_position`])}</small></div>`;
+    return h + '</div>';
+  };
+  R.startlist = d => {
+    header(d, d.title || d.ath_event, d.subtitle, '', '');
+    let h = '<table><tr><th>LANE</th><th class="nm">ATHLETE</th><th class="nm">TEAM</th><th>PB</th><th>SB</th></tr>';
+    for (let i = 1; i <= Math.min(+d.sl_count || 0, 12); i++) h += `<tr><td>${E(d[`sl${i}_lane`] || d[`sl${i}_bib`])}</td><td class="nm upper">${E(d[`sl${i}_name`])}</td><td class="nm muted">${E(d[`sl${i}_team`])}</td><td>${E(d[`sl${i}_pb`])}</td><td>${E(d[`sl${i}_sb`])}</td></tr>`;
+    return h + '</table>';
+  };
+  R.results = d => {
+    header(d, d.title || d.ath_event, d.subtitle, '', '');
+    let h = '<table><tr><th>POS</th><th class="nm">ATHLETE</th><th class="nm">TEAM</th><th>RESULT</th><th></th></tr>';
+    for (let i = 1; i <= Math.min(+d.rs_count || 0, 12); i++) h += `<tr><td class="tot">${E(d[`rs${i}_rank`])}</td><td class="nm upper">${E(d[`rs${i}_name`])}</td><td class="nm muted">${E(d[`rs${i}_team`])}</td><td>${E(d[`rs${i}_result`])}</td><td style="color:var(--gold)">${E(d[`rs${i}_note`])}</td></tr>`;
+    return h + '</table>';
+  };
+  CGX.on('update', d => {
+    document.getElementById('main').innerHTML = (R[d.layout] || R.summary)(d);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,269 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>CricketCG Full Frame</title>
+<link rel="stylesheet" href="lib/cgx.css">
+<style>
+  body { background: transparent; }
+  #ff { position: absolute; left: 260px; top: 120px; width: 1400px; height: 840px; display: flex; flex-direction: column;
+        background: linear-gradient(180deg, rgba(11,26,51,.97), rgba(7,16,33,.97)); border-radius: 6px; overflow: hidden;
+        box-shadow: 0 30px 80px rgba(0,0,0,.55); opacity: 0; transform: scale(.96); transition: opacity .45s, transform .55s cubic-bezier(.2,.9,.2,1); }
+  .cg-in #ff { opacity: 1; transform: none; }
+  .cg-out #ff { opacity: 0; transform: scale(1.02); transition-duration: .35s; }
+
+  header { display: flex; align-items: center; gap: 24px; height: 128px; padding: 0 40px; background: var(--team, var(--navy2)); position: relative; flex: none; }
+  header::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--team2, var(--gold)); }
+  header img { width: 96px; height: 96px; }
+  header .tt { flex: 1; min-width: 0; }
+  header .t1 { font-size: 64px; font-weight: 800; line-height: 1; }
+  header .t2 { font-size: 30px; font-weight: 600; color: rgba(255,255,255,.85); letter-spacing: .05em; margin-top: 4px; }
+  header .rt { text-align: right; font-size: 30px; font-weight: 700; line-height: 1.1; }
+  header .rt b { display: block; font-size: 52px; font-weight: 800; }
+
+  main { flex: 1; padding: 22px 40px 10px; overflow: hidden; }
+  footer { flex: none; height: 64px; display: flex; align-items: center; padding: 0 40px; background: rgba(255,255,255,.06); border-top: 2px solid rgba(255,255,255,.08);
+           font-size: 28px; font-weight: 700; letter-spacing: .04em; color: var(--gold); }
+  footer:empty { display: none; }
+
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 0 10px; height: 46px; font-size: 31px; white-space: nowrap; }
+  th { font-size: 20px; color: var(--grey); font-weight: 700; letter-spacing: .12em; height: 34px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  td { border-bottom: 1px solid rgba(255,255,255,.07); text-align: right; font-variant-numeric: tabular-nums; }
+  td.nm { font-weight: 700; text-transform: uppercase; max-width: 380px; overflow: hidden; text-overflow: ellipsis; }
+  td.how { text-align: left; color: var(--grey); font-size: 24px; max-width: 460px; overflow: hidden; text-overflow: ellipsis; }
+  td.big { font-weight: 800; font-size: 36px; }
+  tr.live td { background: rgba(244,194,13,.12); }
+  tr.live td.nm { color: var(--gold); }
+  tr.dim td { color: rgba(255,255,255,.55); }
+  .tot { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; font-size: 30px; }
+  .tot b { font-size: 44px; }
+  .muted { color: var(--grey); }
+
+  /* intro */
+  .intro { display: flex; align-items: center; justify-content: space-around; height: 100%; }
+  .intro .tm { text-align: center; width: 480px; }
+  .intro .tm img { width: 300px; height: 300px; }
+  .intro .tm div { font-size: 50px; font-weight: 800; margin-top: 14px; }
+  .intro .vs { font-size: 90px; font-weight: 800; color: var(--gold); }
+  .introfoot { text-align: center; font-size: 34px; font-weight: 700; letter-spacing: .06em; color: var(--grey); }
+
+  /* summary */
+  .sum { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  .sum .inn { background: rgba(255,255,255,.04); border-left: 8px solid var(--c, var(--gold)); padding: 8px 20px 10px; }
+  .sum .hd { display: flex; align-items: center; gap: 16px; font-size: 38px; font-weight: 800; }
+  .sum .hd img { width: 54px; height: 54px; }
+  .sum .hd .sc { margin-left: auto; font-size: 46px; }
+  .sum .hd .ov { font-size: 26px; color: var(--grey); font-weight: 600; }
+  .sum .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; margin-top: 4px; }
+  .sum .ln { display: flex; justify-content: space-between; font-size: 28px; height: 38px; align-items: center; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .sum .ln span:first-child { text-transform: uppercase; font-weight: 600; }
+
+  /* squad */
+  .squad { columns: 2; column-gap: 60px; }
+  .squad div { font-size: 36px; height: 58px; display: flex; align-items: center; gap: 14px; break-inside: avoid; border-bottom: 1px solid rgba(255,255,255,.07); text-transform: uppercase; font-weight: 700; }
+  .squad small { color: var(--grey); font-size: 22px; font-weight: 600; margin-left: auto; }
+  .squad .tag { color: var(--gold); font-size: 24px; }
+
+  .text { display: flex; flex-direction: column; justify-content: center; height: 100%; gap: 20px; }
+  .text .b { font-size: 44px; line-height: 1.25; white-space: pre-wrap; }
+
+  svg text { font-family: var(--font); }
+</style>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div id="ff">
+  <header>
+    <img class="logo" id="hlogo">
+    <div class="tt"><div class="t1 upper ell" id="t1"></div><div class="t2 upper ell" id="t2"></div></div>
+    <div class="rt upper num" id="rt"></div>
+  </header>
+  <main id="main"></main>
+  <footer class="upper" id="foot"></footer>
+</div>
+<script src="lib/cgx.js"></script>
+<script>
+(function () {
+  var E = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }).replace(/\r?\n/g, '<br>'); };
+  var logo = function (k) { return CGX.logo(k); };
+
+  window.CGX_DEMO = {
+    layout: 'batting_card', title: 'BATTING', bat_name: 'TUSKERS', bat_logo: 'TUSKERS', bat_color1: '#1846b8', score: '154/6', overs: '20', innings_label: '1ST INNINGS',
+    b1_name: 'MOKOENA', b1_howout: 'c SMITH b NTULI', b1_runs: '64', b1_balls: '41', b1_fours: '6', b1_sixes: '3', b1_sr: '156.10', b1_status: 'out',
+    b2_name: 'VAN WYK', b2_howout: 'not out', b2_runs: '48', b2_balls: '33', b2_fours: '4', b2_sixes: '2', b2_sr: '145.45', b2_status: 'notout',
+    rows: '2', extras: '9', extras_detail: 'lb 3, w 6', footer: 'CSA HIGH PERFORMANCE NEED 155 TO WIN'
+  };
+
+  function setHeader(d, t1, t2, rt, logoKey, color) {
+    document.getElementById('t1').textContent = t1 || ''; document.getElementById('t1').classList.toggle('cg-ml', /\n/.test(t1 || ''));
+    document.getElementById('t2').textContent = t2 || ''; document.getElementById('t2').classList.toggle('cg-ml', /\n/.test(t2 || ''));
+    document.getElementById('rt').innerHTML = rt || '';
+    var img = document.getElementById('hlogo');
+    img.style.display = logoKey ? '' : 'none';
+    if (logoKey) img.src = logo(logoKey);
+    var ff = document.getElementById('ff');
+    ff.style.setProperty('--team', color || '');
+    ff.style.setProperty('--team2', d.bat_color2 || d.team_color2 || '');
+    document.getElementById('foot').textContent = d.footer || '';
+  }
+
+  var R = {};
+
+  R.batting_card = function (d) {
+    setHeader(d, d.bat_name, (d.innings_label || '') + ' · BATTING', '<b>' + E(d.score) + '</b>' + E(d.overs) + ' OVERS', d.bat_logo, d.bat_color1);
+    var h = '<table><tr><th>BATTER</th><th></th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr>';
+    var n = +d.rows || 0;
+    for (var i = 1; i <= Math.min(n, 11); i++) {
+      var p = 'b' + i + '_', st = d[p + 'status'];
+      var live = st === 'batting';
+      var star = (st === 'batting' || st === 'notout') ? '*' : '';
+      h += '<tr class="' + (live ? 'live' : '') + '"><td class="nm">' + E(d[p + 'name']) + (d[p + 'captain'] ? ' (C)' : '') + (d[p + 'keeper'] ? ' †' : '') + '</td><td class="how">' + E(d[p + 'howout']) +
+        '</td><td class="big">' + E(d[p + 'runs']) + star + '</td><td>' + E(d[p + 'balls']) + '</td><td>' + E(d[p + 'fours']) + '</td><td>' + E(d[p + 'sixes']) + '</td><td>' + E(d[p + 'sr']) + '</td></tr>';
+    }
+    h += '</table><div class="tot"><span class="muted">EXTRAS <b style="font-size:32px;color:#fff">' + E(d.extras) + '</b> ' + E(d.extras_detail ? '(' + d.extras_detail + ')' : '') + '</span><span>TOTAL <b>' + E(d.score) + '</b></span></div>';
+    if (d.yet_to_bat && n < 11) h += '<div class="muted" style="font-size:24px;margin-top:6px">YET TO BAT: ' + E(d.yet_to_bat) + '</div>';
+    return h;
+  };
+
+  R.bowling_card = function (d) {
+    setHeader(d, d.bowl_name, (d.innings_label || '') + ' · BOWLING', '<b>' + E(d.score) + '</b>' + E(d.overs) + ' OVERS', d.bowl_logo, d.bowl_color1);
+    var h = '<table><tr><th>BOWLER</th><th>O</th><th>M</th><th>R</th><th>W</th><th>ECON</th><th>DOTS</th></tr>';
+    for (var i = 1; i <= Math.min(+d.rows || 0, 11); i++) {
+      var p = 'w' + i + '_';
+      h += '<tr><td class="nm">' + E(d[p + 'name']) + '</td><td>' + E(d[p + 'overs']) + '</td><td>' + E(d[p + 'maidens']) + '</td><td>' + E(d[p + 'runs']) + '</td><td class="big">' + E(d[p + 'wickets']) + '</td><td>' + E(d[p + 'econ']) + '</td><td>' + E(d[p + 'dots']) + '</td></tr>';
+    }
+    return h + '</table>';
+  };
+
+  R.fow = function (d) {
+    setHeader(d, d.bat_name, 'FALL OF WICKETS', '<b>' + E(d.score) + '</b>' + E(d.overs) + ' OVERS', d.bat_logo, d.bat_color1);
+    var h = '<table><tr><th>WKT</th><th>SCORE</th><th>OVER</th><th style="text-align:left">BATTER</th><th>RUNS</th></tr>';
+    for (var i = 1; i <= Math.min(+d.rows || 0, 10); i++) {
+      var p = 'f' + i + '_';
+      h += '<tr><td class="big">' + E(d[p + 'wicket']) + '</td><td class="big">' + E(d[p + 'score']) + '</td><td>' + E(d[p + 'over']) + '</td><td class="nm" style="text-align:left">' + E(d[p + 'name']) + '</td><td>' + E(d[p + 'runs']) + '</td></tr>';
+    }
+    return h + '</table>';
+  };
+
+  R.partnerships = function (d) {
+    setHeader(d, d.bat_name, 'PARTNERSHIPS', '<b>' + E(d.score) + '</b>' + E(d.overs) + ' OVERS', d.bat_logo, d.bat_color1);
+    var h = '<table><tr><th>WKT</th><th style="text-align:left">BATTERS</th><th>RUNS</th><th>BALLS</th></tr>';
+    for (var i = 1; i <= Math.min(+d.rows || 0, 10); i++) {
+      var p = 'p' + i + '_';
+      h += '<tr><td>' + E(d[p + 'wicket']) + '</td><td class="nm" style="text-align:left;max-width:800px">' + E(d[p + 'b1_name']) + ' ' + E(d[p + 'b1_runs']) + ' · ' + E(d[p + 'b2_name']) + ' ' + E(d[p + 'b2_runs']) + '</td><td class="big">' + E(d[p + 'runs']) + '</td><td>' + E(d[p + 'balls']) + '</td></tr>';
+    }
+    return h + '</table>';
+  };
+
+  R.intro = function (d) {
+    setHeader(d, d.title || d.tournament, d.subtitle || d.format, '', '', '');
+    return '<div class="intro" style="height:560px"><div class="tm"><img class="logo" src="' + E(logo(d.teamA_logo)) + '"><div class="upper">' + E(d.teamA_name) + '</div></div>' +
+      '<div class="vs">V</div><div class="tm"><img class="logo" src="' + E(logo(d.teamB_logo)) + '"><div class="upper">' + E(d.teamB_name) + '</div></div></div>' +
+      '<div class="introfoot upper">' + E(d.line2) + '</div>';
+  };
+
+  function summary(d) {
+    setHeader(d, d.title, d.tournament, '', '', '');
+    var h = '<div class="sum">';
+    var n = Math.min(+d.innings_count || 0, 2);
+    for (var i = 1; i <= n; i++) {
+      var p = 'in' + i + '_';
+      var color = i === 1 ? '#f4c20d' : '#39c5cf';
+      h += '<div class="inn" style="--c:' + color + '"><div class="hd upper">' + (d[p + 'logo'] ? '<img class="logo" src="' + E(logo(d[p + 'logo'])) + '">' : '') + E(d[p + 'team']) +
+        '<span class="sc num">' + E(d[p + 'score']) + '</span><span class="ov">' + E(d[p + 'label']) + '</span></div><div class="cols"><div>';
+      for (var k = 1; k <= 3; k++) if (d[p + 'bat' + k + '_name']) h += '<div class="ln"><span>' + E(d[p + 'bat' + k + '_name']) + '</span><span class="num">' + E(d[p + 'bat' + k + '_runs']) + ' <span class="muted">(' + E(d[p + 'bat' + k + '_balls']) + ')</span></span></div>';
+      h += '</div><div>';
+      for (k = 1; k <= 3; k++) if (d[p + 'bowl' + k + '_name']) h += '<div class="ln"><span>' + E(d[p + 'bowl' + k + '_name']) + '</span><span class="num">' + E(d[p + 'bowl' + k + '_fig']) + ' <span class="muted">(' + E(d[p + 'bowl' + k + '_overs']) + ')</span></span></div>';
+      h += '</div></div></div>';
+    }
+    if (!n) h += '<div class="text"><div class="b muted">NO INNINGS YET</div></div>';
+    return h + '</div>';
+  }
+  R.summary = summary;
+  R.innings_break = summary;
+
+  R.squad = function (d) {
+    setHeader(d, d.team_name, d.title + (d.coach ? ' · COACH ' + d.coach : ''), '', d.team_logo, d.team_color1);
+    var h = '<div class="squad">';
+    for (var i = 1; i <= Math.min(+d.rows || 0, 16); i++) {
+      var p = 'p' + i + '_';
+      h += '<div>' + E(d[p + 'fullname'] || d[p + 'name']) + (d[p + 'captain'] ? ' <span class="tag">(C)</span>' : '') + (d[p + 'keeper'] ? ' <span class="tag">†</span>' : '') + '<small>' + E(d[p + 'role']) + '</small></div>';
+    }
+    return h + '</div>';
+  };
+
+  R.officials = function (d) {
+    setHeader(d, d.title, d.tournament, '', '', '');
+    var rows = [['UMPIRES', (d.umpire1 || '') + (d.umpire2 ? ' & ' + d.umpire2 : '')], ['TV UMPIRE', d.tv_umpire], ['FOURTH UMPIRE', d.fourth_umpire], ['MATCH REFEREE', d.referee]];
+    var h = '<table>';
+    rows.forEach(function (r) { if (r[1]) h += '<tr><td class="muted" style="font-size:28px;letter-spacing:.1em">' + r[0] + '</td><td class="nm" style="text-align:right;max-width:none;font-size:40px">' + E(r[1]) + '</td></tr>'; });
+    return h + '</table>';
+  };
+
+  R.text = function (d) {
+    setHeader(d, d.title, d.subtitle, '', d.teamA_logo && d.show_logo ? d.teamA_logo : '', '');
+    return '<div class="text"><div class="b upper">' + E(d.body) + '</div></div>';
+  };
+
+  function chart(d, kind) {
+    setHeader(d, d.title, d.tournament, '', '', '');
+    var W = 1320, H = 560, L = 70, B = 50, T = 20;
+    var maxO = +d.max_overs || 20;
+    var series = [];
+    for (var i = 1; i <= (+d.series_count || 0); i++) {
+      var p = 'in' + i + '_';
+      series.push({
+        team: d[p + 'short'] || d[p + 'team'], score: d[p + 'score'],
+        color: i === 1 ? '#f4c20d' : '#39c5cf',
+        per: (d[p + 'runs_per_over'] || '').split(',').filter(String).map(Number),
+        cum: (d[p + 'cumulative'] || '').split(',').filter(String).map(Number),
+        wk: (d[p + 'wickets_per_over'] || '').split(',').filter(String).map(Number)
+      });
+    }
+    var maxY = 10;
+    series.forEach(function (s) { (kind === 'worm' ? s.cum : s.per).forEach(function (v) { if (v > maxY) maxY = v; }); });
+    maxY = Math.ceil(maxY / (kind === 'worm' ? 20 : 5)) * (kind === 'worm' ? 20 : 5);
+    var x = function (o) { return L + (W - L - 20) * o / maxO; };
+    var y = function (v) { return T + (H - T - B) * (1 - v / maxY); };
+    var svg = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">';
+    var step = kind === 'worm' ? (maxY > 120 ? 40 : 20) : 5;
+    for (var g = 0; g <= maxY; g += step) svg += '<line x1="' + L + '" x2="' + (W - 20) + '" y1="' + y(g) + '" y2="' + y(g) + '" stroke="rgba(255,255,255,.1)"/><text x="' + (L - 12) + '" y="' + (y(g) + 8) + '" fill="#c9d3e0" font-size="22" text-anchor="end">' + g + '</text>';
+    for (var o = 0; o <= maxO; o += (maxO > 20 ? 5 : 2)) svg += '<text x="' + x(o) + '" y="' + (H - 14) + '" fill="#c9d3e0" font-size="22" text-anchor="middle">' + o + '</text>';
+    if (kind === 'worm') {
+      series.forEach(function (s) {
+        var pts = [[x(0), y(0)]].concat(s.cum.map(function (v, k) { return [x(k + 1), y(v)]; }));
+        svg += '<polyline fill="none" stroke="' + s.color + '" stroke-width="6" stroke-linejoin="round" points="' + pts.map(function (p) { return p.join(','); }).join(' ') + '"/>';
+        s.wk.forEach(function (w, k) { for (var j = 0; j < w; j++) svg += '<circle cx="' + x(k + 1) + '" cy="' + (y(s.cum[k]) - 18 - j * 22) + '" r="9" fill="#e3262d" stroke="#fff" stroke-width="2"/>'; });
+      });
+    } else {
+      var bw = (W - L - 20) / maxO * .7;
+      series.forEach(function (s) {
+        s.per.forEach(function (v, k) {
+          var cx = x(k + .5);
+          svg += '<rect x="' + (cx - bw / 2) + '" y="' + y(v) + '" width="' + bw + '" height="' + (y(0) - y(v)) + '" fill="' + s.color + '" rx="3"/>';
+          for (var j = 0; j < (s.wk[k] || 0); j++) svg += '<circle cx="' + cx + '" cy="' + (y(v) - 16 - j * 22) + '" r="9" fill="#e3262d" stroke="#fff" stroke-width="2"/>';
+        });
+      });
+    }
+    svg += '</svg>';
+    var legend = '<div style="display:flex;gap:40px;font-size:30px;font-weight:700;margin-bottom:6px">' + series.map(function (s) {
+      return '<span><span style="display:inline-block;width:26px;height:10px;background:' + s.color + ';margin-right:10px;vertical-align:middle"></span>' + E(s.team) + ' ' + E(s.score) + '</span>';
+    }).join('') + '</div>';
+    return legend + svg;
+  }
+  R.worm = function (d) { return chart(d, 'worm'); };
+  R.manhattan = function (d) { return chart(d, 'manhattan'); };
+
+  R.error = function (d) { setHeader(d, d.line1, '', '', '', '#8e1f24'); return '<div class="text"><div class="b">' + E(d.line2) + '</div></div>'; };
+
+  CGX.on('update', function (d) {
+    var fn = R[d.layout] || R.text;
+    document.getElementById('main').innerHTML = fn(d);
+    document.querySelectorAll('img.logo').forEach(function (img) { img.onerror = function () { img.style.visibility = 'hidden'; }; });
+  });
+})();
+</script>
+</body>
+</html>
