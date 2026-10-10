@@ -43,7 +43,7 @@
           h('h3', { style: { marginTop: '16px' } }, 'SRT (vMix, OBS, encoders, Larix on a phone)'),
           field('Host', ing.srtHost), field('Port', String(ing.srtPort)), field('Stream ID', ing.srtStreamId, true), field('Full SRT URL', ing.srtUrl, true),
           h('p', { class: 'dim small' }, 'vMix: Settings → Outputs/NDI/SRT (or Streaming → SRT), type Caller, then the host, port and stream ID above. OBS: Settings → Stream → Custom, paste the full SRT URL as the server and leave the key empty. SRT copes better with poor internet than RTMP. Video H.264, audio AAC (RTMP) or AAC/Opus; 2–6 Mb/s, keyframe every 2 seconds.'),
-          App.can('edit') ? h('button', { class: 'sm danger', onclick: async () => {
+          App.canEdit('channel') ? h('button', { class: 'sm danger', onclick: async () => {
             if (!(await confirmBox('Make a new stream key? Anything still using the old key stops streaming until you paste the new one.'))) return;
             try { await api('POST', `/api/channels/${encodeURIComponent(doc.id)}/newkey?team=${App.team}`); toast('New stream key made'); paint(); } catch (e) { oops(e); }
           } }, 'New stream key') : null);

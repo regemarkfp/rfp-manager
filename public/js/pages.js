@@ -17,7 +17,7 @@
       r && f.status === 'Live' ? h('span', { class: 'dim small' }, r.period) : null,
       air ? h('span', { class: 'pill live', title: 'Graphics, outputs and monitors follow this match' }, 'ON AIR') : null,
       statusPill(f),
-      App.can('score') ? h('a', { class: 'btn sm' + (f.status === 'Live' ? ' primary' : ''), href: App.scorerUrl(d.id, f) }, 'Score') : null,
+      App.canScore() ? h('a', { class: 'btn sm' + (f.status === 'Live' ? ' primary' : ''), href: App.scorerUrl(d.id, f) }, 'Score') : null,
       App.gfx && App.can('score') && !air ? h('button', { class: 'sm', title: 'Graphics control, outputs and monitors switch to this match', onclick: () => App.gfxDo('setFixture', { fixtureId: d.id }).then(() => { App.machine.onAirFixture = d.id; toast('On air: ' + App.fixtureName(f)); route(); }).catch(oops) }, 'Put on air') : null,
       App.gfx && App.can('score') && air ? h('a', { class: 'btn sm primary', href: '/live/control.html', title: 'Graphics control for the match on air' }, 'Graphics ↗') : null,
       h('a', { class: 'btn sm', href: '#/rundown/fixture/' + d.id }, 'Rundown'));
@@ -55,8 +55,8 @@
           h('div', { class: 'card' }, h('h2', {}, 'Live & today'),
             live.length + todays.length ? [...live, ...todays].map((d) => fixtureRow(d)) : h('div', { class: 'empty' }, 'No matches today.')),
           h('div', { class: 'card' }, h('h2', {}, 'Coming up'),
-            next.length ? next.map((d) => fixtureRow(d, { showDate: true })) : h('div', { class: 'empty' }, 'Nothing scheduled. ', App.can('edit') ? h('a', { href: '#/edit/fixture/new' }, 'Add a fixture') : null))),
-        h('div', { class: 'card', style: { marginTop: '16px' } }, h('div', { class: 'spread' }, h('h2', {}, 'Upcoming productions'), App.can('edit') ? h('a', { class: 'btn sm', href: '#/edit/production/new' }, '+ New production') : null),
+            next.length ? next.map((d) => fixtureRow(d, { showDate: true })) : h('div', { class: 'empty' }, 'Nothing scheduled. ', App.canEdit('fixture') ? h('a', { href: '#/edit/fixture/new' }, 'Add a fixture') : null))),
+        h('div', { class: 'card', style: { marginTop: '16px' } }, h('div', { class: 'spread' }, h('h2', {}, 'Upcoming productions'), App.canEdit('production') ? h('a', { class: 'btn sm', href: '#/edit/production/new' }, '+ New production') : null),
           prods.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {}, prods.map((d) => h('tr', { class: 'click', onclick: () => { location.hash = '#/edit/production/' + d.id; } },
             h('td', { class: 'nowrap' }, UI.fmtDate(d.data.date)), h('td', {}, h('b', {}, d.data.name)), h('td', {}, d.data.type || ''), h('td', {}, App.title('venue', d.data.venue)), h('td', { class: 'r dim' }, `${(d.data.crew || []).length} crew`))))))
             : h('div', { class: 'empty' }, 'No productions planned.')));
@@ -98,15 +98,16 @@
         ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, cols.map((f) => h('th', { class: f.t === 'money' || f.t === 'number' ? 'r' : '' }, f.t === 'image' ? '' : f.l)))),
           h('tbody', {}, docs.map((d) => h('tr', { class: 'click', tabindex: '0', onclick: () => { location.hash = `#/edit/${type}/${d.id}`; }, onkeydown: (ev) => { if (ev.key === 'Enter') location.hash = `#/edit/${type}/${d.id}`; } },
             cols.map((f) => h('td', { class: f.t === 'money' || f.t === 'number' ? 'r num' : '' }, cell(type, f, d.data[f.k], d.data))))))))
-        : h('div', { class: 'card empty' }, q ? 'Nothing matches that search.' : `No ${e.plural.toLowerCase()} yet.`, ' ', App.can('edit') && !q ? h('a', { href: `#/edit/${type}/new` }, 'Add the first one') : null),
+        : h('div', { class: 'card empty' }, q ? 'Nothing matches that search.' : `No ${e.plural.toLowerCase()} yet.`, ' ', App.canEdit(type) && !q ? h('a', { href: `#/edit/${type}/new` }, 'Add the first one') : null),
       type === 'advert' ? adReport() : null);
     };
     paint();
     const el = h('div', {}, pageHead(e.plural,
       h('input', { type: 'search', placeholder: 'Search…', 'aria-label': 'Search', style: { width: '220px' }, oninput: (ev) => { q = ev.target.value; paint(); } }),
-      type === 'song' && App.can('edit') ? h('button', { title: 'SongSelect lyrics (.txt), SongSelect .usr and ChordPro files', onclick: () => App.importSongs() }, 'Import song files…') : null,
+      type === 'song' && App.canEdit('song') ? h('button', { title: 'SongSelect lyrics (.txt), SongSelect .usr and ChordPro files', onclick: () => App.importSongs() }, 'Import song files…') : null,
       (type === 'song' || type === 'service') && (App.gfx || App.machine.outputKey) && App.can('score') ? h('a', { class: 'btn', href: '/live/worship.html' }, 'Worship control ↗') : null,
-      App.can('edit') ? h('a', { class: 'btn primary', href: `#/edit/${type}/new` }, '+ New ' + e.label.toLowerCase()) : null), body);
+      !App.editable(type) && App.can('edit') ? h('a', { class: 'btn', href: App.onlineUrl(`#/list/${type}`), target: '_blank', rel: 'noopener', title: 'Records are managed on the website' }, 'Manage on the website ↗') : null,
+      App.canEdit(type) ? h('a', { class: 'btn primary', href: `#/edit/${type}/new` }, '+ New ' + e.label.toLowerCase()) : null), body);
     return { el, keepScroll: true, onMessage: UI.debounce((m) => { if (m.type === 'doc') paint(); }, 200) };
   };
 
@@ -187,7 +188,7 @@
     fixture(doc) {
       const f = doc.data, r = res(f), sp = Scoring.sportFor(f.sport);
       return h('div', { class: 'card' }, h('div', { class: 'spread' }, h('div', {}, h('h2', { style: { marginBottom: '4px' } }, App.fixtureName(f)), h('div', { class: 'row' }, statusPill(f), r && r.started ? h('b', {}, r.text) : null, r && r.started ? h('span', { class: 'dim' }, r.status || r.period) : null)),
-        h('div', { class: 'row' }, App.can('score') ? h('a', { class: 'btn primary', href: App.scorerUrl(doc.id, f) }, sp && sp.id === 'cricket' ? 'Open cricket scorer' : 'Open scorer') : null,
+        h('div', { class: 'row' }, App.canScore() ? h('a', { class: 'btn primary', href: App.scorerUrl(doc.id, f) }, sp && sp.id === 'cricket' ? 'Open cricket scorer' : 'Open scorer') : null,
           App.gfx && App.can('score') ? (App.machine.onAirFixture === doc.id ? h('a', { class: 'btn', href: '/live/control.html' }, 'Graphics control ↗')
             : h('button', { title: 'Graphics control, outputs and monitors switch to this match', onclick: () => App.gfxDo('setFixture', { fixtureId: doc.id }).then(() => { App.machine.onAirFixture = doc.id; toast('On air: ' + App.fixtureName(f)); route(); }).catch(oops) }, 'Put on air')) : null,
           h('a', { class: 'btn', href: App.commsUrl(doc.id, f), target: '_blank', rel: 'noopener' }, 'Commentary screen ↗'), h('a', { class: 'btn', href: '#/rundown/fixture/' + doc.id }, `Rundown (${(f.rundown || []).length})`))),
@@ -229,7 +230,8 @@
     const isNew = id === 'new';
     const doc = isNew ? { id: App.newId(type), type, data: {} } : App.docs.get(id);
     if (!doc) return { el: h('div', { class: 'card' }, 'This record no longer exists. ', h('a', { href: '#/list/' + type }, 'Back to the list')) };
-    const canEdit = App.can('edit');
+    const canEdit = App.canEdit(type);
+    const online = !App.editable(type);
     const pre = {};
     if (isNew && type === 'fixture') pre.startDate = UI.today();
     if (isNew && type === 'production') pre.date = UI.today();
@@ -256,9 +258,12 @@
       !isNew && canEdit ? h('button', { class: 'danger no-print', onclick: async () => { if (await confirmBox(`Delete this ${e.label.toLowerCase()}? This cannot be undone.`)) { try { await App.remove(type, doc.id); toast('Deleted'); location.hash = back; } catch (err) { oops(err); } } } }, 'Delete') : null,
       canEdit ? h('button', { class: 'primary no-print', onclick: save }, 'Save') : null),
     type !== 'production' ? panel : null,
-    h('div', { class: 'card' }, canEdit ? null : h('p', { class: 'dim' }, 'You can view this but your role cannot change it.'), form.el),
+    h('div', { class: 'card' }, canEdit ? null : online ? h('div', { class: 'spread', style: { marginBottom: '10px' } }, h('p', { class: 'dim', style: { margin: 0 } }, `${e.plural} are managed on the website. This PC shows them and keeps a copy for when the internet is down.`), App.can('edit') && !isNew ? h('a', { class: 'btn sm', href: App.onlineUrl(`#/edit/${type}/${doc.id}`), target: '_blank', rel: 'noopener' }, 'Edit on the website ↗') : null) : h('p', { class: 'dim' }, 'You can view this but your role cannot change it.'), form.el),
     type === 'production' ? panel : null);
-    if (!canEdit) el.querySelectorAll('.form input, .form select, .form textarea, .form button').forEach((x) => { x.disabled = true; });
+    if (!canEdit) {
+      el.querySelectorAll('.form input, .form select, .form textarea').forEach((x) => { x.disabled = true; });
+      el.querySelectorAll('.form button').forEach((x) => { x.style.display = 'none'; });     // upload, add row … mean nothing when it cannot be saved
+    }
     const onKey = (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); if (canEdit) save(); } };
     document.addEventListener('keydown', onKey);
     return { el, destroy: () => document.removeEventListener('keydown', onKey), onMessage: UI.debounce((m) => { if (m.type === 'doc' && panel && panel.repaint) panel.repaint(); }, 250) };
@@ -326,7 +331,7 @@
         : h('div', { class: 'card empty' }, fxTab === 'Results' ? 'Completed matches show up here.' : fxTab === 'Live' ? 'Nothing is live right now.' : 'No fixtures yet.'));
     };
     paint();
-    return { el: h('div', {}, pageHead('Fixtures & Results', App.can('edit') ? h('a', { class: 'btn primary', href: '#/edit/fixture/new' }, '+ New match') : null), tabs, body), keepScroll: true, onMessage: UI.debounce((m) => { if (m.type === 'doc') paint(); }, 200) };
+    return { el: h('div', {}, pageHead('Fixtures & Results', App.canEdit('fixture') ? h('a', { class: 'btn primary', href: '#/edit/fixture/new' }, '+ New match') : null), tabs, body), keepScroll: true, onMessage: UI.debounce((m) => { if (m.type === 'doc') paint(); }, 200) };
   };
 
   // ---- images ---------------------------------------------------------------------------------
@@ -336,7 +341,7 @@
     const paint = () => {
       const imgs = App.list('image').sort((a, b) => b.updatedAt - a.updatedAt);
       grid.replaceChildren(imgs.length ? h('div', { class: 'gallery' }, imgs.map((d) => h('div', { class: 'g', style: { cursor: 'default' } }, h('img', { src: '/media/' + d.id, alt: d.data.name, loading: 'lazy' }), h('div', { title: d.data.name }, h('b', {}, d.data.name)), h('div', { class: 'dim', title: d.data.file }, d.data.file), h('div', { class: 'dim' }, Math.max(1, Math.round(d.data.size / 1024)) + ' KB'),
-        App.can('edit') ? h('button', { class: 'sm ghost danger', onclick: async () => { if (await confirmBox(used(d.id) ? 'This image is in use. Delete it anyway?' : 'Delete this image?')) { try { await App.remove('image', d.id); paint(); } catch (e) { oops(e); } } } }, 'Delete') : null)))
+        App.canEdit('image') ? h('button', { class: 'sm ghost danger', onclick: async () => { if (await confirmBox(used(d.id) ? 'This image is in use. Delete it anyway?' : 'Delete this image?')) { try { await App.remove('image', d.id); paint(); } catch (e) { oops(e); } } } }, 'Delete') : null)))
         : h('div', { class: 'card empty' }, 'No images yet. Upload logos, player photos and sponsor boards here, or from any record that has an image field.'));
     };
     const file = h('input', { type: 'file', multiple: true, accept: 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml', class: 'hide', onchange: async () => {
@@ -346,7 +351,7 @@
     } });
     paint();
     const local = App.cfg.mode === 'local';
-    return { el: h('div', {}, pageHead('Images', file, App.can('edit') ? h('button', { class: 'primary', onclick: () => file.click() }, 'Upload images') : null),
+    return { el: h('div', {}, pageHead('Images', file, App.canEdit('image') ? h('button', { class: 'primary', onclick: () => file.click() }, 'Upload images') : null),
       h('p', { class: 'dim', style: { marginTop: '-8px' } }, local ? 'Every image is saved as a file in this machine\'s image folder, so CasparCG can load it from disk. Images added on other machines or the website are downloaded here automatically. Change the folder in Settings → This machine.'
         : 'Images uploaded here are downloaded to every linked production PC, into the image folder chosen on that machine.'), grid),
     keepScroll: true, onMessage: UI.debounce((m) => { if (m.type === 'doc' && m.doc.type === 'image') paint(); }, 300) };

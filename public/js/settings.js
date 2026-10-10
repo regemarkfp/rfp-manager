@@ -12,7 +12,7 @@
     CUSTOM_FIELDS];
 
   function teamTab() {
-    const admin = App.can('admin');
+    const admin = App.can('admin') && App.editable('org');
     const form = buildForm('org', App.org(), { fields: TEAM_FIELDS });
     const el = h('div', { class: 'stack' }, h('div', { class: 'card' }, h('h2', {}, 'Production team'), form.el,
       h('p', { class: 'help' }, 'Custom fields appear on that record\'s form. Sports rules are built in and follow each federation; choose the format or variant in the scorer\'s Setup tab.'),
@@ -22,6 +22,7 @@
   }
 
   function membersTab() {
+    if (App.cfg.bridge) return bridgeMembers();
     const admin = App.can('admin'), local = App.cfg.mode === 'local';
     const list = h('div', {});
     const paint = () => {
@@ -42,6 +43,25 @@
       local ? h('label', { class: 'f' }, h('span', {}, 'Password (optional, for signing in without internet)'), h('input', { type: 'password', autocomplete: 'new-password', oninput: (e) => { f.password = e.target.value; } })) : null),
     h('p', { class: 'help' }, local ? 'They can sign in with Google using this email, or with the password you set here.' : 'They sign in with Google using this email and will see this production team straight away.'),
     h('button', { class: 'primary', style: { marginTop: '10px' }, onclick: async () => { try { const r = await api('POST', '/api/members?team=' + App.team, f); App.docs.set(r.doc.id, r.doc); toast('Member added'); route(); } catch (e) { oops(e); } } }, 'Add member')) : null);
+  }
+
+  // the production PC: members and roles come from the website; an Admin can give someone a password for this PC
+  function bridgeMembers() {
+    const ms = App.list('member').sort((a, b) => String(a.data.email).localeCompare(String(b.data.email)));
+    const f = { email: (ms[0] && ms[0].data.email) || '', password: '' };
+    return h('div', { class: 'stack' }, h('div', { class: 'card' }, h('div', { class: 'spread' }, h('h2', {}, 'Members'), App.can('admin') ? h('a', { class: 'btn sm', href: App.onlineUrl('#/settings'), target: '_blank', rel: 'noopener' }, 'Manage on the website ↗') : null),
+      h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, h('th', {}, 'Email'), h('th', {}, 'Name'), h('th', {}, 'Role'))),
+        h('tbody', {}, ms.map((m) => h('tr', {}, h('td', {}, m.data.email), h('td', {}, m.data.name || ''), h('td', {}, m.data.role)))))),
+      h('p', { class: 'help' }, 'Members and roles are managed on the website and come down to this PC. Everyone signs in here with the same Google account.')),
+    App.can('admin') ? h('div', { class: 'card' }, h('h2', {}, 'Password for this PC (no internet at the venue)'),
+      h('p', { class: 'dim', style: { marginTop: 0 } }, 'Google sign-in needs the internet. Give a member a password that works on this PC only, for venues without it.'),
+      h('div', { class: 'form' },
+        h('label', { class: 'f' }, h('span', {}, 'Member'), h('select', { onchange: (e) => { f.email = e.target.value; } }, ms.map((m) => h('option', { value: m.data.email }, `${m.data.name || m.data.email} (${m.data.role})`)))),
+        h('label', { class: 'f' }, h('span', {}, 'Password (8+ characters)'), h('input', { type: 'password', autocomplete: 'new-password', oninput: (e) => { f.password = e.target.value; } }))),
+      h('button', { class: 'primary', style: { marginTop: '10px' }, onclick: async () => {
+        const m = ms.find((x) => x.data.email === f.email);
+        try { await api('POST', '/api/members?team=' + App.team, { email: f.email, role: m && m.data.role, password: f.password }); toast('Password set for this PC'); } catch (e) { oops(e); }
+      } }, 'Set password')) : null);
   }
 
   function accountTab() {
@@ -83,7 +103,7 @@
             h('div', { class: 'form', style: { marginTop: '8px' } }, lab('Website address', inp(f.cloud, 'url', { placeholder: 'https://your-site.onrender.com' })), lab('Machine key', inp(f.cloud, 'key', { type: 'password', autocomplete: 'off', placeholder: m.cloud.hasKey ? 'saved – leave empty to keep' : 'mk_…' }), 'Create one on the website: Settings → Machine keys.')),
             h('button', { style: { marginTop: '8px' }, onclick: () => save({ cloud: f.cloud }, 'Link saved') }, 'Save link')) : null),
         h('div', { class: 'card' }, h('div', { class: 'spread' }, h('h2', {}, 'Remote access through the website'), (() => { const ra = m.remoteAccess || {}; return h('div', { class: 'row' }, h('span', { class: 'led ' + (!m.remote || !s.linked ? '' : ra.connected ? 'ok' : 'warn') }), h('span', { class: 'dim' }, !m.remote ? 'Off' : !s.linked ? 'Needs the website link' : ra.connected ? 'Online' : 'Connecting' + (ra.lastError ? ': ' + ra.lastError : ''))); })()),
-          h('p', { class: 'dim', style: { marginTop: 0 } }, 'Team members signed in on the website can use this PC\'s live screens from anywhere: Graphics control, scorers, dashboards, Timeline, Worship, monitors, Connections and Templates. Nothing needs to be opened on your router: the PC keeps one outgoing link to the website. Graphics still play out from this PC.'),
+          h('p', { class: 'dim', style: { marginTop: 0 } }, 'Team members signed in on the website can use this PC\'s live screens from anywhere: Graphics control, dashboards, Timeline, Worship, monitors, Connections and Templates. Scoring stays on this PC and devices on its network. Nothing needs to be opened on your router: the PC keeps one outgoing link to the website. Graphics still play out from this PC.'),
           h('label', { class: 'row', style: { gap: '8px' } }, h('input', { type: 'checkbox', checked: m.remote !== false, onchange: (e) => save({ remote: e.target.checked }, e.target.checked ? 'Remote access on' : 'Remote access off') }), 'Allow use through the website'),
           s.linked && m.remote !== false ? h('p', { class: 'dim small' }, 'On the website choose this PC (', h('b', {}, m.machineName || 'this PC'), ') under PC at the top of the menu. Browser output for OBS / vMix from anywhere: ', h('code', {}, (m.cloud.url || '') + '/output?key=' + m.outputKey + '&pc=…'), ' (the website shows the full link under Monitors).') : null),
         h('div', { class: 'card' }, h('h2', {}, 'Access & sign-in'), h('div', { class: 'form' },
@@ -126,18 +146,19 @@
       file.value = '';
     } });
     return h('div', { class: 'card' }, h('h2', {}, 'Save file (XML)'), h('p', { class: 'dim', style: { marginTop: 0 } }, 'Export this production team in the RFP Manager save file layout, or load a save file into it. Importing adds and updates records; it never deletes anything.'), file,
-      h('div', { class: 'row' }, App.can('edit') ? h('a', { class: 'btn', href: '/api/export.xml?team=' + App.team }, 'Export save file') : null, App.can('admin') ? h('button', { onclick: () => file.click() }, 'Import save file…') : null));
+      h('div', { class: 'row' }, App.can('edit') ? h('a', { class: 'btn', href: '/api/export.xml?team=' + App.team }, 'Export save file') : null, App.can('admin') && !App.cfg.bridge ? h('button', { onclick: () => file.click() }, 'Import save file…') : null));
   }
 
   App.pages.settings = () => {
     const local = App.cfg.mode === 'local';
-    const tabs = [['team', 'Production team'], ['members', 'Members'], ['account', 'My account']];
+    const tabs = (App.cfg.bridge ? [] : [['team', 'Production team']]).concat([['members', 'Members'], ['account', 'My account']]);   // team settings are made on the website
     if ((local || App.machine.remote) && App.machine.admin) tabs.push(['connections', 'Connections'], ['machine', local ? 'This machine' : 'Production PC']);
-    if (App.teams.some((t) => t.role === 'Admin')) tabs.push(['keys', 'Machine keys']);
+    if (!App.cfg.bridge && App.teams.some((t) => t.role === 'Admin')) tabs.push(['keys', 'Machine keys']);   // keys are made on the website
     if (!local && App.machine.siteAdmin) tabs.push(['server', 'Server']);
     if (App.settingsTab) { tab = App.settingsTab; App.settingsTab = null; }
-    tabs.push(['file', 'Save file']);
-    if (!tabs.some(([k]) => k === tab)) tab = 'team';
+    if (!App.cfg.bridge) tabs.push(['file', 'Save file']);
+    if (App.cfg.bridge) tabs.sort((a, b) => ['connections', 'machine', 'members', 'account'].indexOf(a[0]) - ['connections', 'machine', 'members', 'account'].indexOf(b[0]));   // the PC: CasparCG and devices first
+    if (!tabs.some(([k]) => k === tab)) tab = tabs.some(([k]) => k === 'connections') && App.cfg.bridge ? 'connections' : tabs[0][0];
     const body = { team: teamTab, members: membersTab, account: accountTab, connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab, server: App.serverTab }[tab]();
     return { el: h('div', {}, pageHead('Settings'), h('div', { class: 'tabs' }, tabs.map(([k, l]) => h('button', { class: k === tab ? 'on' : '', onclick: () => { tab = k; route(); } }, l))), body) };
   };

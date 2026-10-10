@@ -54,7 +54,7 @@
           hasGoogle ? gHolder : null,
           hasGoogle ? h('div', { class: 'or' }, 'or') : h('p', { class: 'dim' }, 'First run on this machine. Link it to your website: you sign in there with Google, and your account, teams and data come down to this PC.'),
           hasGoogle ? h('details', {}, h('summary', { class: 'dim small' }, 'Link by signing in on the website instead'), h('div', { style: { marginTop: '10px' } }, linkBox(err))) : linkBox(err),
-          h('details', { style: { marginTop: '14px' } }, h('summary', { class: 'dim small' }, 'Use this PC on its own (no website)'), h('div', { style: { marginTop: '10px' } }, localForm))].filter(Boolean));
+          c.bridge ? null : h('details', { style: { marginTop: '14px' } }, h('summary', { class: 'dim small' }, 'Use this PC on its own (no website)'), h('div', { style: { marginTop: '10px' } }, localForm))].filter(Boolean));
         return;
       }
       box.replaceChildren(...[
@@ -108,6 +108,7 @@
       App.cfg = await api('GET', '/api/config');
       document.title = App.cfg.name;
       try { await App.loadMe(); } catch (e) { if (e.status === 401) return login(); throw e; }
+      if (App.cfg.bridge && !App.machine.linked) return App.linkGate(root);
       if (!App.teams.length) return noTeam();
       // Signed in after following a screen link (pc-name/scorer …): go back to that screen.
       const next = new URLSearchParams(location.search).get('next');

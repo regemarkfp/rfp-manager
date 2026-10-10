@@ -39,7 +39,7 @@
   App.pages.rundown = (type, id) => {
     const doc0 = App.docs.get(id);
     if (!doc0 || !['fixture', 'production'].includes(type)) return App.pages.notfound();
-    const can = App.can('edit');
+    const can = App.canEdit(type);
     const field = Schema.ENTITIES[type].fields.find((x) => x.k === 'rundown');
     const d = () => (App.docs.get(id) || doc0).data;
     let rows = (d().rundown || []).map((r) => ({ ...r })), dirty = false, editing = !rows.length && can;
@@ -135,7 +135,7 @@
         local && !remote ? h('p', { class: 'pill warn', style: { marginTop: '10px', whiteSpace: 'normal' } }, `Other devices reach this PC by its name (${m.hostname || 'pc-name'}) or its Tailscale address, not "localhost". The links below already use the PC name.`) : null,
         Number(m.port) !== 80 && !remote ? h('p', { class: 'dim small', style: { margin: '8px 0 0' } }, `To drop the ":${m.port}" from the links, set "port": 80 in config.json and restart RFP Manager (nothing else on the PC may be using port 80).`) : null),
       h('div', { class: 'card' }, h('h2', {}, 'Sport'), h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {},
-        link('Scorer', 'The right scorer for the match on air, with teams, squads and rules from the match.', '/scorer', true),
+        App.cfg.mode !== 'local' ? null : link('Scorer', 'The right scorer for the match on air, with teams, squads and rules from the match.', '/scorer', true),
         link('Graphics control', 'Take, update and clear graphics.', '/graphics-control', true),
         link('Confidence monitor', 'Commentary box: score, clock, players, cards, stats and talking points.', '/confidence'),
         link('Rundown', 'Running order with the item on air, time left and what is next.', '/rundown'),

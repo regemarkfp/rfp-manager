@@ -16,6 +16,12 @@ const App = {
   sorted(type) { return this.list(type).sort((a, b) => this.title(type, a.id).localeCompare(this.title(type, b.id), undefined, { numeric: true })); },
   sports() { return [...new Set([...Scoring.sportNames(), 'Rugby Sevens', ...this.list('squad').map((d) => d.data.sport).filter(Boolean)])]; },
   // Where a match is scored: the cricket scorer, the sports scorer, or nowhere if the sport has no rules engine yet.
+  // scoring is done on the production PC (or a device on its network), not on the website
+  // on the production PC (the CasparCG bridge) most records are managed on the website and only shown here
+  editable(type) { return !(this.cfg && this.cfg.bridge) || (this.cfg.pcEdit || []).includes(type); },
+  canEdit(type) { return this.can('edit') && this.editable(type); },
+  onlineUrl(hash) { return (this.cfg && this.cfg.cloudUrl ? this.cfg.cloudUrl.replace(/\/+$/, '') : '') + '/' + (hash || ''); },
+  canScore() { return this.cfg && this.cfg.mode === 'local' && this.can('score'); },
   scorerUrl(id, f) { const s = Scoring.sportFor(f.sport); return `/live/${s && s.id === 'cricket' ? 'stats' : 'sport'}.html?fixture=${encodeURIComponent(id)}`; },
   commsUrl(id, f) { const s = Scoring.sportFor(f.sport); return `/live/${s && s.id === 'cricket' ? 'commentary' : 'sport-commentary'}.html?fixture=${encodeURIComponent(id)}`; },
   img(id) { return id && this.docs.has(id) ? '/media/' + id : ''; },
@@ -56,7 +62,7 @@ const App = {
       if (m.doc.deleted) this.docs.delete(m.doc.id); else this.docs.set(m.doc.id, m.doc);
       if (m.doc.id === this.team) applyTheme();
       this.notify(m);
-    } else if (m.type === 'sync') { this.sync = m.status; this.paintSync(); }
+    } else if (m.type === 'sync') { this.sync = m.status; this.paintSync(); this.notify(m); }
     else if (m.type === 'gfx-state') { if (this.gfx) this.gfx.state = m.state; this.notify(m); }
     else if (m.type === 'gfx-warn') toast(m.text, 'error');
     else if (m.type === 'pcs') { this.loadMe().then(() => { paintPcPicker(); this.notify(m); }).catch(() => {}); }
@@ -132,16 +138,33 @@ function applyTheme() {
 }
 
 // ---- routing + shell ------------------------------------------------------------------------
-const NAV = [
-  ['', [['#/', 'Dashboard']]],
-  ['Matches', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions']]],
-  ['Live', [['#/pcs', 'Production PCs'], ['#/adverts', 'Advert playout'], ['#/monitors', 'Monitors'], ['#/templates', 'Templates'], ['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/list/timeline', 'Timelines'], ['#/list/dashboard', 'Dashboards'], ['#/automation', 'Variables & triggers'], ['#/playlog', 'Play log']]],
-  ['Streaming', [['#/list/channel', 'Channels']]],
-  ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report'], ['#/bibles', 'Bibles']]],
-  ['Productions', [['#/list/production', 'Productions'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment']]],
-  ['Assets', [['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/theme', 'Themes'], ['#/images', 'Images']]],
-  ['', [['#/settings', 'Settings']]],
-];
+// The side menu. The website manages the records; a production PC (the CasparCG bridge) runs the live side and
+// shows the records it gets from the website.
+function navFor() {
+  const c = App.cfg || {};
+  if (c.bridge) {
+    return [
+      ['', [['#/', 'Bridge']]],
+      ['Live', [['#/monitors', 'Monitors'], ['#/templates', 'Templates'], ['#/list/theme', 'Themes'], ['#/adverts', 'Advert playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'], ['#/playlog', 'Play log']]],
+      ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/bibles', 'Bibles'], ['#/ccli', 'CCLI report']]],
+      ['From the website', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions'], ['#/list/production', 'Productions'], ['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/crewMember', 'Crew'], ['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/images', 'Images']]],
+      ['', [['#/settings', 'Settings']]],
+    ];
+  }
+  const local = c.mode === 'local', pc = local || !!App.pc;          // live screens: on a PC, or on the website with a PC chosen
+  return [
+    ['', [['#/', 'Dashboard']]],
+    ['Matches', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions']]],
+    ['Productions', [['#/list/production', 'Productions'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment']]],
+    ['Assets', [['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/theme', 'Themes'], ['#/images', 'Images']]],
+    ['Advertising', [['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log']]],
+    ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report']].concat(local ? [['#/bibles', 'Bibles']] : [])],
+    local ? null : ['Streaming', [['#/list/channel', 'Channels']]],
+    ['Live', [App.pcs ? ['#/pcs', 'Production PCs'] : null, pc ? ['#/monitors', 'Monitors'] : null, pc ? ['#/templates', 'Templates'] : null, pc ? ['#/adverts', 'Advert playout'] : null,
+      ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers']].filter(Boolean)],
+    ['', [['#/settings', 'Settings']]],
+  ].filter(Boolean);
+}
 
 // The side menu: one part open at a time (the one you are in, or the one you opened last); the whole menu can be made narrow.
 const navStore = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* not kept */ } } };
@@ -157,13 +180,14 @@ function shell(content) {
       } }, App.teams.map((t) => h('option', { value: t.id, selected: t.id === App.team }, t.name)), h('option', { value: '+' }, '+ New production team…')),
       App.pcs ? h('div', { id: 'pc-picker' }, pcPicker()) : null,
       (() => {
+        const NAV = navFor();
         const groups = NAV.filter(([g]) => g).map(([g]) => g), here = (NAV.find(([g, links]) => g && links.some(([href]) => on(href))) || [])[0];
         let openG = here || navStore.get('rfp-nav-open') || '';
         if (!groups.includes(openG)) openG = '';
         const parts = [];
         const paint = () => parts.forEach((p) => { const o = p.g === openG; p.list.style.display = o ? '' : 'none'; p.head.textContent = (o ? '▾ ' : '▸ ') + p.g; });
         const nav = h('nav', { class: 'nav' }, NAV.map(([g, links]) => {
-          const list = h('div', {}, links.filter(([href]) => href !== '#/pcs' || App.pcs).map(([href, label]) => h('a', { href, class: on(href) ? 'on' : '', onclick: () => root.classList.remove('open') }, label)));
+          const list = h('div', {}, links.map(([href, label]) => h('a', { href, class: on(href) ? 'on' : '', onclick: () => root.classList.remove('open') }, label)));
           if (!g) return list;
           const head = h('div', { class: 'nav-group', role: 'button', tabindex: '0', title: 'Open this part of the menu (the others close)', style: { cursor: 'pointer', userSelect: 'none' },
             onclick: () => { openG = openG === g ? '' : g; navStore.set('rfp-nav-open', openG); paint(); }, onkeydown: (e) => { if (e.key === 'Enter') head.click(); } }, g);
@@ -294,7 +318,7 @@ function fieldInput(f, value, onChange, ctx = {}) {
         e.target.value = value || '';
         App.editModal(f.ref, (doc) => { value = doc.id; sel.insertBefore(h('option', { value: doc.id }, App.title(f.ref, doc.id)), sel.lastChild); sel.value = doc.id; onChange(doc.id); });
       } }, h('option', { value: '' }, '—'), docs.map((d) => h('option', { value: d.id, selected: d.id === value }, App.title(f.ref, d.id))),
-      App.can('edit') && Schema.ENTITIES[f.ref] ? h('option', { value: '+' }, '+ New ' + Schema.ENTITIES[f.ref].label.toLowerCase() + '…') : null);
+      App.canEdit(f.ref) && Schema.ENTITIES[f.ref] ? h('option', { value: '+' }, '+ New ' + Schema.ENTITIES[f.ref].label.toLowerCase() + '…') : null);
       return sel;
     }
     case 'image': return imageField(value, onChange, f.k);

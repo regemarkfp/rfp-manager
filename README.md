@@ -248,6 +248,23 @@ To update the server later, make a new setup command and run it again. The setti
 `journalctl -u rfp-manager -f` and `journalctl -u mediamtx -f`. Bandwidth: one 4 Mb/s stream uses about 1.8 GB
 an hour for each viewer (Oracle includes 10 TB a month).
 
+### Who does what: the website manages, the PC is the CasparCG bridge
+
+* **The website** is where records are managed: clubs, teams, players, venues, competitions, fixtures, productions
+  and rundowns, crew, crew roles, equipment, adverts and ad playlists, songs and services, images, channels, team
+  settings and members. The website does **no scoring**.
+* **The production PC** is the bridge to CasparCG. It must be linked to the website once (sign in with Google, or
+  link by signing in on the website). It shows everything from the website **read-only** (each record has *Edit on
+  the website ↗*), and it runs the live side: scoring (on the PC or on tablets and phones on its network), Graphics
+  control, the template folder, themes, dashboards, timelines, variables and triggers, worship control, advert
+  playout, devices and the play log. The menu opens on **Bridge**: website and CasparCG status, what is on air, and
+  the live screens.
+* **Internet down?** The PC carries on with its own copy of everything. Scores, graphics and the play log are kept
+  on the PC. The Bridge page shows how many changes are waiting, and they go up to the website as soon as it is
+  reachable again.
+* **Signing in without internet:** Google needs the internet. An Admin can give a member a password for this PC only
+  (Settings → Members on the PC).
+
 ## 4. Using it
 
 | Area | What it does |
@@ -815,13 +832,13 @@ To change a sport's rules or add a variant, edit its entry in `shared/sports.js`
 
 ## 7. Tests
 
-`npm test` runs 53 tests: the cricket engine (ICC conditions, DLS, super over, two-innings matches), the rules
+`npm test` runs 54 tests: the cricket engine (ICC conditions, DLS, super over, two-innings matches), the rules
 and statistics of every other sport, worship control (slides, outputs, CCLI log, song and Bible file formats),
 the short screen links, the live scorer and graphics control over the WebSocket against a stand-in CasparCG
 server, the rundown monitor, accounts and roles, the image folder, Google token checks (against a locally
 generated key), XML export and import, sync between an online instance and production PCs, scorer buttons and
 macros per theme, advert options and the play log, vMix, ATEM, HyperDeck, Raspberry Pi GPIO, OBS, Companion, OSC, Art-Net, MIDI and X-keys (the Windows helper's line protocol, and Linux device files) against small stand-ins, input mappings, the Companion addresses, who took each graphic, the Timeline (cues, holds, GO,
-crew screens, comments, rundown import), custom variables, game triggers (adverts on tries), dashboards, text of several lines (JSON, XML and `{nl}`), linking a PC by signing in on the website or with Google on the PC (a stand-in Google key), and remote access through the website (live pages, WebSocket, settings, adverts, screen keys, team checks, a forged identity, the PC going offline), streaming channels (stream keys, who may publish and watch, viewer tokens, passwords, live status against a stand-in MediaMTX) and the server setup command (bundle, settings, who may make it).
+crew screens, comments, rundown import), custom variables, game triggers (adverts on tries), dashboards, text of several lines (JSON, XML and `{nl}`), linking a PC by signing in on the website or with Google on the PC (a stand-in Google key), and remote access through the website (live pages, WebSocket, settings, adverts, screen keys, team checks, a forged identity, the PC going offline), the bridge PC (records read-only on the PC, no scoring through the website, working offline and catching up afterwards), streaming channels (stream keys, who may publish and watch, viewer tokens, passwords, live status against a stand-in MediaMTX) and the server setup command (bundle, settings, who may make it).
 
 Not covered by the tests, so check these on your own setup first: a real CasparCG server, real vMix, ATEM,
 HyperDeck, OBS, Companion, lighting desks and X-keys / MIDI hardware (built from their published protocols, tested only

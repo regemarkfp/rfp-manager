@@ -53,7 +53,7 @@
       let r;
       try { r = await api('GET', '/api/pcs'); } catch (e) { el.replaceChildren(pageHead('Production PCs'), h('div', { class: 'card' }, e.message)); return; }
       const choose = async (id) => { try { await api('POST', '/api/pcs/choose', { id }); location.reload(); } catch (e) { oops(e); } };
-      const live = [['Graphics control', '/live/control.html'], ['Scorer', '/scorer'], ['Dashboards', '/live/dash.html'], ['Timeline', '/live/timeline.html'], ['Worship', '/live/worship.html'], ['Rundown', '/rundown'], ['Confidence monitor', '/confidence']];
+      const live = [['Graphics control', '/live/control.html'], ['Dashboards', '/live/dash.html'], ['Timeline', '/live/timeline.html'], ['Worship', '/live/worship.html'], ['Rundown', '/rundown'], ['Confidence monitor', '/confidence']];
       el.replaceChildren(pageHead('Production PCs'),
         h('div', { class: 'card' }, h('h2', {}, 'Online now'),
           r.pcs.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {}, r.pcs.map((p) => h('tr', {},
