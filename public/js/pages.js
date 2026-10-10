@@ -13,14 +13,14 @@
       h('div', { class: 'when' }, showDate ? UI.fmtDate(f.startDate, { day: 'numeric', month: 'short' }) : (f.startTime || '--:--')),
       h('div', { class: 'grow' }, h('a', { href: '#/edit/fixture/' + d.id }, h('b', {}, App.fixtureName(f))),
         h('div', { class: 'dim small' }, [f.sport, App.title('competition', f.competition), App.title('venue', f.venue), showDate ? f.startTime : ''].filter(Boolean).join(' · '))),
-      r && r.started ? h('span', { class: 'sc' }, r.text) : null,
+      r && r.started ? h('span', { class: 'sc' }, r.text) : f.officialReport && f.officialReport.scoreA !== '' ? h('span', { class: 'sc', title: 'Confirmed by ' + f.officialReport.by }, `${f.officialReport.scoreA} – ${f.officialReport.scoreB}`) : null,
       r && f.status === 'Live' ? h('span', { class: 'dim small' }, r.period) : null,
       air ? h('span', { class: 'pill live', title: 'Graphics, outputs and monitors follow this match' }, 'ON AIR') : null,
       statusPill(f),
       App.canScore() ? h('a', { class: 'btn sm' + (f.status === 'Live' ? ' primary' : ''), href: App.scorerUrl(d.id, f) }, 'Score') : null,
       App.gfx && App.can('score') && !air ? h('button', { class: 'sm', title: 'Graphics control, outputs and monitors switch to this match', onclick: () => App.gfxDo('setFixture', { fixtureId: d.id }).then(() => { App.machine.onAirFixture = d.id; toast('On air: ' + App.fixtureName(f)); route(); }).catch(oops) }, 'Put on air') : null,
       App.gfx && App.can('score') && air ? h('a', { class: 'btn sm primary', href: '/live/control.html', title: 'Graphics control for the match on air' }, 'Graphics ↗') : null,
-      h('a', { class: 'btn sm', href: '#/rundown/fixture/' + d.id }, 'Rundown'));
+      App.limited() ? null : h('a', { class: 'btn sm', href: '#/rundown/fixture/' + d.id }, 'Rundown'));
   }
   App.fixtureRow = fixtureRow;
 
@@ -98,7 +98,7 @@
         ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, cols.map((f) => h('th', { class: f.t === 'money' || f.t === 'number' ? 'r' : '' }, f.t === 'image' ? '' : f.l)))),
           h('tbody', {}, docs.map((d) => h('tr', { class: 'click', tabindex: '0', onclick: () => { location.hash = `#/edit/${type}/${d.id}`; }, onkeydown: (ev) => { if (ev.key === 'Enter') location.hash = `#/edit/${type}/${d.id}`; } },
             cols.map((f) => h('td', { class: f.t === 'money' || f.t === 'number' ? 'r num' : '' }, cell(type, f, d.data[f.k], d.data))))))))
-        : h('div', { class: 'card empty' }, q ? 'Nothing matches that search.' : `No ${e.plural.toLowerCase()} yet.`, ' ', App.canEdit(type) && !q ? h('a', { href: `#/edit/${type}/new` }, 'Add the first one') : null),
+        : h('div', { class: 'card empty' }, q ? 'Nothing matches that search.' : `No ${e.plural.toLowerCase()} yet.`, ' ', App.canCreate(type) && !q ? h('a', { href: `#/edit/${type}/new` }, 'Add the first one') : null),
       type === 'advert' ? adReport() : null);
     };
     paint();
@@ -107,7 +107,7 @@
       type === 'song' && App.canEdit('song') ? h('button', { title: 'SongSelect lyrics (.txt), SongSelect .usr and ChordPro files', onclick: () => App.importSongs() }, 'Import song files…') : null,
       (type === 'song' || type === 'service') && (App.gfx || App.machine.outputKey) && App.can('score') ? h('a', { class: 'btn', href: '/live/worship.html' }, 'Worship control ↗') : null,
       !App.editable(type) && App.can('edit') ? h('a', { class: 'btn', href: App.onlineUrl(`#/list/${type}`), target: '_blank', rel: 'noopener', title: 'Records are managed on the website' }, 'Manage on the website ↗') : null,
-      App.canEdit(type) ? h('a', { class: 'btn primary', href: `#/edit/${type}/new` }, '+ New ' + e.label.toLowerCase()) : null), body);
+      App.canCreate(type) ? h('a', { class: 'btn primary', href: `#/edit/${type}/new` }, '+ New ' + e.label.toLowerCase()) : null), body);
     return { el, keepScroll: true, onMessage: UI.debounce((m) => { if (m.type === 'doc') paint(); }, 200) };
   };
 
@@ -197,13 +197,13 @@
     production(doc, form) {
       const box = h('div', {});
       const paint = () => {
-        const p = form.data, c = Schema.costing(p, (id) => App.get(id));
+        const p = form.data, c = Schema.costing({ ...p, expenses: App.list('expense').filter((x) => x.data.production === doc.id).map((x) => ({ id: x.id, ...x.data })) }, (id) => App.get(id));
         const over = {};
         for (const r of p.crew || []) if (r.role) over[r.role] = (over[r.role] || 0) + 1;
         const warn = Object.entries(over).map(([id, n]) => { const role = App.get(id); return role && Number(role.maxQuantity) && n > Number(role.maxQuantity) ? `${role.name}: ${n} booked, maximum is ${role.maxQuantity}` : null; }).filter(Boolean);
         const clash = (p.crew || []).filter((r) => r.crewMember).map((r) => r.crewMember).filter((id, i, a) => a.indexOf(id) !== i).map((id) => App.title('crewMember', id));
         const fx = (p.fixtures || []).map((r) => App.docs.get(r.fixture)).filter(Boolean);
-        box.replaceChildren(
+        box.replaceChildren(...[
           fx.length ? h('div', { class: 'card' }, h('h2', {}, 'Matches in this production'), fx.map((d) => App.fixtureRow(d))) : null,
           h('div', { class: 'card' }, h('div', { class: 'spread' }, h('h2', {}, 'Costing'), h('div', { class: 'row no-print' }, h('a', { class: 'btn sm', href: '#/rundown/production/' + doc.id }, `Rundown (${(p.rundown || []).length})`), h('a', { class: 'btn sm', href: '#/callsheet/' + doc.id }, 'Call sheet'))),
             warn.concat(clash.length ? ['Booked twice: ' + [...new Set(clash)].join(', ')] : []).map((w) => h('div', { class: 'pill warn', style: { marginBottom: '8px', marginRight: '6px' } }, w)),
@@ -214,7 +214,7 @@
             c.lines.length ? h('div', { class: 'cards', style: { marginTop: '12px' } },
               h('div', { class: 'tile' }, h('b', {}, UI.money(c.cost, cur())), h('span', {}, 'What it costs you')),
               h('div', { class: 'tile' }, h('b', {}, UI.money(c.invoice, cur())), h('span', {}, 'What you invoice')),
-              h('div', { class: 'tile' }, h('b', { style: { color: c.profit < 0 ? 'var(--danger)' : 'var(--accent)' } }, UI.money(c.profit, cur())), h('span', {}, `Profit · ${c.margin}% margin`))) : null));
+              h('div', { class: 'tile' }, h('b', { style: { color: c.profit < 0 ? 'var(--danger)' : 'var(--accent)' } }, UI.money(c.profit, cur())), h('span', {}, `Profit · ${c.margin}% margin`))) : null)].filter(Boolean));
       };
       paint();
       box.repaint = paint;
@@ -230,7 +230,7 @@
     const isNew = id === 'new';
     const doc = isNew ? { id: App.newId(type), type, data: {} } : App.docs.get(id);
     if (!doc) return { el: h('div', { class: 'card' }, 'This record no longer exists. ', h('a', { href: '#/list/' + type }, 'Back to the list')) };
-    const canEdit = App.canEdit(type);
+    const canEdit = App.canEdit(type) && (isNew || App.coachOwns(type, doc));
     const online = !App.editable(type);
     const pre = {};
     if (isNew && type === 'fixture') pre.startDate = UI.today();
@@ -257,9 +257,9 @@
     const el = h('div', {}, pageHead(h('div', {}, h('a', { class: 'small', href: back }, '← ' + e.plural), h('h1', {}, isNew ? 'New ' + e.label.toLowerCase() : e.title(doc.data, (x) => App.get(x)) || e.label)),
       !isNew && canEdit ? h('button', { class: 'danger no-print', onclick: async () => { if (await confirmBox(`Delete this ${e.label.toLowerCase()}? This cannot be undone.`)) { try { await App.remove(type, doc.id); toast('Deleted'); location.hash = back; } catch (err) { oops(err); } } } }, 'Delete') : null,
       canEdit ? h('button', { class: 'primary no-print', onclick: save }, 'Save') : null),
-    type !== 'production' ? panel : null,
-    h('div', { class: 'card' }, canEdit ? null : online ? h('div', { class: 'spread', style: { marginBottom: '10px' } }, h('p', { class: 'dim', style: { margin: 0 } }, `${e.plural} are managed on the website. This PC shows them and keeps a copy for when the internet is down.`), App.can('edit') && !isNew ? h('a', { class: 'btn sm', href: App.onlineUrl(`#/edit/${type}/${doc.id}`), target: '_blank', rel: 'noopener' }, 'Edit on the website ↗') : null) : h('p', { class: 'dim' }, 'You can view this but your role cannot change it.'), form.el),
-    type === 'production' ? panel : null);
+    type !== 'production' || !canEdit ? panel : null,
+    App.limited() && type === 'fixture' ? null : h('div', { class: 'card' }, canEdit ? null : online ? h('div', { class: 'spread', style: { marginBottom: '10px' } }, h('p', { class: 'dim', style: { margin: 0 } }, `${e.plural} are managed on the website. This PC shows them and keeps a copy for when the internet is down.`), App.can('edit') && !isNew ? h('a', { class: 'btn sm', href: App.onlineUrl(`#/edit/${type}/${doc.id}`), target: '_blank', rel: 'noopener' }, 'Edit on the website ↗') : null) : h('p', { class: 'dim' }, 'You can view this but your role cannot change it.'), form.el),
+    type === 'production' && canEdit ? panel : null);
     if (!canEdit) {
       el.querySelectorAll('.form input, .form select, .form textarea').forEach((x) => { x.disabled = true; });
       el.querySelectorAll('.form button').forEach((x) => { x.style.display = 'none'; });     // upload, add row … mean nothing when it cannot be saved

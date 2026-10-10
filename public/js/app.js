@@ -19,7 +19,29 @@ const App = {
   // scoring is done on the production PC (or a device on its network), not on the website
   // on the production PC (the CasparCG bridge) most records are managed on the website and only shown here
   editable(type) { return !(this.cfg && this.cfg.bridge) || (this.cfg.pcEdit || []).includes(type); },
-  canEdit(type) { return this.can('edit') && this.editable(type); },
+  canEdit(type) { return this.editable(type) && (this.can('edit') || (this.role === 'Coach' && ['club', 'squad', 'player'].includes(type)) || (type === 'expense' && !Schema.ROLE_SEES[this.role])); },
+  canCreate(type) { return this.canEdit(type) && !(this.role === 'Coach' && type === 'club'); },
+  // coaches and officials: their member record, a coach's clubs, and whether a coach may change this record
+  myMember() { return this.list('member').find((m) => m.data.email === (this.me && this.me.email)) || null; },
+  coachClubs() { const m = this.myMember(); return new Set((m && m.data.role === 'Coach' && m.data.clubs) || []); },
+  coachOwns(type, doc) {
+    if (this.role !== 'Coach') return true;
+    const clubs = this.coachClubs(), d = (doc && doc.data) || {};
+    if (type === 'club') return clubs.has(doc.id);
+    if (type === 'squad') return clubs.has(d.club);
+    if (type === 'player') return d.addedBy === this.me.email || this.list('squad').some((s) => clubs.has(s.data.club) && (s.data.players || []).some((r) => r.player === doc.id));
+    return false;
+  },
+  // a person's picture: their Google profile picture, else their initials
+  avatar(img, name, size = 24) {
+    const src = /^https:\/\//.test(img || '') ? img : /^img_/.test(img || '') && this.docs.has(img) ? '/media/' + img : '';
+    const st = { width: size + 'px', height: size + 'px', borderRadius: '50%', flex: 'none', objectFit: 'cover', verticalAlign: 'middle' };
+    if (src) return h('img', { src, alt: '', referrerpolicy: 'no-referrer', style: st });
+    const ini = String(name || '?').split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+    return h('span', { style: { ...st, display: 'inline-grid', placeItems: 'center', background: 'var(--panel2)', color: 'var(--dim)', fontSize: Math.round(size * 0.42) + 'px', fontWeight: 700 } }, ini);
+  },
+  personByEmail(email) { const m = this.list('member').find((x) => x.data.email === email); return m ? m.data : null; },
+  limited() { return !!Schema.ROLE_SEES[this.role]; },          // a coach or an official
   onlineUrl(hash) { return (this.cfg && this.cfg.cloudUrl ? this.cfg.cloudUrl.replace(/\/+$/, '') : '') + '/' + (hash || ''); },
   canScore() { return this.cfg && this.cfg.mode === 'local' && this.can('score'); },
   scorerUrl(id, f) { const s = Scoring.sportFor(f.sport); return `/live/${s && s.id === 'cricket' ? 'stats' : 'sport'}.html?fixture=${encodeURIComponent(id)}`; },
@@ -29,10 +51,11 @@ const App = {
   newId(type) { const a = new Uint8Array(9); crypto.getRandomValues(a); return type.toLowerCase().slice(0, 8) + '_' + [...a].map((b) => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join(''); },
 
   async save(type, id, data) {
-    const r = await api('PUT', `/api/docs/${type}/${id}?team=${this.team}`, { data });
+    const r = type === 'expense' ? await api('POST', `/api/expenses?team=${this.team}`, { id, data }) : await api('PUT', `/api/docs/${type}/${id}?team=${this.team}`, { data });
     this.docs.set(r.doc.id, r.doc);
     return r.doc;
   },
+  // (expenses go through their own address: crew add them too, Producers approve)
   async remove(type, id) { await api('DELETE', `/api/docs/${type}/${id}?team=${this.team}`); this.docs.delete(id); },
 
   async uploadImage(file, kind) {
@@ -142,6 +165,8 @@ function applyTheme() {
 // shows the records it gets from the website.
 function navFor() {
   const c = App.cfg || {};
+  if (App.role === 'Coach') return [['', [['#/', 'My teams'], ['#/fixtures', 'Fixtures & Results'], ['#/list/club', 'My clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/settings', 'Settings']]]];
+  if (App.role === 'Official') return [['', [['#/', 'My matches'], ['#/fixtures', 'Fixtures & Results'], ['#/settings', 'Settings']]]];
   if (c.bridge) {
     return [
       ['', [['#/', 'Bridge']]],
@@ -155,7 +180,7 @@ function navFor() {
   return [
     ['', [['#/', 'Dashboard']]],
     ['Matches', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions']]],
-    ['Productions', [['#/list/production', 'Productions'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment']]],
+    ['Productions', [['#/list/production', 'Productions'], ['#/list/expense', App.can('edit') ? 'Expenses' : 'My expenses'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment']]],
     ['Assets', [['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/theme', 'Themes'], ['#/images', 'Images']]],
     ['Advertising', [['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log']]],
     ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report']].concat(local ? [['#/bibles', 'Bibles']] : [])],
@@ -200,7 +225,7 @@ function shell(content) {
       h('div', { class: 'foot' },
         h('div', { class: 'dim small', style: { padding: '2px 8px' }, title: 'The version of RFP Manager this PC is running' }, 'RFP Manager ' + (App.cfg.version || '')),
         h('div', { class: 'sync', id: 'sync' }, h('span', { class: 'led' }), h('span', {}, '')),
-        h('div', { class: 'row', style: { padding: '4px 8px', justifyContent: 'space-between' } }, h('span', { class: 'dim', title: App.me.email }, (App.me.name || App.me.email) + ' · ' + (App.role || '')),
+        h('div', { class: 'row', style: { padding: '4px 8px', justifyContent: 'space-between', gap: '8px' } }, h('span', { class: 'dim row', style: { gap: '8px', minWidth: 0 }, title: App.me.email }, App.avatar(App.me.image, App.me.name || App.me.email, 26), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis' } }, (App.me.name || App.me.email) + ' · ' + (App.role || ''))),
           h('button', { class: 'ghost sm', onclick: async () => { await api('POST', '/api/auth/logout'); location.hash = ''; location.reload(); } }, 'Sign out')))),
     h('main', { class: 'main' }, h('button', { class: 'menu-btn no-print', style: { marginBottom: '12px' }, onclick: () => root.classList.toggle('open') }, '☰ Menu'), content));
   return root;
@@ -245,7 +270,7 @@ function optionsFor(f) {
 
 function imagePicker(onPick) {
   const grid = h('div', { class: 'gallery' });
-  const imgs = App.list('image').sort((a, b) => b.updatedAt - a.updatedAt);
+  const imgs = App.list('image').filter((d) => d.data.kind !== 'receipt').sort((a, b) => b.updatedAt - a.updatedAt);
   let close;
   for (const d of imgs) grid.append(h('div', { class: 'g', onclick: () => { onPick(d.id); close(); } }, h('img', { src: '/media/' + d.id, alt: '', loading: 'lazy' }), h('div', {}, d.data.name)));
   close = modal({ title: 'Image library', wide: true, body: imgs.length ? grid : h('div', { class: 'empty' }, 'No images yet. Upload one first.'), actions: [{ label: 'Close' }] });
@@ -253,14 +278,31 @@ function imagePicker(onPick) {
 
 function imageField(value, onChange, kind) {
   const pv = h('div', { class: 'pv' });
-  const paint = () => pv.replaceChildren(value && App.docs.has(value) ? h('img', { src: '/media/' + value, alt: '' }) : 'none');
+  const receipt = kind === 'receipt';
+  const paint = () => {
+    const d = value && App.docs.get(value);
+    pv.replaceChildren(!d ? 'none' : d.data.mime === 'application/pdf' ? h('a', { href: '/media/' + value, target: '_blank', rel: 'noopener', style: { fontWeight: 700 } }, 'PDF') : h('a', { href: '/media/' + value, target: '_blank', rel: 'noopener' }, h('img', { src: '/media/' + value, alt: '' })));
+  };
   const set = (v) => { value = v; paint(); onChange(v); };
-  const file = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml', class: 'hide', onchange: async () => {
+  const file = h('input', { type: 'file', accept: receipt ? 'image/*,application/pdf' : 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml', class: 'hide', onchange: async () => {
     if (!file.files[0]) return;
     try { set(await App.uploadImage(file.files[0], kind)); toast('Image saved'); } catch (e) { oops(e); }
     file.value = '';
   } });
   paint();
+  if (receipt) {
+    // on a phone: straight to the camera; a PDF or a photo from the gallery works too
+    const cam = h('input', { type: 'file', accept: 'image/*', capture: 'environment', class: 'hide', onchange: async () => {
+      if (!cam.files[0]) return;
+      try { set(await App.uploadImage(cam.files[0], kind)); toast('Receipt saved'); } catch (e) { oops(e); }
+      cam.value = '';
+    } });
+    paint();
+    return h('div', { class: 'imgfield' }, pv, file, cam, h('div', { class: 'row' },
+      h('button', { type: 'button', class: 'sm primary', onclick: () => cam.click() }, '📷 Photo'),
+      h('button', { type: 'button', class: 'sm', onclick: () => file.click() }, 'File or PDF'),
+      value ? h('button', { type: 'button', class: 'sm ghost', onclick: () => set('') }, 'Clear') : null));
+  }
   return h('div', { class: 'imgfield' }, pv, file, h('div', { class: 'row' },
     h('button', { type: 'button', class: 'sm', onclick: () => file.click() }, 'Upload'),
     h('button', { type: 'button', class: 'sm', onclick: () => imagePicker(set) }, 'Library'),

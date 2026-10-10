@@ -27,22 +27,27 @@
     const list = h('div', {});
     const paint = () => {
       const ms = App.list('member').sort((a, b) => String(a.data.email).localeCompare(String(b.data.email)));
-      list.replaceChildren(h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, h('th', {}, 'Email'), h('th', {}, 'Name'), h('th', {}, 'Role'), h('th', {}))),
-        h('tbody', {}, ms.map((m) => h('tr', {}, h('td', {}, m.data.email, m.data.email === App.me.email ? h('span', { class: 'pill', style: { marginLeft: '6px' } }, 'you') : null), h('td', {}, m.data.name || ''),
-          h('td', {}, admin ? h('select', { style: { width: '140px' }, onchange: async (e) => { try { await api('POST', '/api/members?team=' + App.team, { email: m.data.email, name: m.data.name, role: e.target.value }); toast('Role changed'); } catch (err) { oops(err); paint(); } } }, Schema.ROLES.map((r) => h('option', { selected: r === m.data.role }, r))) : m.data.role),
+      list.replaceChildren(h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, h('th', {}, 'Email'), h('th', {}, 'Name'), h('th', {}, 'Role'), h('th', {}, ''), h('th', {}))),
+        h('tbody', {}, ms.map((m) => h('tr', {}, h('td', {}, App.avatar(m.data.image, m.data.name || m.data.email, 24), ' ', m.data.email, m.data.email === App.me.email ? h('span', { class: 'pill', style: { marginLeft: '6px' } }, 'you') : null), h('td', {}, m.data.name || ''),
+          h('td', {}, admin ? h('select', { style: { width: '140px' }, onchange: async (e) => { if (['Coach', 'Official'].includes(e.target.value)) return roleDetails({ ...m, data: { ...m.data, role: e.target.value } }, paint); try { await api('POST', '/api/members?team=' + App.team, { email: m.data.email, name: m.data.name, role: e.target.value }); toast('Role changed'); } catch (err) { oops(err); paint(); } } }, Schema.ROLES.map((r) => h('option', { selected: r === m.data.role }, r))) : m.data.role),
+          h('td', { class: 'nowrap small' }, m.data.role === 'Coach' ? (m.data.clubs || []).map((c) => App.title('club', c)).join(', ') || h('span', { class: 'pill warn' }, 'no club yet') : m.data.role === 'Official' ? 'Named as: ' + (m.data.officialName || m.data.name || '—') : '',
+            admin && ['Coach', 'Official'].includes(m.data.role) ? h('button', { class: 'sm ghost', style: { marginLeft: '6px' }, onclick: () => roleDetails(m, paint) }, 'Change') : null),
           h('td', { class: 'r' }, admin ? h('button', { class: 'sm ghost danger', onclick: async () => { if (await confirmBox(`Remove ${m.data.email} from this production team?`, 'Remove')) { try { await api('DELETE', `/api/members/${m.id}?team=${App.team}`); App.docs.delete(m.id); paint(); } catch (err) { oops(err); } } } }, 'Remove') : null)))))));
     };
     paint();
     const f = { email: '', name: '', role: 'Scorer', password: '' };
     return h('div', { class: 'stack' }, h('div', { class: 'card' }, h('h2', {}, 'Members'), list,
-      h('p', { class: 'help' }, 'Admin: everything, including members and settings. Producer: edit all records. Scorer: score matches and control graphics. Crew: view only (no ID numbers).')),
+      h('p', { class: 'help' }, 'Admin: everything, including members and settings. Producer: productions, crew, bookings, costing and every record. Scorer: score matches and control graphics. Crew: view, and add their expenses with receipts. Coach: their own clubs, teams, players and team sheets. Official: the matches they are named on, and confirming results.')),
     admin ? h('div', { class: 'card' }, h('h2', {}, 'Add someone'), h('div', { class: 'form' },
       h('label', { class: 'f' }, h('span', {}, 'Email (their Google account)'), h('input', { type: 'email', oninput: (e) => { f.email = e.target.value; } })),
       h('label', { class: 'f' }, h('span', {}, 'Name'), h('input', { oninput: (e) => { f.name = e.target.value; } })),
       h('label', { class: 'f' }, h('span', {}, 'Role'), h('select', { onchange: (e) => { f.role = e.target.value; } }, Schema.ROLES.map((r) => h('option', { selected: r === f.role }, r)))),
       local ? h('label', { class: 'f' }, h('span', {}, 'Password (optional, for signing in without internet)'), h('input', { type: 'password', autocomplete: 'new-password', oninput: (e) => { f.password = e.target.value; } })) : null),
     h('p', { class: 'help' }, local ? 'They can sign in with Google using this email, or with the password you set here.' : 'They sign in with Google using this email and will see this production team straight away.'),
-    h('button', { class: 'primary', style: { marginTop: '10px' }, onclick: async () => { try { const r = await api('POST', '/api/members?team=' + App.team, f); App.docs.set(r.doc.id, r.doc); toast('Member added'); route(); } catch (e) { oops(e); } } }, 'Add member')) : null);
+    h('button', { class: 'primary', style: { marginTop: '10px' }, onclick: async () => {
+      if (['Coach', 'Official'].includes(f.role)) return roleDetails({ data: { email: f.email, name: f.name, role: f.role } }, () => route());
+      try { const r = await api('POST', '/api/members?team=' + App.team, f); App.docs.set(r.doc.id, r.doc); toast('Member added'); route(); } catch (e) { oops(e); }
+    } }, 'Add member')) : null);
   }
 
   // the production PC: members and roles come from the website; an Admin can give someone a password for this PC
@@ -64,12 +69,33 @@
       } }, 'Set password')) : null);
   }
 
+  // a coach's clubs, an official's name as written on match sheets
+  function roleDetails(m, done) {
+    const d = m.data, v = { clubs: new Set(d.clubs || []), officialName: d.officialName || d.name || '' };
+    const clubs = App.list('club').sort((a, b) => String(a.data.name).localeCompare(String(b.data.name)));
+    const body = d.role === 'Coach'
+      ? h('div', {}, h('p', { class: 'dim', style: { marginTop: 0 } }, `${d.email} can change these clubs, their teams and players, and pick team sheets for their matches.`),
+        clubs.length ? h('div', { class: 'stack', style: { maxHeight: '50vh', overflow: 'auto' } }, clubs.map((c) => h('label', { class: 'row', style: { gap: '8px' } }, h('input', { type: 'checkbox', checked: v.clubs.has(c.id), onchange: (e) => { if (e.target.checked) v.clubs.add(c.id); else v.clubs.delete(c.id); } }), c.data.name)))
+          : h('p', {}, 'Add the club first (Assets → Clubs).'))
+      : h('div', {}, h('p', { class: 'dim', style: { marginTop: 0 } }, `${d.email} sees the matches where this name is listed under Match officials (as "Role: Name"), and can confirm their results.`),
+        h('label', { class: 'f' }, h('span', {}, 'Name as written on the match sheets'), h('input', { value: v.officialName, oninput: (e) => { v.officialName = e.target.value; } })));
+    modal({ title: `${d.role}: ${d.name || d.email}`, body, actions: [{ label: 'Cancel', onClick: () => { done(); } }, { label: 'Save', primary: true, onClick: async () => {
+      try {
+        const r = await api('POST', '/api/members?team=' + App.team, { email: d.email, name: d.name, role: d.role, clubs: [...v.clubs], officialName: v.officialName });
+        App.docs.set(r.doc.id, r.doc); toast('Saved'); done(); return true;
+      } catch (e) { oops(e); return false; }
+    } }] });
+  }
+
   function accountTab() {
     const linked = App.machine.linked;
-    const f = { name: App.me.name, password: '', currentPassword: '' };
+    const f = { name: App.me.name, phone: App.me.phone || '', emailOff: !!App.me.emailOff, password: '', currentPassword: '' };
     return h('div', { class: 'card' }, h('h2', {}, 'My account'), h('p', {}, h('b', {}, App.me.email), App.me.google ? h('span', { class: 'pill ok', style: { marginLeft: '8px' } }, 'Google') : null, App.me.hasPassword ? h('span', { class: 'pill', style: { marginLeft: '8px' } }, 'Password set') : null),
       linked ? h('p', { class: 'dim' }, 'This machine is linked to the website, so your name and sign-in are managed there and synced down.') : h('div', {}, h('div', { class: 'form' },
         h('label', { class: 'f' }, h('span', {}, 'Name'), h('input', { value: f.name, oninput: (e) => { f.name = e.target.value; } })),
+        h('label', { class: 'f' }, h('span', {}, 'Phone'), h('input', { type: 'tel', value: f.phone, oninput: (e) => { f.phone = e.target.value; } })),
+        App.cfg.mail ? h('label', { class: 'row', style: { gap: '8px', gridColumn: '1 / -1' } }, h('input', { type: 'checkbox', checked: !f.emailOff, onchange: (e) => { f.emailOff = !e.target.checked; } }), 'Email me: bookings, matches I officiate, results of my teams, expenses') : null,
+        h('div', { class: 'f' }, h('span', { class: 'flabel' }, 'Picture'), h('div', { class: 'row', style: { gap: '10px' } }, App.avatar(App.me.image, App.me.name || App.me.email, 48), h('span', { class: 'dim small' }, App.me.google ? 'Your Google profile picture. Change it in your Google account; it updates here the next time you sign in.' : 'Sign in with Google to use your Google profile picture.'))),
         App.me.hasPassword ? h('label', { class: 'f' }, h('span', {}, 'Current password'), h('input', { type: 'password', autocomplete: 'current-password', oninput: (e) => { f.currentPassword = e.target.value; } })) : null,
         App.cfg.mode === 'local' || App.me.hasPassword ? h('label', { class: 'f' }, h('span', {}, 'New password (8+ characters)'), h('input', { type: 'password', autocomplete: 'new-password', oninput: (e) => { f.password = e.target.value; } })) : null),
       h('button', { class: 'primary', style: { marginTop: '12px' }, onclick: async () => { try { await api('POST', '/api/me', f); await App.loadMe(); toast('Account saved'); route(); } catch (e) { oops(e); } } }, 'Save')));

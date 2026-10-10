@@ -1,0 +1,111 @@
+{
+  "mode": "local",
+  "name": "RFP Manager",
+  "port": 8090,
+  "access": "lan",
+  "dataDir": "data",
+  "mediaFolder": "C:\\Users\\cfits\\CasparCG\\media\\Media Manager",
+  "publicUrl": "",
+  "allowSignup": false,
+  "syncSeconds": 5,
+  "mongo": {
+    "uri": "",
+    "db": "rfpmanager"
+  },
+  "cloud": {
+    "url": "https://rfp-manager-f3r7.onrender.com",
+    "key": "mk_ZrGzImPes6te3QBYlyof4DNVa0oTyJuI"
+  },
+  "defaultCloudUrl": "https://rfp-manager-f3r7.onrender.com",
+  "caspar": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 5250,
+    "channel": 1,
+    "previewChannel": 2,
+    "clearAfterOutMs": 0,
+    "format": "json",
+    "images": "file",
+    "templateFolder": "rfp",
+    "clearAfterStopMs": 1500
+  },
+  "devices": [
+    {
+      "id": "obs",
+      "type": "obs",
+      "name": "OBS Studio",
+      "host": "127.0.0.1",
+      "port": 4455,
+      "enabled": true,
+      "password": ""
+    },
+    {
+      "id": "midi",
+      "type": "midi",
+      "name": "MIDI",
+      "host": "",
+      "port": 0,
+      "enabled": true,
+      "channel": 0
+    }
+  ],
+  "graphics": {},
+  "outputKey": "r3OQQVKFSV5C",
+  "machineId": "cf57c28cb8e5",
+  "machineName": "Ruan-PC",
+  "streaming": {
+    "host": "",
+    "rtmpPort": 1935,
+    "srtPort": 8890,
+    "api": "",
+    "hookSecret": ""
+  },
+  "siteAdmins": [],
+  "remote": true,
+  "worship": {
+    "outputs": [
+      {
+        "id": "audience",
+        "name": "Audience screen",
+        "enabled": false,
+        "channel": 0,
+        "layer": 60,
+        "template": "worship",
+        "layout": "full"
+      },
+      {
+        "id": "stream",
+        "name": "Stream lower third",
+        "enabled": true,
+        "channel": 0,
+        "layer": 61,
+        "template": "worship",
+        "layout": "lower"
+      }
+    ],
+    "lowerThird": {
+      "channel": 0,
+      "layer": 62,
+      "template": "worship"
+    },
+    "macros": [
+      {
+        "id": "mmuwa6iw5",
+        "name": "Francois Lamprecht",
+        "color": "#b7e1bc",
+        "commands": "CG 1-5 add 1 \"Pellissier_gemeente/2025/music-copyright\" 1"
+      },
+      {
+        "id": "mmuwaagt3",
+        "name": "Stop",
+        "color": "#ff0000",
+        "commands": "CG 1-5 stop 1 "
+      }
+    ]
+  },
+  "templatesPath": "C:\\Users\\cfits\\CasparCG\\template",
+  "deviceMappings": [],
+  "google": {
+    "clientId": "216090666863-2oh523lvl2erjd6ag8micv24pk2du3v7.apps.googleusercontent.com"
+  }
+}

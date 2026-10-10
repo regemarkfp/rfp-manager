@@ -719,6 +719,79 @@ Cancel puts the colour back. A colour without transparency is stored as `#rrggbb
   it on a competition.
 - **Save file**: Settings → Save file exports and imports XML in the layout of the original save file template.
 
+### People and roles
+
+Settings → Members (Admins). The roles:
+
+| Role | Can |
+|---|---|
+| Admin | everything, including members and team settings |
+| Producer | productions, crew, crew roles, equipment, bookings, costing, approving expenses, and every other record |
+| Scorer | score matches (on the production PC) and control graphics |
+| Crew | see productions, and add their own expenses with receipts |
+| Coach | change their own clubs, those clubs' teams and players, and pick the team sheet for their matches |
+| Official | see the matches they are named on, and confirm the result |
+
+* **Coach:** after choosing the role, tick the club(s) they look after. Their home page is **My teams**: their
+  clubs and teams, the next matches (with a reminder to pick the team sheet) and results. On a match they pick the
+  **team sheet**: who plays, numbers, positions, captain and bench. The scorer and the graphics use that team sheet
+  for that match. Coaches do not see productions, crew or costs.
+* **Official:** after choosing the role, type their name as it is written under *Match officials* on the matches
+  ("Referee: A Name"). Their home page is **My matches**. After the game they open the match and press **Confirm the
+  result** (score, cards and incidents, notes). The result shows on the fixtures list and goes to the coaches and
+  producers by email.
+* **Pictures:** everyone signed in with Google shows with their Google profile picture (menus, members, expenses).
+  It updates when they next sign in after changing it in their Google account. Settings → My account has their
+  phone number too.
+
+### Expenses and receipts
+
+On a production, **+ Add expense**: what it was for, category, amount (and VAT), and the receipt. On a phone
+**📷 Photo** opens the camera; **File or PDF** takes a PDF or a picture from the gallery. Crew members see only their
+own expenses. Producers and Admins see all of them on the production and under **Productions → Expenses**, and set
+each one to **Approved**, **Rejected** or **Paid back**. Approved expenses are added to the production's
+**Costing**; tick *Invoice to the client* to add them to what you invoice too. Receipts can only be opened by the
+person who added them and by Producers and Admins.
+
+### Email notifications
+
+The website emails people when:
+
+* they are added to a production team (with what their role lets them do),
+* they are booked as crew on a production (role, date, call time, venue): their email is on their Crew record,
+* they are named as an official on a match,
+* an expense is waiting for approval (Producers and Admins), or theirs was approved, rejected or paid back,
+* the officials confirmed a result (the coaches of both teams, Producers and Admins).
+
+Each person can switch emails off under Settings → My account. To switch emails on for the website, add these on
+Render (Environment), or on your own server in `/etc/rfp-manager/env`:
+
+* **Brevo** (free for 300 emails a day; easiest): make a free account at brevo.com, add and confirm your sender
+  address (Senders), create an API key (SMTP & API → API keys), then set `MAIL_PROVIDER=brevo`,
+  `MAIL_FROM=RFP Manager <info@yourdomain>` and `MAIL_API_KEY=<the key>`.
+* **Resend**: `MAIL_PROVIDER=resend`, `MAIL_FROM`, `MAIL_API_KEY` (your domain must be verified at resend.com).
+* **SMTP** (your own server only; Render's free plan blocks mail ports): `SMTP_URL=smtps://user:password@smtp.host:465`
+  and `MAIL_FROM`. With Google Workspace use smtp.gmail.com with an app password.
+
+### Android app
+
+The Android app is an APK that opens the website as an app (full screen, its own icon, Google sign-in, the camera
+for receipts). It runs through Chrome, which every Android phone has.
+
+* **Getting it:** on the website's sign-in page on a phone, **⬇ Get the Android app** (`/app/rfp-manager.apk`).
+  Open the downloaded file and allow installing from your browser when Android asks (it is not from the Play Store).
+* **Building it:** GitHub builds it by itself. The `android` folder and `.github/workflows/android.yml` are in the
+  repository; whenever the `android` folder changes (or Actions → Android app → Run workflow), GitHub builds the APK,
+  puts it into `public/app/rfp-manager.apk` and Render publishes it. The build is also kept as a download on the
+  workflow run.
+* **Another website address:** change `site` at the top of `android/app/build.gradle`, and the app is rebuilt.
+* **Signing key:** `android/rfp-release.keystore` with its passwords in `android/keystore.properties`. Every update
+  must be signed with the same key, so keep a copy of both. The key's fingerprint is what the website serves at
+  `/.well-known/assetlinks.json` (setting `android.sha256`, or `ANDROID_SHA256`); that file is what lets the app open
+  without an address bar. The key is in your private repository. If the repository is ever made public, make a new
+  key and keep it out of the repository.
+* People can also skip the APK: in Chrome on the website, ⋮ → **Add to Home screen** / **Install app**.
+
 ## 5. Templates
 
 Copy `templates/rfp` into CasparCG's template folder. It holds the CricketCG templates plus three for
@@ -811,6 +884,9 @@ lib/templates.js     reads the template folder and each template's variable fiel
 lib/worship.js       worship control (outputs, stage display, CCLI log)   lib/bible.js   Bibles on this PC
 lib/sync.js          PC <-> website sync     lib/domain.js        match names, automatic productions
 lib/amcp.js          CasparCG client         lib/xml.js           XML save file
+lib/mail.js          email (Brevo, Resend, SMTP)   lib/notify.js   who gets which email
+android/             the Android app (Trusted Web Activity), built by .github/workflows/android.yml
+public/js/people-pages.js  coaches, officials, team sheets, results, expenses
 lib/stream.js        streaming channels: MediaMTX checks, live status, watch pages   lib/tarball.js  the program as .tar.gz
 tools/server/install.sh   sets up a server: website + MediaMTX + Caddy   public/watch.html  the viewer page
 shared/schema.js     every record type and field (forms, lists and the save file come from this)
@@ -832,19 +908,19 @@ To change a sport's rules or add a variant, edit its entry in `shared/sports.js`
 
 ## 7. Tests
 
-`npm test` runs 54 tests: the cricket engine (ICC conditions, DLS, super over, two-innings matches), the rules
+`npm test` runs 58 tests: the cricket engine (ICC conditions, DLS, super over, two-innings matches), the rules
 and statistics of every other sport, worship control (slides, outputs, CCLI log, song and Bible file formats),
 the short screen links, the live scorer and graphics control over the WebSocket against a stand-in CasparCG
 server, the rundown monitor, accounts and roles, the image folder, Google token checks (against a locally
 generated key), XML export and import, sync between an online instance and production PCs, scorer buttons and
 macros per theme, advert options and the play log, vMix, ATEM, HyperDeck, Raspberry Pi GPIO, OBS, Companion, OSC, Art-Net, MIDI and X-keys (the Windows helper's line protocol, and Linux device files) against small stand-ins, input mappings, the Companion addresses, who took each graphic, the Timeline (cues, holds, GO,
-crew screens, comments, rundown import), custom variables, game triggers (adverts on tries), dashboards, text of several lines (JSON, XML and `{nl}`), linking a PC by signing in on the website or with Google on the PC (a stand-in Google key), and remote access through the website (live pages, WebSocket, settings, adverts, screen keys, team checks, a forged identity, the PC going offline), the bridge PC (records read-only on the PC, no scoring through the website, working offline and catching up afterwards), streaming channels (stream keys, who may publish and watch, viewer tokens, passwords, live status against a stand-in MediaMTX) and the server setup command (bundle, settings, who may make it).
+crew screens, comments, rundown import), custom variables, game triggers (adverts on tries), dashboards, text of several lines (JSON, XML and `{nl}`), linking a PC by signing in on the website or with Google on the PC (a stand-in Google key), and remote access through the website (live pages, WebSocket, settings, adverts, screen keys, team checks, a forged identity, the PC going offline), the bridge PC (records read-only on the PC, no scoring through the website, working offline and catching up afterwards), coaches, officials and expenses (who may change what, team sheets used by the graphics, results, receipts and who may open them, costing), email notifications (each kind, switching off, an SMTP conversation), the Android app files (app link, manifest, service worker), streaming channels (stream keys, who may publish and watch, viewer tokens, passwords, live status against a stand-in MediaMTX) and the server setup command (bundle, settings, who may make it).
 
 Not covered by the tests, so check these on your own setup first: a real CasparCG server, real vMix, ATEM,
 HyperDeck, OBS, Companion, lighting desks and X-keys / MIDI hardware (built from their published protocols, tested only
 against stand-ins; the Windows MIDI / X-keys helper and RFP Manager.exe (with its WebView2 windows) could not be built or run on the build machine; the X-keys key numbering and
 backlight commands vary by model), a real relay board on a Pi
-(pi-gpio.py was tried in its --mock mode only), a real MediaMTX server and tools/server/install.sh on a real VM (written to MediaMTX's documented settings; not run here), a real MongoDB Atlas
+(pi-gpio.py was tried in its --mock mode only), the Android build (written for GitHub Actions and Android's tools, which this build machine could not reach; not built here), real Brevo / Resend / SMTP servers, a real MediaMTX server and tools/server/install.sh on a real VM (written to MediaMTX's documented settings; not run here), a real MongoDB Atlas
 cluster (the tests use an in-memory stand-in for the driver), a real Google client ID, Windows (the tests
 ran on Linux), the King James download (the address could not be reached from the build machine), and real
 SongSelect and publisher Bible files (the importers were tested with files written to the published formats).

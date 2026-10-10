@@ -18,3 +18,12 @@ services:
         value: rfpmanager
       - key: GOOGLE_CLIENT_ID
         sync: false
+      - key: SITE_ADMINS
+        sync: false
+      # email notifications (optional): MAIL_PROVIDER = brevo or resend, MAIL_FROM, MAIL_API_KEY
+      - key: MAIL_PROVIDER
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_API_KEY
+        sync: false

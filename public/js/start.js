@@ -72,7 +72,8 @@
     };
     paint();
     root.replaceChildren(h('div', { class: 'login' }, h('div', { class: 'box card' }, h('div', { class: 'brand', style: { padding: 0 } }, h('span', { class: 'dot' }), c.name), h('h1', {}, c.needsSetup ? 'Set up this machine' : 'Sign in'),
-      h('p', { class: 'dim', style: { marginTop: '4px' } }, local ? 'Production PC' : 'Live production management'), err, box)));
+      h('p', { class: 'dim', style: { marginTop: '4px' } }, local ? 'Production PC' : 'Live production management'), err, box,
+      c.androidApp && !/; wv\)|RFPManager/.test(navigator.userAgent) ? h('p', { class: 'small', style: { textAlign: 'center', marginTop: '16px', marginBottom: 0 } }, h('a', { href: '/app/rfp-manager.apk', download: 'rfp-manager.apk' }, '⬇ Get the Android app')) : null)));
   }
 
   function linkBox(err) {
@@ -106,6 +107,7 @@
   async function start() {
     try {
       App.cfg = await api('GET', '/api/config');
+      if (App.cfg.mode === 'cloud' && location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
       document.title = App.cfg.name;
       try { await App.loadMe(); } catch (e) { if (e.status === 401) return login(); throw e; }
       if (App.cfg.bridge && !App.machine.linked) return App.linkGate(root);
