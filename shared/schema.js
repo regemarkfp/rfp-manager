@@ -174,6 +174,11 @@
   for (const [type, e] of Object.entries(E)) e.type = type;
 
   // Record types that are not edited through the generic screens.
+  // A production PC is the bridge to CasparCG: it shows everything from the website but changes only what drives the
+  // playout (graphics loaded from its template folder, themes, dashboards, timelines, variables and triggers).
+  // Everything else is managed on the website.
+  const PC_EDIT = ['graphic', 'theme', 'dashboard', 'timeline', 'variable', 'gametrigger'];
+
   const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'songuse', 'user', 'machinekey'];
   const ALL_TYPES = [...Object.keys(E), ...SYSTEM_TYPES];
 
@@ -260,6 +265,6 @@
     read: (role) => ROLES.includes(role),
   };
 
-  return { ENTITIES: E, LINE_COLORS, ROLES, STATUSES, PRODUCTION_TYPES, SOURCES, EQUIP_CATS, SYSTEM_TYPES, ALL_TYPES, resolveSquad, snapshotTeam, fieldsFor, age,
+  return { ENTITIES: E, LINE_COLORS, ROLES, STATUSES, PRODUCTION_TYPES, SOURCES, EQUIP_CATS, SYSTEM_TYPES, ALL_TYPES, PC_EDIT, resolveSquad, snapshotTeam, fieldsFor, age,
     parseDuration, fmtDuration, rundownTimes, costing, CAN };
 });
