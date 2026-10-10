@@ -7,7 +7,14 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const ROLES = ['Admin', 'Producer', 'Scorer', 'Crew'];
+  const ROLES = ['Admin', 'Producer', 'Scorer', 'Crew', 'Coach', 'Official'];
+  // Coaches and officials see only what is about their teams and matches.
+  const ROLE_SEES = {
+    Coach: ['org', 'member', 'club', 'squad', 'player', 'competition', 'venue', 'fixture', 'image', 'theme'],
+    Official: ['org', 'member', 'club', 'squad', 'player', 'competition', 'venue', 'fixture', 'image', 'theme'],
+  };
+  const EXPENSE_CATS = ['Travel', 'Fuel', 'Accommodation', 'Meals', 'Equipment hire', 'Consumables', 'Parking & tolls', 'Crew', 'Other'];
+  const EXPENSE_STATUS = ['Submitted', 'Approved', 'Rejected', 'Paid back'];
   const PRODUCTION_TYPES = ['Sport', 'Corporate', 'Religion', 'Concert', 'Conference', 'Wedding', 'Awards', 'Esports', 'Other'];
   const STATUSES = ['Upcoming', 'Live', 'Completed', 'Postponed', 'Cancelled'];
   const SOURCES = ['CAMS', 'EVS', 'VT', 'GFX', 'PRESENTATION', 'REMOTE', 'BREAK'];
@@ -167,6 +174,16 @@
       { k: 'poster', l: 'Picture before it starts', t: 'image' },
       { k: 'production', l: 'Production', t: 'ref', ref: 'production' }, { k: 'fixture', l: 'Match', t: 'ref', ref: 'fixture' },
       { k: 'disabled', l: 'Switched off', t: 'bool', help: 'Nobody can stream to it or watch it.' }] },
+    expense: { label: 'Expense', plural: 'Expenses', group: 'Productions', title: (d) => [d.description, d.amount ? Number(d.amount).toFixed(2) : ''].filter(Boolean).join(' · '), cols: ['date', 'production', 'description', 'category', 'amount', 'status'], fields: [
+      { k: 'production', l: 'Production', t: 'ref', ref: 'production', req: true }, { k: 'date', l: 'Date', t: 'date' },
+      { k: 'description', l: 'What for', t: 'text', req: true, ph: 'Fuel to the venue' }, { k: 'category', l: 'Category', t: 'combo', opts: EXPENSE_CATS },
+      { k: 'amount', l: 'Amount', t: 'money', req: true }, { k: 'vat', l: 'VAT included', t: 'money', help: 'The VAT part of the amount, if the receipt shows it.' },
+      { k: 'receipt', l: 'Receipt (photo or PDF)', t: 'image', receipt: true },
+      { k: 'recharge', l: 'Invoice to the client', t: 'bool', help: 'Adds it to what you invoice for the production.' },
+      { k: 'paidBy', l: 'Paid by', t: 'text', help: 'Filled in with whoever adds it.' },
+      { k: 'status', l: 'Status', t: 'select', opts: EXPENSE_STATUS, def: 'Submitted', help: 'Producers and Admins approve, reject or mark as paid back.' },
+      { k: 'note', l: 'Note', t: 'textarea' }] },
+
     playlist: { label: 'Ad playlist', plural: 'Ad playlists', group: 'Advertising', title: (d) => d.name, cols: ['name', 'loop'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'loop', l: 'Loop until stopped', t: 'bool' },
       { k: 'items', l: 'Adverts', t: 'list', fields: [{ k: 'advert', l: 'Advert', t: 'ref', ref: 'advert' }, { k: 'duration', l: 'Seconds (optional)', t: 'number', w: 150 }] }] },
@@ -254,9 +271,19 @@
       lines.push({ group: 'Equipment', label: it ? it.name : 'Item', qty: q, days, cost: n(it && it.rate) * q * days, invoice: n(it && it.invoiceRate) * q * days });
     }
     for (const x of prod.extras || []) lines.push({ group: 'Other', label: x.description || 'Other', qty: 1, days: 1, cost: n(x.cost), invoice: n(x.invoice) });
+    // receipts the producer approved (or already paid back): what was really spent
+    for (const x of (prod.expenses || [])) if (x.status === 'Approved' || x.status === 'Paid back') lines.push({ group: 'Expenses', label: [x.description || 'Expense', x.category].filter(Boolean).join(' · '), qty: 1, days: 1, cost: n(x.amount), invoice: x.recharge ? n(x.amount) : 0, expense: x.id || '' });
     const cost = lines.reduce((s, l) => s + l.cost, 0), invoice = lines.reduce((s, l) => s + l.invoice, 0);
     return { lines, cost, invoice, profit: invoice - cost, margin: invoice ? Math.round(((invoice - cost) / invoice) * 1000) / 10 : 0 };
   }
+
+  // Officials named on a match ("Referee: A Name", one per line): is this person one of them?
+  function officiates(fixture, name) {
+    const want = String(name || '').trim().toLowerCase();
+    if (!want) return false;
+    return String((fixture && fixture.officials) || '').split(/\n+/).some((l) => { const i = l.indexOf(':'); return (i >= 0 ? l.slice(i + 1) : l).trim().toLowerCase() === want; });
+  }
+  const sees = (role, type) => !ROLE_SEES[role] || ROLE_SEES[role].includes(type);
 
   const CAN = {
     admin: (role) => role === 'Admin',
@@ -265,6 +292,6 @@
     read: (role) => ROLES.includes(role),
   };
 
-  return { ENTITIES: E, LINE_COLORS, ROLES, STATUSES, PRODUCTION_TYPES, SOURCES, EQUIP_CATS, SYSTEM_TYPES, ALL_TYPES, PC_EDIT, resolveSquad, snapshotTeam, fieldsFor, age,
+  return { ENTITIES: E, LINE_COLORS, ROLES, STATUSES, PRODUCTION_TYPES, SOURCES, EQUIP_CATS, SYSTEM_TYPES, ALL_TYPES, PC_EDIT, ROLE_SEES, EXPENSE_CATS, EXPENSE_STATUS, officiates, sees, resolveSquad, snapshotTeam, fieldsFor, age,
     parseDuration, fmtDuration, rundownTimes, costing, CAN };
 });
