@@ -73,11 +73,19 @@
         h('div', { class: 'card' }, h('div', { class: 'spread' }, h('h2', {}, 'CasparCG and other devices'), h('div', { class: 'row' }, h('span', { class: 'led ' + (!c.enabled ? '' : c.connected ? 'ok' : 'bad') }), h('span', { class: 'dim' }, !c.enabled ? 'Off' : c.connected ? 'Connected ' + (c.version || '') : 'Not connected'))),
           h('p', { class: 'dim', style: { margin: 0 } }, 'CasparCG, vMix, ATEM, HyperDeck, OBS, Companion, OSC, Art-Net, MIDI, X-keys and the Pi GPIO box are set up under ', h('a', { href: '#/settings', onclick: (e) => { e.preventDefault(); tab = 'connections'; route(); } }, 'Settings → Connections'), '.')),
         h('div', { class: 'card' }, h('div', { class: 'spread' }, h('h2', {}, 'Website link (online sync)'), h('div', { class: 'row' }, h('span', { class: 'led ' + (!s.linked ? '' : s.lastError ? 'warn' : 'ok') }), h('span', { class: 'dim' }, !s.linked ? 'Not linked' : s.lastError ? 'Offline: ' + s.lastError : `Synced ${s.lastSync ? new Date(s.lastSync).toLocaleTimeString('en-GB') : ''} · ${s.pending} to upload`))),
-          h('div', { class: 'form' }, lab('Website address', inp(f.cloud, 'url', { placeholder: 'https://your-site.onrender.com' })), lab('Machine key', inp(f.cloud, 'key', { type: 'password', autocomplete: 'off', placeholder: m.cloud.hasKey ? 'saved – leave empty to keep' : 'mk_…' }), 'Create one on the website: Settings → Machine keys.'),
-            lab('Sync every (seconds)', inp(f, 'syncSeconds', { type: 'number' }), 'Changes also go straight away; this is the catch-up interval.')),
-          h('div', { class: 'row', style: { marginTop: '12px' } }, h('button', { class: 'primary', onclick: () => save({ cloud: f.cloud, syncSeconds: f.syncSeconds }, 'Link saved') }, 'Save link'),
+          s.linked ? h('p', { class: 'dim', style: { marginTop: 0 } }, 'Linked to ', h('b', {}, m.cloud.url), '. Records and images sync both ways; changes go straight away.') : App.linkFlow({ url: m.cloud.url || (App.cfg && App.cfg.cloudUrl) || '', onDone: () => setTimeout(() => route(), 2500) }),
+          s.linked ? h('div', { class: 'form' }, lab('Sync every (seconds)', inp(f, 'syncSeconds', { type: 'number' }), 'Changes also go straight away; this is the catch-up interval.')) : null,
+          h('div', { class: 'row', style: { marginTop: '12px' } },
+            s.linked ? h('button', { class: 'primary', onclick: () => save({ syncSeconds: f.syncSeconds }, 'Saved') }, 'Save') : null,
             s.linked ? h('button', { onclick: async () => { try { const r = await api('POST', '/api/machine/sync'); toast(r.sync.lastError ? 'Sync failed: ' + r.sync.lastError : `Synced${r.media.downloaded ? ' · ' + r.media.downloaded + ' images downloaded' : ''}`, r.sync.lastError ? 'error' : ''); route(); } catch (e) { oops(e); } } }, 'Sync now') : null,
-            s.linked ? h('button', { class: 'ghost danger', onclick: async () => { if (await confirmBox('Unlink this machine from the website? Data stays on both sides.', 'Unlink')) save({ cloud: { url: '', key: '' } }, 'Unlinked'); } }, 'Unlink') : null)),
+            s.linked && App.cfg.mode === 'local' ? h('button', { class: 'ghost danger', onclick: async () => { if (await confirmBox('Unlink this machine from the website? Data stays on both sides, and its screens are no longer reachable through the website.', 'Unlink')) save({ cloud: { url: '', key: '' } }, 'Unlinked'); } }, 'Unlink') : null),
+          App.cfg.mode === 'local' ? h('details', { style: { marginTop: '12px' } }, h('summary', { class: 'dim small' }, 'Link with a machine key instead'),
+            h('div', { class: 'form', style: { marginTop: '8px' } }, lab('Website address', inp(f.cloud, 'url', { placeholder: 'https://your-site.onrender.com' })), lab('Machine key', inp(f.cloud, 'key', { type: 'password', autocomplete: 'off', placeholder: m.cloud.hasKey ? 'saved – leave empty to keep' : 'mk_…' }), 'Create one on the website: Settings → Machine keys.')),
+            h('button', { style: { marginTop: '8px' }, onclick: () => save({ cloud: f.cloud }, 'Link saved') }, 'Save link')) : null),
+        h('div', { class: 'card' }, h('div', { class: 'spread' }, h('h2', {}, 'Remote access through the website'), (() => { const ra = m.remoteAccess || {}; return h('div', { class: 'row' }, h('span', { class: 'led ' + (!m.remote || !s.linked ? '' : ra.connected ? 'ok' : 'warn') }), h('span', { class: 'dim' }, !m.remote ? 'Off' : !s.linked ? 'Needs the website link' : ra.connected ? 'Online' : 'Connecting' + (ra.lastError ? ': ' + ra.lastError : ''))); })()),
+          h('p', { class: 'dim', style: { marginTop: 0 } }, 'Team members signed in on the website can use this PC\'s live screens from anywhere: Graphics control, scorers, dashboards, Timeline, Worship, monitors, Connections and Templates. Nothing needs to be opened on your router: the PC keeps one outgoing link to the website. Graphics still play out from this PC.'),
+          h('label', { class: 'row', style: { gap: '8px' } }, h('input', { type: 'checkbox', checked: m.remote !== false, onchange: (e) => save({ remote: e.target.checked }, e.target.checked ? 'Remote access on' : 'Remote access off') }), 'Allow use through the website'),
+          s.linked && m.remote !== false ? h('p', { class: 'dim small' }, 'On the website choose this PC (', h('b', {}, m.machineName || 'this PC'), ') under PC at the top of the menu. Browser output for OBS / vMix from anywhere: ', h('code', {}, (m.cloud.url || '') + '/output?key=' + m.outputKey + '&pc=…'), ' (the website shows the full link under Monitors).') : null),
         h('div', { class: 'card' }, h('h2', {}, 'Access & sign-in'), h('div', { class: 'form' },
           lab('Who can reach this app', pick(f, 'access', [['tailnet', 'This PC and Tailscale only'], ['lan', 'This PC, Tailscale and the local network'], ['any', 'Any address']])),
           lab('Google client ID', inp(f, 'googleClientId', { placeholder: '….apps.googleusercontent.com' }), 'Filled in automatically when linked. Google sign-in on this machine works at http://localhost:' + m.port + '.'),
@@ -124,11 +132,13 @@
   App.pages.settings = () => {
     const local = App.cfg.mode === 'local';
     const tabs = [['team', 'Production team'], ['members', 'Members'], ['account', 'My account']];
-    if (local && App.machine.admin) tabs.push(['connections', 'Connections'], ['machine', 'This machine']);
+    if ((local || App.machine.remote) && App.machine.admin) tabs.push(['connections', 'Connections'], ['machine', local ? 'This machine' : 'Production PC']);
     if (App.teams.some((t) => t.role === 'Admin')) tabs.push(['keys', 'Machine keys']);
+    if (!local && App.machine.siteAdmin) tabs.push(['server', 'Server']);
+    if (App.settingsTab) { tab = App.settingsTab; App.settingsTab = null; }
     tabs.push(['file', 'Save file']);
     if (!tabs.some(([k]) => k === tab)) tab = 'team';
-    const body = { team: teamTab, members: membersTab, account: accountTab, connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab }[tab]();
+    const body = { team: teamTab, members: membersTab, account: accountTab, connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab, server: App.serverTab }[tab]();
     return { el: h('div', {}, pageHead('Settings'), h('div', { class: 'tabs' }, tabs.map(([k, l]) => h('button', { class: k === tab ? 'on' : '', onclick: () => { tab = k; route(); } }, l))), body) };
   };
 })();

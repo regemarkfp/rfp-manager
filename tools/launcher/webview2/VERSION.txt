@@ -1,0 +1,1 @@
+Microsoft.Web.WebView2 1.0.4258.31 (nuget.org). Licence: https://www.nuget.org/packages/Microsoft.Web.WebView2/1.0.4258.31/License

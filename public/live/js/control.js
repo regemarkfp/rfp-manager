@@ -1009,7 +1009,7 @@
       frameReady = false; framePlayed = false;
       frameTemplate = d.template;
       frame = document.createElement('iframe');
-      frame.src = `templates/${d.template}.html`;
+      frame.src = `templates/${d.template}.html` + (CG.pcQuery || '');
       frame.onload = () => { frameReady = true; framePlayed = false; sendToFrame(); };
       pv.appendChild(frame);
       scaleFrame();

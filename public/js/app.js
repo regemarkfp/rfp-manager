@@ -59,6 +59,7 @@ const App = {
     } else if (m.type === 'sync') { this.sync = m.status; this.paintSync(); }
     else if (m.type === 'gfx-state') { if (this.gfx) this.gfx.state = m.state; this.notify(m); }
     else if (m.type === 'gfx-warn') toast(m.text, 'error');
+    else if (m.type === 'pcs') { this.loadMe().then(() => { paintPcPicker(); this.notify(m); }).catch(() => {}); }
     else if (m.type === 'ack' || m.type === 'error') {
       const w = this.waiting.get(m.rid);
       if (w) { this.waiting.delete(m.rid); if (m.type === 'ack') w.resolve(m.result || {}); else w.reject(new Error(m.error)); }
@@ -96,6 +97,7 @@ const App = {
   async loadMe() {
     const r = await api('GET', '/api/me');
     this.me = r.user; this.teams = r.teams; this.machine = r.machine; this.sync = r.machine.sync;
+    this.pcs = r.pcs || null; this.pc = r.pc || '';         // the website: production PCs online for your teams, and the one this browser uses
   },
   async selectTeam(id) {
     this.team = id; this.role = (this.teams.find((t) => t.id === id) || {}).role || null;
@@ -107,6 +109,22 @@ const App = {
   refresh() { route(); },
 };
 
+// The website: which production PC the live screens (Graphics control, scorer, dashboards …) use. Chosen per browser.
+function pcPicker() {
+  const list = App.pcs || [], cur = list.find((p) => p.id === App.pc);
+  return h('div', { class: 'pc-pick', title: 'The live screens on this website control this production PC' },
+    h('span', { class: 'led ' + (cur ? 'ok' : list.length ? 'warn' : '') }),
+    h('select', { 'aria-label': 'Production PC', onchange: async (e) => {
+      const v = e.target.value;
+      if (v === '+') { e.target.value = App.pc || 'none'; location.hash = '#/pcs'; return; }
+      try { await api('POST', '/api/pcs/choose', { id: v }); location.reload(); } catch (err) { oops(err); }
+    } },
+      h('option', { value: 'none', selected: !cur }, list.length ? 'No PC (website only)' : 'No production PC online'),
+      list.map((p) => h('option', { value: p.id, selected: p.id === App.pc }, 'PC: ' + p.name)),
+      h('option', { value: '+' }, '+ Link a production PC…')));
+}
+function paintPcPicker() { const el = document.getElementById('pc-picker'); if (el) el.replaceChildren(pcPicker()); }
+
 function applyTheme() {
   const accent = App.org().accentColor || '#00ff82';
   document.documentElement.style.setProperty('--accent', accent);
@@ -117,7 +135,8 @@ function applyTheme() {
 const NAV = [
   ['', [['#/', 'Dashboard']]],
   ['Matches', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions']]],
-  ['Live', [['#/adverts', 'Advert playout'], ['#/monitors', 'Monitors'], ['#/templates', 'Templates'], ['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/list/timeline', 'Timelines'], ['#/list/dashboard', 'Dashboards'], ['#/automation', 'Variables & triggers'], ['#/playlog', 'Play log']]],
+  ['Live', [['#/pcs', 'Production PCs'], ['#/adverts', 'Advert playout'], ['#/monitors', 'Monitors'], ['#/templates', 'Templates'], ['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/list/timeline', 'Timelines'], ['#/list/dashboard', 'Dashboards'], ['#/automation', 'Variables & triggers'], ['#/playlog', 'Play log']]],
+  ['Streaming', [['#/list/channel', 'Channels']]],
   ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report'], ['#/bibles', 'Bibles']]],
   ['Productions', [['#/list/production', 'Productions'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment']]],
   ['Assets', [['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/theme', 'Themes'], ['#/images', 'Images']]],
@@ -136,6 +155,7 @@ function shell(content) {
         if (e.target.value === '+') { e.target.value = App.team; return newTeam(); }
         await App.selectTeam(e.target.value); location.hash = '#/'; route();
       } }, App.teams.map((t) => h('option', { value: t.id, selected: t.id === App.team }, t.name)), h('option', { value: '+' }, '+ New production team…')),
+      App.pcs ? h('div', { id: 'pc-picker' }, pcPicker()) : null,
       (() => {
         const groups = NAV.filter(([g]) => g).map(([g]) => g), here = (NAV.find(([g, links]) => g && links.some(([href]) => on(href))) || [])[0];
         let openG = here || navStore.get('rfp-nav-open') || '';
@@ -143,7 +163,7 @@ function shell(content) {
         const parts = [];
         const paint = () => parts.forEach((p) => { const o = p.g === openG; p.list.style.display = o ? '' : 'none'; p.head.textContent = (o ? '▾ ' : '▸ ') + p.g; });
         const nav = h('nav', { class: 'nav' }, NAV.map(([g, links]) => {
-          const list = h('div', {}, links.map(([href, label]) => h('a', { href, class: on(href) ? 'on' : '', onclick: () => root.classList.remove('open') }, label)));
+          const list = h('div', {}, links.filter(([href]) => href !== '#/pcs' || App.pcs).map(([href, label]) => h('a', { href, class: on(href) ? 'on' : '', onclick: () => root.classList.remove('open') }, label)));
           if (!g) return list;
           const head = h('div', { class: 'nav-group', role: 'button', tabindex: '0', title: 'Open this part of the menu (the others close)', style: { cursor: 'pointer', userSelect: 'none' },
             onclick: () => { openG = openG === g ? '' : g; navStore.set('rfp-nav-open', openG); paint(); }, onkeydown: (e) => { if (e.key === 'Enter') head.click(); } }, g);

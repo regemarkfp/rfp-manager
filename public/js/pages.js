@@ -221,6 +221,8 @@
     },
   };
 
+  App.panels = PANELS;               // more panels are added by other pages (stream-pages.js: channel)
+
   App.pages.edit = (type, id) => {
     const e = E[type];
     if (!e) return App.pages.notfound();

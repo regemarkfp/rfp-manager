@@ -16,6 +16,8 @@ h1 { font-size: 24px; margin: 0; font-weight: 700; } h2 { font-size: 17px; margi
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 12px; font-weight: 700; font-size: 16px; }
 .brand .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); flex: none; }
 .side select { width: 100%; margin-bottom: 8px; }
+.side .pc-pick { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; } .side .pc-pick select { margin: 0; flex: 1; min-width: 0; font-size: 13px; }
+.shell.side-min .pc-pick { display: none; }
 .nav-group { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding: 12px 10px 4px; }
 .nav a { display: block; padding: 7px 10px; border-radius: 6px; color: var(--text); }
 .nav a:hover { background: var(--panel2); text-decoration: none; }

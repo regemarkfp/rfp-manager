@@ -30,6 +30,16 @@ async function start(overrides = {}, { configPath = process.env.CONFIG || path.j
   const server = http.createServer((req, res) => { api.handle(req, res); });
   server.on('upgrade', (req, sock) => {
     const p = new URL(req.url, 'http://x').pathname;
+    if (p === '/relay' && app.relayServer) return app.relayServer.upgrade(req, sock).catch(() => sock.destroy());
+    if (p === '/live/ws' && app.relayServer) {
+      // the website: a live page for a production PC goes through that PC's relay link; otherwise the website's own
+      return (async () => {
+        const user = await app.auth.userFromReq(req).catch(() => null);
+        const m = await app.relayServer.choose(req, user);
+        if (m) return app.relayServer.socket(req, sock, m, user);
+        return app.live.upgrade(req, sock);
+      })().catch(() => sock.destroy());
+    }
     if (p === '/live/ws') return app.live.upgrade(req, sock).catch(() => sock.destroy());
     if (p !== '/ws') return sock.destroy();
     hub.upgrade(req, sock).catch(() => sock.destroy());
@@ -45,7 +55,8 @@ async function start(overrides = {}, { configPath = process.env.CONFIG || path.j
   }
   config.port = server.address().port;
   app.server = server; app.hub = hub;
-  app.stop = async () => { hub.close(); app.live.close(); app.worship.close(); await new Promise((r) => { server.close(r); server.closeAllConnections(); }); await app.close(); };
+  if (app.relay) app.relay.start();
+  app.stop = async () => { if (app.relay) app.relay.close(); if (app.relayServer) app.relayServer.close(); hub.close(); app.live.close(); app.worship.close(); await new Promise((r) => { server.close(r); server.closeAllConnections(); }); await app.close(); };
   if (!quiet) banner(app);
   return app;
 }
@@ -67,7 +78,7 @@ function banner(app) {
     }
     console.log(`  Image folder   ${app.mediaFolder()}`);
     console.log(`  CasparCG       ${c.caspar.enabled === false ? 'switched off' : c.caspar.host + ':' + c.caspar.port + '  (channel ' + c.caspar.channel + ')'}`);
-    console.log(`  Website        ${c.cloud.url ? c.cloud.url + '  (sync every ' + c.syncSeconds + ' s)' : 'not linked – works offline'}`);
+    console.log(`  Website        ${c.cloud.url ? c.cloud.url + '  (sync every ' + c.syncSeconds + ' s' + (c.remote !== false ? ', screens usable through the website' : '') + ')' : 'not linked – works offline'}`);
     const host = require('node:os').hostname().toLowerCase() + (Number(c.port) === 80 ? '' : ':' + c.port);
     console.log(`  Screen links   http://${host}/scorer  /graphics-control  /confidence  /rundown  /output  /preview`);
     console.log(`                 http://${host}/worship  /stage  /fill-key  /key  /fill`);
@@ -105,6 +116,7 @@ function launcherCommands(app) {
 function status(app) {
   const s = app.sync.status(), a = app.gfx.amcp.status();
   log(`CasparCG ${a.enabled ? (a.connected ? 'connected ' + a.version : 'NOT connected') : 'off'} · on air: ${app.gfx.onAirList().map((e) => e.name).join(', ') || 'nothing'}`);
+  if (app.relay) { const r = app.relay.status(); log(`Remote access ${!r.enabled ? 'switched off' : !s.linked ? 'needs the PC linked to the website' : r.connected ? 'online through ' + r.url : 'connecting' + (r.lastError ? ' (' + r.lastError + ')' : '')}`); }
   log(`Sync ${s.linked ? (s.lastError ? 'ERROR ' + s.lastError : 'ok, last ' + (s.lastSync ? new Date(s.lastSync).toLocaleTimeString('en-GB') : 'never')) + `, ${s.pending} waiting to upload` : 'not linked'} · screens connected: ${[...app.hub.clients].filter((c) => c.kind === 'ui').length + app.live.clients.size}`);
 }
 

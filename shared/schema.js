@@ -158,6 +158,15 @@
     // when something happens in a game (a try, a six, a red card …) run actions: an advert, a graphic, a macro, set a variable
     gametrigger: { label: 'Game trigger', plural: 'Game triggers', group: 'Live', hidden: true, title: (d) => d.name, cols: ['name', 'when'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'notes', l: 'Notes', t: 'textarea' }] },
+    channel: { label: 'Channel', plural: 'Channels', group: 'Streaming', title: (d) => d.name, cols: ['name', 'slug', 'access'], fields: [
+      { k: 'name', l: 'Name', t: 'text', req: true, ph: 'Main field, Church service …' },
+      { k: 'slug', l: 'Web address', t: 'text', ph: 'Made from the name', help: 'Viewers watch at /watch/<this>. Letters, numbers and dashes.' },
+      { k: 'access', l: 'Who can watch', t: 'select', opts: ['Public', 'Team members', 'Password'], def: 'Public', help: 'Public: anyone with the link. Team members: people in this production team (signed in). Password: anyone who types the password below.' },
+      { k: 'viewerPassword', l: 'Viewer password', t: 'text', help: 'Only used when "Who can watch" is Password.' },
+      { k: 'description', l: 'Description', t: 'textarea', help: 'Shown under the player.' },
+      { k: 'poster', l: 'Picture before it starts', t: 'image' },
+      { k: 'production', l: 'Production', t: 'ref', ref: 'production' }, { k: 'fixture', l: 'Match', t: 'ref', ref: 'fixture' },
+      { k: 'disabled', l: 'Switched off', t: 'bool', help: 'Nobody can stream to it or watch it.' }] },
     playlist: { label: 'Ad playlist', plural: 'Ad playlists', group: 'Advertising', title: (d) => d.name, cols: ['name', 'loop'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'loop', l: 'Loop until stopped', t: 'bool' },
       { k: 'items', l: 'Adverts', t: 'list', fields: [{ k: 'advert', l: 'Advert', t: 'ref', ref: 'advert' }, { k: 'duration', l: 'Seconds (optional)', t: 'number', w: 150 }] }] },

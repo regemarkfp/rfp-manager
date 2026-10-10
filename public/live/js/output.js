@@ -89,7 +89,7 @@
       const f = document.createElement('iframe');
       f.setAttribute('allowtransparency', 'true');
       f.style.zIndex = String(layer);
-      f.src = `templates/${template}.html`;
+      f.src = `templates/${template}.html` + (CG.pcQuery || '');
       const V = { frame: f, ready: false, queue: [] };
       L.views.push(V);
       f.onload = () => {

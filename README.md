@@ -28,18 +28,31 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 
 ### The app: RFP Manager.exe (Windows)
 
-Double-click **`Build RFP Manager app.cmd`** once. It builds `RFP Manager.exe` in this folder with the C# compiler
-that comes with Windows (nothing is downloaded) and puts shortcuts on the desktop and in the Start menu. Start RFP
-Manager from those from then on:
+Double-click **`Build RFP Manager app.cmd`** once (with internet the first time). It builds `RFP Manager.exe` in this
+folder with the C# compiler that comes with Windows and puts shortcuts on the desktop and in the Start menu. The first
+build fetches Microsoft's WebView2 SDK (about 10 MB from nuget.org) into `tools\launcher\webview2`; later builds and
+new zips reuse it (copy that folder across when you update). Start RFP Manager from the shortcut from then on:
 
-- no console window: RFP Manager runs in the background with an icon in the tray (bottom right);
-- RFP Manager, Graphics control, the scorer, dashboards, the Timeline and Worship open in **their own app windows**
-  (Microsoft Edge or Chrome in app mode: no tabs, no address bar; they keep you signed in);
+- **its own windows, no browser**: RFP Manager, Graphics control, the scorer, dashboards, the Timeline and Worship open
+  as windows of RFP Manager.exe (WebView2, the engine of Microsoft Edge that Windows 10 and 11 already have). Each window
+  has a menu: **RFP Manager** (Home, New window Ctrl+N, Console, Open this screen in my web browser, Close Ctrl+W, Quit
+  Ctrl+Q), **Screens** (Graphics control Ctrl+1, Scorer Ctrl+2, Dashboards Ctrl+3, Timeline Ctrl+4, Worship Ctrl+5,
+  Rundown, Browser output, Monitors), **View** (Reload F5, Back, Zoom Ctrl +/−/0, Full screen F11 (Esc leaves it),
+  Always on top, Print Ctrl+P, Developer tools). Links and pop-ups of RFP Manager (reports, print views) open as new
+  windows; other websites open in your web browser. Each screen remembers its size, position and monitor. You sign in
+  once for all windows.
+- no console window: RFP Manager runs in the background with an icon in the tray (bottom right). Closing the windows
+  keeps it running (graphics, scorers on tablets and outputs carry on); double-click the tray icon to open it again,
+  Quit to stop it. Starting the shortcut again opens a window in the running copy.
 - right-click the tray icon: those screens, **Console** (everything the console prints, with Status, Sync now,
-  Reconnect CasparCG, Reset a password and Restart as buttons), open the folder, **Start with Windows**, Restart, Quit;
+  Reconnect CasparCG, Reset a password and Restart as buttons), open in your web browser, open the folder,
+  **Start with Windows**, Restart, Quit;
 - if RFP Manager stops by itself it is started again.
 
-It still needs Node.js installed (or a `node\node.exe` in this folder). `run.bat` keeps working as before.
+If the WebView2 SDK could not be fetched, or the WebView2 Runtime is missing (rare; installer at
+https://go.microsoft.com/fwlink/p/?LinkId=2124703), the windows open in Edge / Chrome app mode instead and the console
+says why. It still needs Node.js installed (or a `node\node.exe` in this folder). `run.bat` keeps working as before,
+and phones, tablets and other PCs still use the web addresses.
 
 ### Where things are kept, and a forgotten password
 
@@ -52,7 +65,8 @@ password for the one you choose.
 ### Updating to a new zip
 
 Close the RFP Manager window, unzip over the same folder (replace all files; `config.json` and `data/` are kept), and
-start `run.bat` again. The version shows at the bottom of the side menu and on the SERVER pill in Graphics control
+start `run.bat` (or RFP Manager.exe: tray icon → Quit first, and run `Build RFP Manager app.cmd` again when the
+new version's notes say the app changed; `tools\launcher\webview2` is kept) again. The version shows at the bottom of the side menu and on the SERVER pill in Graphics control
 (`SERVER 0.10.0`). If it still shows the old number, the old copy is the one that is running.
 
 
@@ -132,17 +146,107 @@ email and give each a role.
 
 ## 3. Link a production PC to the website
 
-1. Website: **Settings → Machine keys → Create machine key**. Copy the key (shown once).
-2. Production PC, first run: choose *link to your website*, enter the site address and key.
-   Already set up: **Settings → This machine → Website link**.
+**With Google on the PC (quickest).** On the PC's first-run screen (in RFP Manager.exe or at
+`http://localhost:8090`), press **Sign in with Google** and pick your account. If you are an Admin of a production
+team on the website, the PC links itself to the website (it gets its own machine key), your teams and data come down,
+and you are signed in. The PC takes the Google sign-in settings from the website by itself, so nothing needs setting
+up on it. After that, every member of those teams signs in on the PC with Google; someone added on the website a
+moment ago is let in too (the PC checks with the website first). Changes made on the PC go up to the website as
+before.
+
+**By signing in on the website.** On the PC, at first run (or **Settings → This machine → Website link**), keep the
+website address (`https://rfp-manager-f3r7.onrender.com` is filled in) and press **Sign in on the website to link this
+PC**. The website opens in your browser with a code: sign in with Google as an Admin of your production team, check
+the code matches the one on the PC, and press **Link this PC**. The PC gets its own machine key by itself (it shows on
+the website under Settings → Machine keys, where it can be revoked) and starts syncing. Nothing to copy.
+
+**With a key (still works).** Website: **Settings → Machine keys → Create machine key**, then on the PC open
+"Link with a machine key instead" and paste the address and key.
 
 The PC then holds every production team the key's owner is an Admin of. Accounts come down with the data, so
-members can sign in at the venue. For venues with no internet, an Admin can set a password for a member on the
-PC (**Settings → Members**). Those passwords stay on that PC.
+members sign in on the PC with the same Google account they use on the website (at `http://localhost:8090` and in
+RFP Manager.exe). For venues with no internet, an Admin can set a password for a member on the PC
+(**Settings → Members**). Those passwords stay on that PC.
 
 Google sign-in on the PC works at `http://localhost:8090`. Google does not allow plain `http://` addresses
-other than localhost, so other devices on the network or tailnet sign in with a password, or over HTTPS
-(for example `tailscale serve --bg 8090`, then add that `https://…ts.net` address as an authorised origin).
+other than localhost, so other devices reach the PC's screens through the website (below), or sign in with a
+password on the local network, or over HTTPS with Tailscale.
+
+### Using the PC's screens from anywhere (remote access through the website)
+
+A linked PC keeps one outgoing connection open to the website. Team members signed in on the website can then use
+**every live screen of that PC from anywhere**: Graphics control, the scorers, dashboards, the Timeline and crew view,
+Worship, the confidence, rundown and output monitors, Settings → Connections, Templates (with previews from the
+PC's template folder), Variables & triggers and Advert playout. Graphics still play out from the PC (CasparCG,
+vMix, ATEM, HyperDeck, OBS, Companion …). Nothing has to be opened on the router.
+
+- On the website, the menu shows **PC: <name>** under the team. With one PC online it is used straight away; with
+  several, pick one (remembered per browser). "No PC (website only)" uses the website itself (scoring and records,
+  no graphics). **Live → Production PCs** (or "+ Link a production PC…" in that list) shows which PCs are online.
+- Settings on the website gets **Connections** and **Production PC** tabs for the PC in use (Admins).
+- **Monitors** on the website gives links that work anywhere. View-only screens (confidence monitor, rundown,
+  output, preview, fill/key, stage, crew view) carry the PC and its screen key, e.g.
+  `https://…onrender.com/output?pc=<PC>&key=<screen key>` for an OBS or vMix browser source in another city.
+- Who may: the website checks the Google sign-in and that the person is in a production team the PC serves; the PC
+  then applies the person's role as usual. The play log shows such actions with the person and their address.
+- If the PC goes offline, its screens show "Waiting for the production PC…" and carry on by themselves when it is back.
+- Switch it off per PC: Settings → This machine → Remote access through the website.
+- Every request travels website → PC, so expect a little delay (about the round trip from the viewer to the
+  website and on to the PC). For the lowest latency at the venue, keep using the PC's own address there.
+- The free Render plan sleeps when nobody uses the site; a linked PC keeps it awake while it runs.
+
+### Backup: Tailscale Funnel (no website involved)
+
+Tailscale can give the PC its own fixed `https://` address on the internet, separate from the website:
+
+1. Install Tailscale on the PC (https://tailscale.com/download) and sign in.
+2. In the Tailscale admin console, allow Funnel for the PC (Access controls → "funnel" node attribute; the console
+   offers it the first time).
+3. On the PC, in a command prompt: `tailscale funnel --bg 8090`. It prints the address, e.g.
+   `https://ob-truck.tail1234.ts.net`.
+4. In RFP Manager on the PC: Settings → This machine → "Who can reach this app" → **Any address**, and add the
+   `https://…ts.net` address as an authorised JavaScript origin of the Google client (Google Cloud console →
+   Clients → RFP Manager website) so Google sign-in works there too.
+
+Anyone with that address reaches the PC's sign-in page, so keep members' roles tight. `tailscale funnel --bg off`
+(or `tailscale funnel reset`) turns it off. Only for devices on your own tailnet, `tailscale serve --bg 8090` is
+the private version.
+
+### Live streaming: Channels (SRT / RTMP in, watch pages out)
+
+The website can run its own streaming server, so you do not need YouTube or Facebook. Each production team makes
+**Channels** (Streaming → Channels). A channel has its own stream key and a watch page at
+`https://<site>/watch/<channel>` that plays in any browser (WebRTC, under a second of delay; HLS on iPhones when
+WebRTC cannot play). Who can watch is set per channel: **Public**, **Team members** (signed in) or **Password**.
+A paywall can be added later on the same check.
+
+Send to a channel from OBS, vMix, Wirecast, an encoder or Larix on a phone. The channel page shows exactly what to
+type and has Copy buttons:
+
+* **RTMP**: server `rtmp://<site>/live`, stream key `<channel>?user=publish&pass=<key>`.
+* **SRT** (better on poor internet): host `<site>`, port 8890, stream ID `publish:live/<channel>:publish:<key>`
+  (or the full `srt://…` URL in OBS).
+
+The channel page also shows whether it is live, for how long, how many watch and the bitrate coming in.
+**New stream key** stops the old key straight away. **Switched off** blocks streaming and watching.
+
+**Setting up the server** (once; Oracle Cloud, Hetzner or any Ubuntu 22.04 / 24.04 VM, arm64 or x64):
+
+1. Where the website runs now (Render → Environment), add `SITE_ADMINS` = your email, so you get
+   **Settings → Server**.
+2. Settings → Server → **Make the setup command**. Run that one line on the new server over SSH, or paste it in
+   as the VM's *cloud-init script* when you create it. It installs Node.js, this website, MediaMTX (the streaming
+   server) and Caddy (https), using the same database and Google sign-in as the current website. The link in it
+   works for 24 hours and hands out the database settings, so do not share it.
+3. Open the ports in the cloud firewall (Oracle: the subnet's security list): TCP 80, 443, 1935, 8189 and UDP
+   443, 8189, 8890.
+4. The server's address is `https://<its-ip-with-dashes>.sslip.io` unless you add `--domain tv.example.com` (point
+   the domain's A record at the server first). Add that address to the Google client's *Authorised JavaScript
+   origins*, then use it from then on and link the production PCs to it. Render can stay as a spare.
+
+To update the server later, make a new setup command and run it again. The settings and stream keys stay. Logs:
+`journalctl -u rfp-manager -f` and `journalctl -u mediamtx -f`. Bandwidth: one 4 Mb/s stream uses about 1.8 GB
+an hour for each viewer (Oracle includes 10 TB a month).
 
 ## 4. Using it
 
@@ -690,6 +794,8 @@ lib/templates.js     reads the template folder and each template's variable fiel
 lib/worship.js       worship control (outputs, stage display, CCLI log)   lib/bible.js   Bibles on this PC
 lib/sync.js          PC <-> website sync     lib/domain.js        match names, automatic productions
 lib/amcp.js          CasparCG client         lib/xml.js           XML save file
+lib/stream.js        streaming channels: MediaMTX checks, live status, watch pages   lib/tarball.js  the program as .tar.gz
+tools/server/install.sh   sets up a server: website + MediaMTX + Caddy   public/watch.html  the viewer page
 shared/schema.js     every record type and field (forms, lists and the save file come from this)
 shared/cricket.js    cricket engine (ICC)    shared/sports.js     rules for every other sport
 shared/scoring.js    results, log tables and player statistics across sports
@@ -709,19 +815,19 @@ To change a sport's rules or add a variant, edit its entry in `shared/sports.js`
 
 ## 7. Tests
 
-`npm test` runs 48 tests: the cricket engine (ICC conditions, DLS, super over, two-innings matches), the rules
+`npm test` runs 53 tests: the cricket engine (ICC conditions, DLS, super over, two-innings matches), the rules
 and statistics of every other sport, worship control (slides, outputs, CCLI log, song and Bible file formats),
 the short screen links, the live scorer and graphics control over the WebSocket against a stand-in CasparCG
 server, the rundown monitor, accounts and roles, the image folder, Google token checks (against a locally
 generated key), XML export and import, sync between an online instance and production PCs, scorer buttons and
 macros per theme, advert options and the play log, vMix, ATEM, HyperDeck, Raspberry Pi GPIO, OBS, Companion, OSC, Art-Net, MIDI and X-keys (the Windows helper's line protocol, and Linux device files) against small stand-ins, input mappings, the Companion addresses, who took each graphic, the Timeline (cues, holds, GO,
-crew screens, comments, rundown import), custom variables, game triggers (adverts on tries), dashboards, and text of several lines (JSON, XML and `{nl}`).
+crew screens, comments, rundown import), custom variables, game triggers (adverts on tries), dashboards, text of several lines (JSON, XML and `{nl}`), linking a PC by signing in on the website or with Google on the PC (a stand-in Google key), and remote access through the website (live pages, WebSocket, settings, adverts, screen keys, team checks, a forged identity, the PC going offline), streaming channels (stream keys, who may publish and watch, viewer tokens, passwords, live status against a stand-in MediaMTX) and the server setup command (bundle, settings, who may make it).
 
 Not covered by the tests, so check these on your own setup first: a real CasparCG server, real vMix, ATEM,
 HyperDeck, OBS, Companion, lighting desks and X-keys / MIDI hardware (built from their published protocols, tested only
-against stand-ins; the Windows MIDI / X-keys helper and RFP Manager.exe could not be built or run on the build machine; the X-keys key numbering and
+against stand-ins; the Windows MIDI / X-keys helper and RFP Manager.exe (with its WebView2 windows) could not be built or run on the build machine; the X-keys key numbering and
 backlight commands vary by model), a real relay board on a Pi
-(pi-gpio.py was tried in its --mock mode only), a real MongoDB Atlas
+(pi-gpio.py was tried in its --mock mode only), a real MediaMTX server and tools/server/install.sh on a real VM (written to MediaMTX's documented settings; not run here), a real MongoDB Atlas
 cluster (the tests use an in-memory stand-in for the driver), a real Google client ID, Windows (the tests
 ran on Linux), the King James download (the address could not be reached from the build machine), and real
 SongSelect and publisher Bible files (the importers were tested with files written to the published formats).

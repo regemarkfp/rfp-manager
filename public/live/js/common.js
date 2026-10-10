@@ -42,7 +42,8 @@
 
     // RFP Manager: the match comes from the page address (?fixture=<id>). Without one, the screen follows the match
     // that is on air. Screens opened with ?key=<output key> are view-only and need no sign-in.
-    query: (() => { const q = new URLSearchParams(location.search), o = new URLSearchParams(); ['fixture', 'key', 'team'].forEach(k => { if (q.get(k)) o.set(k, q.get(k)); }); const s = o.toString(); return s ? '?' + s : ''; })(),
+    pcQuery: (() => { const p = new URLSearchParams(location.search).get('pc'); return p ? '?pc=' + encodeURIComponent(p) : ''; })(),
+    query: (() => { const q = new URLSearchParams(location.search), o = new URLSearchParams(); ['fixture', 'key', 'team', 'pc'].forEach(k => { if (q.get(k)) o.set(k, q.get(k)); }); const s = o.toString(); return s ? '?' + s : ''; })(),
     rfp: { canScore: false, user: '', fixtureId: '' },
     async connect(r) {
       role = r;
@@ -232,6 +233,18 @@
     d.innerHTML = `<div><h2 style="margin:0 0 10px">RFP Manager</h2><p>${CG.esc(message)}</p><p><a href="/?next=${encodeURIComponent(location.pathname + location.search)}" style="color:#00ff82">Sign in to RFP Manager</a></p></div>`;
     document.body.appendChild(d);
   }
+  // On the website: the production PC this screen talks to is not running (or lost its internet). Keeps trying.
+  function offlineWall(message) {
+    let d = document.getElementById('rfp-offline');
+    if (!d) {
+      d = document.createElement('div');
+      d.id = 'rfp-offline';
+      d.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(20,20,20,.94);color:#f2f2f2;display:flex;align-items:center;justify-content:center;font:16px system-ui,sans-serif;padding:24px;text-align:center';
+      document.body.appendChild(d);
+    }
+    d.innerHTML = `<div><h2 style="margin:0 0 10px">Waiting for the production PC…</h2><p>${CG.esc(message)}</p><p style="opacity:.7">This screen reconnects by itself as soon as the PC is back.</p><p><a href="/#/pcs" style="color:#00ff82">Choose another PC</a></p></div>`;
+  }
+  CG.on && CG.on('state', () => { const d = document.getElementById('rfp-offline'); if (d) d.remove(); });
   let stopped = false;
 
   function open() {
@@ -310,6 +323,7 @@
           break;
         case 'error':
           if (msg.code === 'AUTH') { stopped = true; authWall(msg.message); break; }
+          if (msg.code === 'OFFLINE') { offlineWall(msg.message); break; }
           if (msg.requestId && pending.has(msg.requestId)) {
             const p = pending.get(msg.requestId); pending.delete(msg.requestId); clearTimeout(p.t);
             p.reject(new Error(msg.message));

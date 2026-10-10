@@ -119,18 +119,21 @@
     }
     const m = App.machine, local = /^(localhost|127\.)/.test(location.hostname);
     // Short links belong to this PC: http://pc-name/scorer. Opened as localhost, show them with the PC's own name instead.
-    const base = local && m.hostname ? `http://${m.hostname.toLowerCase()}${Number(m.port) === 80 ? '' : ':' + m.port}` : location.origin;
-    const link = (title, text, path, signIn) => { const url = base + path; return h('tr', {}, h('td', {}, h('b', {}, title), h('div', { class: 'dim small' }, text)),
+    const base = local && m.hostname && !(m.remote && App.cfg.mode === 'cloud') ? `http://${m.hostname.toLowerCase()}${Number(m.port) === 80 ? '' : ':' + m.port}` : location.origin;
+    // on the website, screens of the production PC in use: the open ones carry the PC and its screen key
+    const remote = m.remote && App.cfg.mode === 'cloud';
+    const link = (title, text, path, signIn) => { const url = base + path + (remote && !signIn ? `?pc=${encodeURIComponent(m.remote.id)}&key=${encodeURIComponent(m.outputKey)}` : ''); return h('tr', {}, h('td', {}, h('b', {}, title), h('div', { class: 'dim small' }, text)),
       h('td', { style: { width: '42%' } }, h('input', { readonly: true, value: url, onfocus: (e) => e.target.select(), 'aria-label': title + ' link' })),
       h('td', { class: 'nowrap' }, signIn ? h('span', { class: 'pill' }, 'sign-in') : h('span', { class: 'pill ok' }, 'open')),
-      h('td', { class: 'right nowrap' }, h('button', { class: 'sm', onclick: () => { navigator.clipboard.writeText(url).then(() => toast('Link copied')).catch(() => {}); } }, 'Copy'), ' ', h('a', { class: 'btn sm', href: path, target: '_blank', rel: 'noopener' }, 'Open ↗'))); };
+      h('td', { class: 'right nowrap' }, h('button', { class: 'sm', onclick: () => { navigator.clipboard.writeText(url).then(() => toast('Link copied')).catch(() => {}); } }, 'Copy'), ' ', h('a', { class: 'btn sm', href: remote ? url : path, target: '_blank', rel: 'noopener' }, 'Open ↗'))); };
     const on = App.get(m.onAirFixture);
     return { el: h('div', {}, pageHead('Monitors & screen links'),
-      h('div', { class: 'card' }, h('div', { class: 'spread' }, h('div', {}, h('h3', {}, 'Live production on this PC'), h('b', {}, on ? App.fixtureName(on) : 'No match on air yet')), h('a', { class: 'btn', href: '#/fixtures' }, 'Choose in Fixtures')),
+      remote ? h('p', { class: 'pill ok', style: { whiteSpace: 'normal' } }, `These links reach the production PC "${m.remote.name}" through this website, from anywhere. The PC must be running and linked.`) : null,
+      h('div', { class: 'card' }, h('div', { class: 'spread' }, h('div', {}, h('h3', {}, remote ? 'Live production on ' + m.remote.name : 'Live production on this PC'), h('b', {}, on ? App.fixtureName(on) : 'No match on air yet')), h('a', { class: 'btn', href: '#/fixtures' }, 'Choose in Fixtures')),
         h('p', { class: 'dim small', style: { marginBottom: 0 } }, 'One link per screen. Each follows whatever is live on this PC, so the links never change from match to match. Screens marked "open" are view-only and need no sign-in',
           m.shortLinks ? '' : ' (switched off on this machine: they ask for a sign-in)', '; the scorer and the control screens ask people to sign in.'),
-        local ? h('p', { class: 'pill warn', style: { marginTop: '10px', whiteSpace: 'normal' } }, `Other devices reach this PC by its name (${m.hostname || 'pc-name'}) or its Tailscale address, not "localhost". The links below already use the PC name.`) : null,
-        Number(m.port) !== 80 ? h('p', { class: 'dim small', style: { margin: '8px 0 0' } }, `To drop the ":${m.port}" from the links, set "port": 80 in config.json and restart RFP Manager (nothing else on the PC may be using port 80).`) : null),
+        local && !remote ? h('p', { class: 'pill warn', style: { marginTop: '10px', whiteSpace: 'normal' } }, `Other devices reach this PC by its name (${m.hostname || 'pc-name'}) or its Tailscale address, not "localhost". The links below already use the PC name.`) : null,
+        Number(m.port) !== 80 && !remote ? h('p', { class: 'dim small', style: { margin: '8px 0 0' } }, `To drop the ":${m.port}" from the links, set "port": 80 in config.json and restart RFP Manager (nothing else on the PC may be using port 80).`) : null),
       h('div', { class: 'card' }, h('h2', {}, 'Sport'), h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {},
         link('Scorer', 'The right scorer for the match on air, with teams, squads and rules from the match.', '/scorer', true),
         link('Graphics control', 'Take, update and clear graphics.', '/graphics-control', true),
