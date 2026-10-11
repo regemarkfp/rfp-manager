@@ -719,6 +719,13 @@ Cancel puts the colour back. A colour without transparency is stored as `#rrggbb
   it on a competition.
 - **Save file**: Settings → Save file exports and imports XML in the layout of the original save file template.
 
+### Production teams
+
+Each production team has its own name on the website: a second team with the same name is refused. Two teams that
+should be one (for example one made on a production PC before it was linked) are merged under
+**Settings → Production team → Merge another production team into this one** (you must be an Admin of both).
+Everything in the other team moves across, the other team is removed, and linked PCs follow by themselves.
+
 ### People and roles
 
 Settings → Members (Admins). The roles:
@@ -908,7 +915,7 @@ To change a sport's rules or add a variant, edit its entry in `shared/sports.js`
 
 ## 7. Tests
 
-`npm test` runs 58 tests: the cricket engine (ICC conditions, DLS, super over, two-innings matches), the rules
+`npm test` runs 59 tests: the cricket engine (ICC conditions, DLS, super over, two-innings matches), the rules
 and statistics of every other sport, worship control (slides, outputs, CCLI log, song and Bible file formats),
 the short screen links, the live scorer and graphics control over the WebSocket against a stand-in CasparCG
 server, the rundown monitor, accounts and roles, the image folder, Google token checks (against a locally

@@ -1,5 +1,12 @@
 /* Small DOM helpers and form widgets shared by every screen. */
 'use strict';
+// replaceChildren / append skip empty parts (null, undefined, false) instead of printing "null" on the page
+for (const P of [Element.prototype, DocumentFragment.prototype]) {
+  for (const name of ['replaceChildren', 'append']) {
+    const orig = P[name];
+    P[name] = function (...kids) { return orig.apply(this, kids.flat(Infinity).filter((k) => k !== null && k !== undefined && k !== false)); };
+  }
+}
 const UI = (() => {
   function h(tag, attrs, ...kids) {
     const el = document.createElement(tag);

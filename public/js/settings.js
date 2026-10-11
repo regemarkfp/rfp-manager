@@ -18,7 +18,34 @@
       h('p', { class: 'help' }, 'Custom fields appear on that record\'s form. Sports rules are built in and follow each federation; choose the format or variant in the scorer\'s Setup tab.'),
       admin ? h('div', { style: { marginTop: '14px' } }, h('button', { class: 'primary', onclick: async () => { try { await App.save('org', App.team, { ...App.org(), ...form.data }); applyTheme(); await App.loadMe(); toast('Team settings saved'); route(); } catch (e) { oops(e); } } }, 'Save team settings')) : h('p', { class: 'dim' }, 'Only an Admin can change team settings.')));
     if (!admin) el.querySelectorAll('input, select, textarea, button').forEach((x) => { x.disabled = true; });
+    const others = App.teams.filter((t) => t.id !== App.team && t.role === 'Admin');
+    if (admin && others.length && !App.cfg.bridge) el.append(mergeCard(others));
     return el;
+  }
+
+  // two teams that should be one: move everything of another team (you are Admin of both) into this one
+  function mergeCard(others) {
+    const info = h('div', { class: 'dim small', style: { margin: '8px 0' } });
+    const sel = h('select', { style: { maxWidth: '360px' }, onchange: () => describe() }, h('option', { value: '' }, 'Choose a team…'), others.map((t) => h('option', { value: t.id }, t.name)));
+    const describe = async () => {
+      info.replaceChildren();
+      if (!sel.value) return;
+      try {
+        const docs = (await api('GET', '/api/docs?team=' + sel.value)).docs;
+        const n = (type) => docs.filter((d) => d.type === type).length;
+        const comps = docs.filter((d) => d.type === 'competition').map((d) => d.data.name).slice(0, 5).join(', ');
+        info.textContent = `It holds ${docs.length} records: ${n('fixture')} matches, ${n('competition')} competitions${comps ? ' (' + comps + ')' : ''}, ${n('club')} clubs, ${n('production')} productions, ${n('member')} members.`;
+      } catch (e) { info.textContent = e.message; }
+    };
+    return h('div', { class: 'card' }, h('h2', {}, 'Merge another production team into this one'),
+      h('p', { class: 'dim', style: { marginTop: 0 } }, `Everything in the other team (clubs, matches, productions, graphics, members …) moves into ${App.org().name || 'this team'}, and the other team is removed. Linked production PCs follow by themselves.`),
+      sel, info,
+      h('button', { class: 'danger', onclick: async () => {
+        const t = others.find((x) => x.id === sel.value);
+        if (!t) return toast('Choose the team to merge in', 'error');
+        if (!(await confirmBox(`Move everything from "${t.name}" into "${App.org().name}" and remove "${t.name}"? This cannot be undone.`, 'Merge'))) return;
+        try { const r = await api('POST', `/api/orgs/${encodeURIComponent(App.team)}/merge`, { from: t.id }); toast(`Merged: ${r.moved} records moved`); await App.loadMe(); await App.loadDocs(); route(); } catch (e) { oops(e); }
+      } }, 'Merge into this team'));
   }
 
   function membersTab() {
