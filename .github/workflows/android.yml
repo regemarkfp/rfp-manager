@@ -1,0 +1,46 @@
+# Builds the Android app (APK) whenever the android folder changes, or by hand (Actions → Android app → Run workflow).
+# The APK is put on the website as /app/rfp-manager.apk and kept as a download on the workflow run.
+name: Android app
+
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build the APK
+        run: gradle -p android assembleRelease --no-daemon --stacktrace
+
+      - name: Put the APK on the website
+        run: |
+          mkdir -p public/app
+          cp android/app/build/outputs/apk/release/app-release.apk public/app/rfp-manager.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add public/app/rfp-manager.apk
+          git commit -m "Android app, build ${{ github.run_number }}" || echo "Nothing new to commit"
+          git pull --rebase
+          git push
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rfp-manager-apk
+          path: public/app/rfp-manager.apk
