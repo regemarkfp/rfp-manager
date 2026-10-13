@@ -9,15 +9,17 @@
 #   --domain tv.example.com   your own name for it (point its DNS A record at this server first).
 #                             Without one it uses <ip>.sslip.io, which works straight away.
 #   --email you@example.com   for the https certificate (optional)
+#   --keep-days 90            how long recordings (the videos) are kept; 0 = for ever
 set -euo pipefail
 
-FROM=""; TOKEN=""; DOMAIN=""; EMAIL=""
+FROM=""; TOKEN=""; DOMAIN=""; EMAIL=""; KEEP_DAYS=90
 while [ $# -gt 0 ]; do
   case "$1" in
     --from) FROM="${2%/}"; shift 2 ;;
     --token) TOKEN="$2"; shift 2 ;;
     --domain) DOMAIN="$2"; shift 2 ;;
     --email) EMAIL="$2"; shift 2 ;;
+    --keep-days) KEEP_DAYS="$2"; shift 2 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -86,7 +88,8 @@ fi
 
 say "RFP Manager"
 id rfp >/dev/null 2>&1 || useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin rfp
-mkdir -p "$DATA" "$ETC" /etc/mediamtx
+mkdir -p "$DATA" "$ETC" /etc/mediamtx /var/lib/mediamtx/recordings
+chown -R rfp:rfp /var/lib/mediamtx
 curl -fsSL "$FROM/api/server/bundle.tgz?t=$TOKEN" -o /tmp/rfp.tgz
 rm -rf /tmp/rfp-new && mkdir -p /tmp/rfp-new && tar -xzf /tmp/rfp.tgz -C /tmp/rfp-new
 rm -rf "$APP.old"; [ -d "$APP" ] && mv "$APP" "$APP.old"
@@ -105,6 +108,7 @@ SECRET=""
   echo "DATA_DIR=$DATA"
   echo "STREAM_HOST=$DOMAIN"
   echo "STREAM_API=http://127.0.0.1:9997"
+  echo "STREAM_PLAYBACK=http://127.0.0.1:9996"
   echo "STREAM_HOOK_SECRET=$SECRET"
 } > "$ETC/env.new"
 install -m 600 -o root -g root "$ETC/env.new" "$ETC/env"; rm -f "$ETC/env.new" /tmp/rfp-site.env
@@ -152,6 +156,15 @@ webrtcLocalUDPAddress: :8189
 webrtcLocalTCPAddress: :8189
 webrtcIPsFromInterfaces: true
 webrtcAdditionalHosts: [$IP]
+# recordings become the videos on the website (RFP Manager lists them; productions can switch recording off)
+playback: true
+playbackAddress: 127.0.0.1:9996
+pathDefaults:
+  record: true
+  recordPath: /var/lib/mediamtx/recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+  recordFormat: fmp4
+  recordSegmentDuration: 1h
+  recordDeleteAfter: ${KEEP_DAYS}d
 paths:
   all_others:
 EOF
@@ -183,6 +196,9 @@ $DOMAIN {
   handle_path /hls/* {
     reverse_proxy 127.0.0.1:8888
   }
+  handle_path /vod/* {
+    reverse_proxy 127.0.0.1:9996
+  }
   handle {
     reverse_proxy 127.0.0.1:3000
   }
@@ -209,7 +225,7 @@ cat <<EOF
   Website     https://$DOMAIN
   RTMP in     rtmp://$DOMAIN/live            (stream key: see the channel)
   SRT in      srt://$DOMAIN:8890             (stream id: see the channel)
-  Watch       https://$DOMAIN/watch/<channel>
+  Watch       https://$DOMAIN/watch/<stream>      Website  https://$DOMAIN/
 
   Still to do:
    · Google sign-in: add https://$DOMAIN to "Authorised JavaScript origins"
