@@ -55,7 +55,7 @@
   // A production PC that is not linked to the website yet: it has to be, before it can be used.
   App.linkGate = (root) => {
     const admin = App.teams.some((t) => t.role === 'Admin');
-    root.replaceChildren(h('div', { class: 'login' }, h('div', { class: 'box card' }, h('div', { class: 'brand', style: { padding: 0 } }, h('span', { class: 'dot' }), App.cfg.name),
+    root.replaceChildren(h('div', { class: 'login' }, h('div', { class: 'box card' }, h('div', { class: 'brand', style: { padding: 0, gap: '10px' } }, h('img', { src: '/brand/rfp-logo-sm.png', alt: 'RFP', style: { height: '30px' } }), App.cfg.name),
       h('h1', {}, 'Link this PC to the website'),
       h('p', { class: 'dim' }, 'This PC is the CasparCG bridge for your production team. It gets clubs, fixtures, crew, adverts and the rest from the website, and keeps its own copy for when the internet is down. It needs to be linked once.'),
       admin ? App.linkFlow({ onDone: () => setTimeout(() => location.reload(), 2500) }) : h('p', { class: 'toast error' }, 'Only an Admin can link this PC. Ask an Admin to sign in here, or to sign in with Google on this PC.'),

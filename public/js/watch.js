@@ -1,7 +1,12 @@
-/* The viewer page: /watch/<channel>. WebRTC (WHEP) from the streaming server, HLS where WebRTC cannot play. */
+/* The viewer page: /watch/<stream> (a production's live stream on a channel), and its recordings with ?v=<start>.
+ * Live: WebRTC (WHEP) from the streaming server, HLS where WebRTC cannot play. Videos: MP4 from the recordings. */
 'use strict';
 (() => {
+  // replaceChildren / append skip empty parts (null, undefined, false)
+  for (const P of [Element.prototype, DocumentFragment.prototype]) for (const name of ['replaceChildren', 'append']) { const orig = P[name]; P[name] = function (...kids) { return orig.apply(this, kids.flat(Infinity).filter((k) => k !== null && k !== undefined && k !== false)); }; }
   const slug = decodeURIComponent(location.pathname.split('/')[2] || '');
+  const vodStart = new URLSearchParams(location.search).get('v') || '';
+  let pub = null;
   const $ = (id) => document.getElementById(id);
   const el = (tag, attrs = {}, ...kids) => {
     const e = document.createElement(tag);
@@ -12,7 +17,7 @@
   let info = null, pc = null, playing = false, password = null, retry = null;
 
   const api = async (method, body) => {
-    const r = await fetch('/api/watch/' + encodeURIComponent(slug), { method, credentials: 'same-origin', headers: body ? { 'content-type': 'application/json', 'x-rfp': '1' } : {}, body: body ? JSON.stringify(body) : undefined });
+    const r = await fetch('/api/watch/' + encodeURIComponent(slug) + (vodStart ? '?v=' + encodeURIComponent(vodStart) : ''), { method, credentials: 'same-origin', headers: body ? { 'content-type': 'application/json', 'x-rfp': '1' } : {}, body: body ? JSON.stringify(body) : undefined });
     const out = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(out.error || 'Something went wrong'), { status: r.status });
     return out;
@@ -23,14 +28,40 @@
     const poster = info && info.poster ? el('img', { class: 'poster', src: '/media/' + encodeURIComponent(info.poster), alt: '' }) : null;
     $('stage').replaceChildren(...[poster, el('div', { class: 'msg' }, el('b', {}, title), text ? el('p', {}, text) : null, ...extra)].filter(Boolean));
   }
+  const imgUrl = (id) => (!id ? '' : /^https?:/.test(id) ? id : '/media/' + encodeURIComponent(id));
+  const dur = (sec) => { sec = Math.round(sec || 0); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0'); };
   function header() {
     if (!info) return;
-    document.title = info.name + (info.live ? ' · LIVE' : '');
-    $('title').textContent = info.name;
-    $('badge').textContent = info.live ? 'LIVE' : 'OFFLINE';
-    $('badge').className = 'badge' + (info.live ? ' on' : '');
-    $('viewers').textContent = info.live && info.viewers ? `${info.viewers} watching` : '';
+    const vod = vodStart && info.vod;
+    document.title = info.title + (info.live && !vod ? ' · LIVE' : '');
+    $('title').textContent = info.title;
+    $('badge').textContent = vod ? 'VIDEO' : info.live ? 'LIVE' : 'OFFLINE';
+    $('badge').className = 'badge' + (info.live && !vod ? ' on' : '');
+    $('viewers').textContent = vod ? new Date(info.vod.start).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : info.live && info.viewers ? `${info.viewers} watching` : '';
     $('desc').textContent = info.description || '';
+    const ch = info.channel || {};
+    const subOn = pub && pub.subscribed;
+    $('chrow').replaceChildren(el('a', { href: '/c/' + ch.slug }, ch.logo ? el('img', { class: 'logo', src: imgUrl(ch.logo), alt: '' }) : null, el('div', {}, el('b', {}, ch.name || ''), el('div', { class: 'dim small' }, pub ? `${pub.subscribers} subscriber${pub.subscribers === 1 ? '' : 's'}` : ''))),
+      el('span', { class: 'sp' }), pub ? el('button', { class: 'sub' + (subOn ? ' on' : ''), onclick: subscribe }, subOn ? 'Subscribed ✓' : 'Subscribe') : null);
+    const vids = info.videos || [];
+    $('vids').replaceChildren(...(vids.length ? [el('h3', {}, 'Recordings'), el('div', { class: 'vids' }, info.live ? el('a', { href: location.pathname, class: vodStart ? '' : 'on' }, el('b', {}, '● Live now'), el('small', {}, `${info.viewers || 0} watching`)) : null,
+      vids.map((v) => el('a', { href: '?v=' + encodeURIComponent(v.start), class: v.start === vodStart ? 'on' : '' }, el('b', {}, new Date(v.start).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })), el('small', {}, dur(v.duration)))))] : []));
+  }
+  async function loadPublic() {
+    if (!info || !info.channel || info.access !== 'Public') return;
+    try { const r = await fetch('/api/public/c/' + encodeURIComponent(info.channel.slug)); if (r.ok) { pub = await r.json(); header(); } } catch (e) { /* no channel page */ }
+  }
+  async function subscribe() {
+    if (!pub.signedIn) { location.href = '/app?next=' + encodeURIComponent(location.pathname + location.search); return; }
+    const r = await fetch('/api/public/subscribe', { method: 'POST', headers: { 'content-type': 'application/json', 'x-rfp': '1' }, body: JSON.stringify({ channel: info.channel.id, on: !pub.subscribed }) });
+    if (r.ok) { pub.subscribed = (await r.json()).subscribed; pub.subscribers += pub.subscribed ? 1 : -1; header(); }
+  }
+  function playVod() {
+    stop();
+    const video = el('video', { controls: '', playsinline: '', autoplay: '', src: info.vod.url });
+    video.addEventListener('dblclick', () => { (video.requestFullscreen || video.webkitEnterFullscreen || (() => {})).call(video); });
+    $('stage').replaceChildren(video);
+    playing = true;
   }
 
   function stop() { if (pc) { try { pc.close(); } catch (e) { /* closed */ } } pc = null; playing = false; }
@@ -82,16 +113,18 @@
     clearTimeout(retry);
     try { info = await api(password === null ? 'GET' : 'POST', password === null ? null : { password }); }
     catch (e) {
-      if (e.status === 404) { document.title = 'Not found'; return message('There is no channel at this address.', 'Check the link you were given.'); }
+      if (e.status === 404) { document.title = 'Not found'; return message('There is no stream at this address.', 'Check the link you were given.'); }
       if (e.status === 403 && password !== null) { password = null; return askPassword(e.message); }
       return message('Cannot reach the website', e.message, el('p', {}, el('button', { onclick: load }, 'Try again')));
     }
     header();
+    if (!pub) loadPublic();
     if (info.needs === 'password') return askPassword();
-    if (info.needs === 'signin') return message('Sign in to watch', 'This channel is for members of the production team.', el('p', {}, el('a', { class: 'btn primary', href: '/?next=' + encodeURIComponent(location.pathname) }, 'Sign in')));
+    if (info.needs === 'signin') return message('Sign in to watch', 'This channel is for members of the production team.', el('p', {}, el('a', { class: 'btn primary', href: '/app?next=' + encodeURIComponent(location.pathname + location.search) }, 'Sign in')));
     if (info.needs === 'team') return message('This channel is for its production team', 'Ask the team to add you, or for a link you can use.');
+    if (vodStart) { if (info.vod) { if (!playing) playVod(); return; } return message('This recording is no longer here', '', el('p', {}, el('a', { class: 'btn', href: location.pathname }, 'Back to the stream'))); }
     if (!info.streaming) return message('Streaming is not set up on this website yet', '');
-    if (!info.live) { message('Not live yet', 'This page starts playing by itself when the stream begins.'); return again(5000); }
+    if (!info.live) { message('Not live yet', (info.videos || []).length ? 'Watch a recording below, or stay here: it starts playing by itself when the stream begins.' : 'This page starts playing by itself when the stream begins.'); return again(5000); }
     if (playing) return;
     try { await playWebRTC(); }
     catch (e) {
@@ -111,7 +144,7 @@
 
   // live badge and viewer count, and noticing when the stream stops or starts
   setInterval(async () => {
-    if (!info || info.needs) return;
+    if (!info || info.needs || vodStart) return;
     try {
       const now = await api(password === null ? 'GET' : 'POST', password === null ? null : { password });
       const was = info.live; info = { ...info, ...now }; header();

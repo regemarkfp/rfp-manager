@@ -88,12 +88,19 @@
         { k: 'title', l: 'Title', t: 'combo', opts: ['Stadium Manager', 'Production Coordinator', 'Technical Manager', 'Producer', 'Client Contact', 'Safety Officer'] },
         { k: 'crewMember', l: 'Crew member', t: 'ref', ref: 'crewMember' }, { k: 'name', l: 'or name', t: 'text' }, { k: 'phone', l: 'Phone', t: 'text' }] },
       { k: 'crew', l: 'Crew', t: 'list', fields: [{ k: 'location', l: 'Location', t: 'combo', opts: ['Gallery', 'Venue', 'Studio', 'OB Van', 'Remote'], w: 150 }, { k: 'role', l: 'Role', t: 'ref', ref: 'crewRole' },
-        { k: 'crewMember', l: 'Crew member', t: 'ref', ref: 'crewMember' }, { k: 'callTime', l: 'Call time', t: 'time' }, { k: 'productionTime', l: 'TX time', t: 'time' }] },
+        { k: 'crewMember', l: 'Crew member', t: 'ref', ref: 'crewMember' }, { k: 'callTime', l: 'Call time', t: 'time' }, { k: 'productionTime', l: 'TX time', t: 'time' },
+        { k: 'rate', l: 'Day rate', t: 'money', w: 110, ph: 'role rate', help: 'Only if this person is paid differently from the role.' }, { k: 'paid', l: 'Paid', t: 'bool', w: 70 }] },
       { k: 'crewNotes', l: 'Additional information', t: 'textarea', ph: 'Entrance: please use the bottom gate. Bring a set of headphones for comms.', help: 'One point per line. Start a line with "Label:" to print the label in bold.' },
       { k: 'hospitals', l: 'Emergency: nearest hospitals', t: 'list', fields: [{ k: 'name', l: 'Hospital', t: 'text' }, { k: 'area', l: 'Area', t: 'text' }, { k: 'phone', l: 'Phone', t: 'text' }] },
       { k: 'equipment', l: 'Equipment', t: 'list', fields: [{ k: 'item', l: 'Item', t: 'ref', ref: 'equipment' }, { k: 'quantity', l: 'Qty', t: 'number', w: 80 }, { k: 'notes', l: 'Notes', t: 'text' }] },
       { k: 'extras', l: 'Other costs', t: 'list', fields: [{ k: 'description', l: 'Description', t: 'text' }, { k: 'cost', l: 'Cost', t: 'money' }, { k: 'invoice', l: 'Invoice', t: 'money' }] },
       { k: 'fixtures', l: 'Matches', t: 'list', hidden: true, fields: [{ k: 'fixture', l: 'Match', t: 'ref', ref: 'fixture' }] },
+      { k: 'streamChannel', l: 'Live stream on channel', t: 'ref', ref: 'channel', group: 'Live stream', help: 'Stream this production on a channel. The stream key is made for this production (shown below once saved).' },
+      { k: 'streamTitle', l: 'Stream title', t: 'text', ph: 'The production name', group: 'Live stream' },
+      { k: 'streamSlug', l: 'Stream web address', t: 'text', ph: 'Made from the name and date', group: 'Live stream', help: 'Viewers watch at /watch/<this>.' },
+      { k: 'streamPoster', l: 'Stream picture', t: 'image', group: 'Live stream', help: 'Shown before it starts and on the video afterwards. The channel\'s banner if empty.' },
+      { k: 'streamRecord', l: 'Record the stream', t: 'bool', def: true, group: 'Live stream' },
+      { k: 'streamVod', l: 'Show the recording on the website afterwards', t: 'bool', def: true, group: 'Live stream' },
       RUNDOWN] },
 
     graphic: { label: 'Template graphic', plural: 'Template graphics', group: 'Live', title: (d) => d.name, cols: ['name', 'template', 'kind', 'layer'], fields: [
@@ -165,15 +172,17 @@
     // when something happens in a game (a try, a six, a red card …) run actions: an advert, a graphic, a macro, set a variable
     gametrigger: { label: 'Game trigger', plural: 'Game triggers', group: 'Live', hidden: true, title: (d) => d.name, cols: ['name', 'when'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'notes', l: 'Notes', t: 'textarea' }] },
-    channel: { label: 'Channel', plural: 'Channels', group: 'Streaming', title: (d) => d.name, cols: ['name', 'slug', 'access'], fields: [
-      { k: 'name', l: 'Name', t: 'text', req: true, ph: 'Main field, Church service …' },
-      { k: 'slug', l: 'Web address', t: 'text', ph: 'Made from the name', help: 'Viewers watch at /watch/<this>. Letters, numbers and dashes.' },
-      { k: 'access', l: 'Who can watch', t: 'select', opts: ['Public', 'Team members', 'Password'], def: 'Public', help: 'Public: anyone with the link. Team members: people in this production team (signed in). Password: anyone who types the password below.' },
+    channel: { label: 'Channel', plural: 'Channels', group: 'Streaming', title: (d) => d.name, cols: ['logo', 'name', 'owner', 'access'], fields: [
+      { k: 'name', l: 'Name', t: 'text', req: true, ph: 'RegemarkFP TV, Cheetahs Rugby …' },
+      { k: 'slug', l: 'Web address', t: 'text', ph: 'Made from the name', help: 'The channel page is at /c/<this>. Letters, numbers and dashes.' },
+      { k: 'owner', l: 'Channel of', t: 'select', opts: ['Production company', 'Club', 'Team', 'Production'], def: 'Production company', help: 'Whose channel this is. A club or team channel takes its logo and colours unless you set them here.' },
+      { k: 'club', l: 'Club', t: 'ref', ref: 'club' }, { k: 'squad', l: 'Team', t: 'ref', ref: 'squad' }, { k: 'production', l: 'Production', t: 'ref', ref: 'production' },
+      { k: 'logo', l: 'Logo', t: 'image' }, { k: 'banner', l: 'Banner (wide picture at the top of the channel)', t: 'image' },
+      { k: 'color', l: 'Brand colour', t: 'color', solid: true },
+      { k: 'description', l: 'About', t: 'textarea', help: 'Shown on the channel page.' },
+      { k: 'access', l: 'Who can watch', t: 'select', opts: ['Public', 'Team members', 'Password'], def: 'Public', help: 'Public channels are on the public website. Team members: people in this production team (signed in). Password: anyone who types the password below.' },
       { k: 'viewerPassword', l: 'Viewer password', t: 'text', help: 'Only used when "Who can watch" is Password.' },
-      { k: 'description', l: 'Description', t: 'textarea', help: 'Shown under the player.' },
-      { k: 'poster', l: 'Picture before it starts', t: 'image' },
-      { k: 'production', l: 'Production', t: 'ref', ref: 'production' }, { k: 'fixture', l: 'Match', t: 'ref', ref: 'fixture' },
-      { k: 'disabled', l: 'Switched off', t: 'bool', help: 'Nobody can stream to it or watch it.' }] },
+      { k: 'disabled', l: 'Switched off', t: 'bool', help: 'Hidden, and nobody can stream to it or watch it.' }] },
     expense: { label: 'Expense', plural: 'Expenses', group: 'Productions', title: (d) => [d.description, d.amount ? Number(d.amount).toFixed(2) : ''].filter(Boolean).join(' · '), cols: ['date', 'production', 'description', 'category', 'amount', 'status'], fields: [
       { k: 'production', l: 'Production', t: 'ref', ref: 'production', req: true }, { k: 'date', l: 'Date', t: 'date' },
       { k: 'description', l: 'What for', t: 'text', req: true, ph: 'Fuel to the venue' }, { k: 'category', l: 'Category', t: 'combo', opts: EXPENSE_CATS },

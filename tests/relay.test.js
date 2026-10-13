@@ -26,7 +26,7 @@ test('a production PC links to the website by signing in there, no key to copy',
   assert.equal(start.status, 200, JSON.stringify(start.data));
   const code = start.data.pending.code;
   assert.match(code, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
-  assert.ok(start.data.pending.approveUrl.endsWith('/#/link/' + code));
+  assert.ok(start.data.pending.approveUrl.endsWith('/app#/link/' + code));
   // the website shows which PC asks; only a signed-in person can see it, only an Admin can approve
   assert.equal((await client(cloud.url).get('/api/pair/' + code)).status, 401);
   assert.equal((await web.get('/api/pair/' + code)).data.name, 'OB truck');

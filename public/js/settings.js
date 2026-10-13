@@ -9,6 +9,7 @@
     { k: 'image', l: 'Logo (dashboard and call sheets)', t: 'image' }, { k: 'address', l: 'Company address', t: 'text' }, { k: 'phone', l: 'Company phone', t: 'text' }, { k: 'email', l: 'Company email', t: 'text' }, { k: 'website', l: 'Website', t: 'text' },
     { k: 'defaultTheme', l: 'Default theme', t: 'ref', ref: 'theme', help: 'Used for every match unless its competition has its own theme, or another is chosen in Graphics control.' },
     { k: 'templateFolder', l: 'Default CasparCG template folder', t: 'text', ph: 'rfp', help: 'Used when a competition has no theme. Themes can point at their own folder.' },
+    { k: 'publicMatches', l: 'Show our matches on the public website', t: 'bool', help: 'Fixtures, live scores and results of this team appear on the website\'s front page. Public channels and their streams always do.' },
     CUSTOM_FIELDS];
 
   function teamTab() {

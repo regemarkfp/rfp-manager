@@ -199,6 +199,7 @@ table.cs-plain td { padding: 2px 26px 2px 0; }
 .shell.side-min .side .brand > span:not(.dot) { display: none; }
 .shell.side-min .side .brand { flex-direction: column; gap: 10px; }
 .shell.side-min .side-toggle { transform: rotate(180deg); }
+.shell.side-min .side .brand .logo { height: 18px !important; }
 
 /* ================= phones and tablets ================= */
 .fx .grow { flex: 1 1 220px; min-width: 0; }
@@ -237,3 +238,20 @@ table.cs-plain td { padding: 2px 26px 2px 0; }
 .conn-dev code, .card code { font-size: 12px; }
 .conn-dev .row > select, .conn-dev .row > input, .card .row > select { width: auto; flex: 0 1 auto; min-width: 120px; max-width: 100%; }
 .conn-dev .row > input[type=number] { min-width: 60px; }
+
+/* productions calendar */
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
+.cal-head { padding: 6px 8px; font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--line); }
+.cal-day { min-height: 104px; padding: 4px 5px 6px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-width: 0; }
+.cal-day:nth-child(7n) { border-right: 0; }
+.cal-day.other { background: #191919; }
+.cal-day.other .cal-n { opacity: .45; }
+.cal-day.today .cal-n { background: var(--accent); color: var(--on-accent); border-radius: 50%; width: 22px; height: 22px; display: grid; place-items: center; font-weight: 700; }
+.cal-n { font-size: 12px; margin-bottom: 3px; }
+.cal-ev { font-size: 12px; padding: 2px 6px; border-radius: 4px; margin-bottom: 3px; background: #3a3a3a; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-ev:hover { filter: brightness(1.25); }
+.cal-ev.production { background: #2f4e6b; }
+.cal-ev.fixture { background: #4b4b4b; }
+.cal-ev.booked { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+@media (max-width: 700px) { .cal-day { min-height: 70px; padding: 2px; } .cal-ev { font-size: 10px; padding: 1px 3px; } .cal-head { font-size: 10px; padding: 4px; } }
+.brand-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

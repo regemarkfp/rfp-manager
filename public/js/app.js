@@ -42,7 +42,7 @@ const App = {
   },
   personByEmail(email) { const m = this.list('member').find((x) => x.data.email === email); return m ? m.data : null; },
   limited() { return !!Schema.ROLE_SEES[this.role]; },          // a coach or an official
-  onlineUrl(hash) { return (this.cfg && this.cfg.cloudUrl ? this.cfg.cloudUrl.replace(/\/+$/, '') : '') + '/' + (hash || ''); },
+  onlineUrl(hash) { return (this.cfg && this.cfg.cloudUrl ? this.cfg.cloudUrl.replace(/\/+$/, '') : '') + '/app' + (hash || ''); },
   canScore() { return this.cfg && this.cfg.mode === 'local' && this.can('score'); },
   scorerUrl(id, f) { const s = Scoring.sportFor(f.sport); return `/live/${s && s.id === 'cricket' ? 'stats' : 'sport'}.html?fixture=${encodeURIComponent(id)}`; },
   commsUrl(id, f) { const s = Scoring.sportFor(f.sport); return `/live/${s && s.id === 'cricket' ? 'commentary' : 'sport-commentary'}.html?fixture=${encodeURIComponent(id)}`; },
@@ -166,13 +166,14 @@ function applyTheme() {
 function navFor() {
   const c = App.cfg || {};
   if (App.role === 'Coach') return [['', [['#/', 'My teams'], ['#/fixtures', 'Fixtures & Results'], ['#/list/club', 'My clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/settings', 'Settings']]]];
+  if (App.role === 'Crew' && !c.bridge) return [['', [['#/', 'My gigs'], ['#/calendar', 'Calendar'], ['#/list/expense', 'My expenses'], ['#/settings', 'Settings']]]];
   if (App.role === 'Official') return [['', [['#/', 'My matches'], ['#/fixtures', 'Fixtures & Results'], ['#/settings', 'Settings']]]];
   if (c.bridge) {
     return [
       ['', [['#/', 'Bridge']]],
       ['Live', [['#/monitors', 'Monitors'], ['#/templates', 'Templates'], ['#/list/theme', 'Themes'], ['#/adverts', 'Advert playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'], ['#/playlog', 'Play log']]],
       ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/bibles', 'Bibles'], ['#/ccli', 'CCLI report']]],
-      ['From the website', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions'], ['#/list/production', 'Productions'], ['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/crewMember', 'Crew'], ['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/images', 'Images']]],
+      ['From the website', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions'], ['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], ['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/crewMember', 'Crew'], ['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/images', 'Images']]],
       ['', [['#/settings', 'Settings']]],
     ];
   }
@@ -180,7 +181,7 @@ function navFor() {
   return [
     ['', [['#/', 'Dashboard']]],
     ['Matches', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions']]],
-    ['Productions', [['#/list/production', 'Productions'], ['#/list/expense', App.can('edit') ? 'Expenses' : 'My expenses'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment']]],
+    ['Productions', [['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], ['#/list/expense', App.can('edit') ? 'Expenses' : 'My expenses'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment']]],
     ['Assets', [['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/theme', 'Themes'], ['#/images', 'Images']]],
     ['Advertising', [['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log']]],
     ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report']].concat(local ? [['#/bibles', 'Bibles']] : [])],
@@ -198,7 +199,7 @@ function shell(content) {
   const on = (href) => (href === '#/' ? here === '#/' : here === href || here.startsWith(href + '/') || (href.startsWith('#/list/') && here.startsWith('#/edit/' + href.slice(7) + '/')) || (href === '#/fixtures' && /^#\/(rundown\/fixture|edit\/fixture)\//.test(here)));
   const root = h('div', { class: 'shell' + (navStore.get('rfp-side-min') === '1' ? ' side-min' : '') },
     h('aside', { class: 'side' },
-      h('div', { class: 'brand', style: { display: 'flex', alignItems: 'center' } }, h('span', { class: 'dot' }), h('span', { style: { flex: 1 } }, App.cfg.name), h('button', { class: 'ghost sm no-print side-toggle', title: 'Make the menu narrow or wide', onclick: () => { const n = !root.classList.contains('side-min'); root.classList.toggle('side-min', n); navStore.set('rfp-side-min', n ? '1' : '0'); } }, '«')),
+      h('div', { class: 'brand', style: { display: 'flex', alignItems: 'center', gap: '10px' } }, h('img', { class: 'logo', src: '/brand/rfp-logo-sm.png', alt: 'RFP', style: { height: '28px', width: 'auto' } }), h('span', { class: 'brand-name', style: { flex: 1 } }, App.cfg.name), h('button', { class: 'ghost sm no-print side-toggle', title: 'Make the menu narrow or wide', onclick: () => { const n = !root.classList.contains('side-min'); root.classList.toggle('side-min', n); navStore.set('rfp-side-min', n ? '1' : '0'); } }, '«')),
       h('select', { 'aria-label': 'Production team', onchange: async (e) => {
         if (e.target.value === '+') { e.target.value = App.team; return newTeam(); }
         await App.selectTeam(e.target.value); location.hash = '#/'; route();

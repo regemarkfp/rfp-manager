@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RFP Manager</title>
+  <link rel="icon" type="image/png" href="/icons/favicon-64.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0f0f0f">
+  <link rel="stylesheet" href="/css/public.css">
+</head>
+<body>
+  <header class="top">
+    <button class="icon menu" id="menu" aria-label="Menu">☰</button>
+    <a class="brand" href="/" data-nav><img src="/brand/rfp-logo-sm.png" alt="RFP"><span id="site-name"></span></a>
+    <form class="search" id="search"><input type="search" placeholder="Search streams, videos, matches, channels" aria-label="Search"><button aria-label="Search">⌕</button></form>
+    <div class="me" id="me"></div>
+  </header>
+  <div class="layout">
+    <nav class="side" id="side"></nav>
+    <main id="main"><div class="loading">Loading…</div></main>
+  </div>
+  <script src="/js/public.js"></script>
+</body>
+</html>

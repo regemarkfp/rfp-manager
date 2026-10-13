@@ -1,5 +1,5 @@
-/* Live streaming: a channel's stream settings (what to type into OBS / vMix), whether it is live, and the website's
- * "Server" settings tab that makes the one-line command to set up a streaming server. */
+/* Live streaming: a production's stream (what to type into OBS / vMix, live or not, recordings), a channel's look and
+ * page, and the website's "Server" settings tab that makes the one-line command to set up a streaming server. */
 'use strict';
 (() => {
   const copy = (text) => navigator.clipboard.writeText(text).then(() => toast('Copied')).catch(() => toast('Select it and copy by hand', 'error'));
@@ -14,46 +14,80 @@
   const ago = (t) => { const s = Math.max(0, Math.round((Date.now() - t) / 1000)); return s < 3600 ? `${Math.floor(s / 60)} min` : `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`; };
 
   App.panels = App.panels || {};
-  App.panels.channel = (doc) => {
+  const liveTag = (on) => h('span', { class: 'pill', style: on ? { background: '#ff3b3b', color: '#fff' } : {} }, on ? 'LIVE' : 'Offline');
+
+  // ---- a production's live stream: what to type into OBS / vMix, live or not, its videos
+  function streamCard(doc) {
     const box = h('div', { class: 'card' }, h('div', { class: 'dim' }, 'Loading…'));
-    let timer = null, alive = true;
+    let timer = null;
     const paint = async () => {
-      if (!box.isConnected && timer) { clearInterval(timer); alive = false; return; }
+      if (!box.isConnected && timer) { clearInterval(timer); return; }
+      const cur = App.docs.get(doc.id) || doc;
+      if (!cur.data.streamChannel || !cur.data.streamSlug) { box.replaceChildren(h('h2', {}, 'Live stream'), h('p', { class: 'dim', style: { margin: 0 } }, 'Pick a channel under "Live stream on channel" below and save: this production gets its own stream key and watch page.')); return; }
       let r;
       try { r = await api('GET', '/api/streams?team=' + App.team); } catch (e) { box.replaceChildren(h('p', { class: 'dim' }, e.message)); return; }
-      const cur = App.docs.get(doc.id) || doc;
       const s = r.list.find((x) => x.id === doc.id) || {};
-      const watch = (r.base || location.origin) + '/watch/' + (cur.data.slug || '');
+      const watch = (r.base || location.origin) + '/watch/' + cur.data.streamSlug;
+      const ch = App.docs.get(cur.data.streamChannel);
       const ing = s.ingest;
-      const kids = [
+      box.replaceChildren(
         h('div', { class: 'spread' },
-          h('div', {}, h('h2', { style: { margin: 0 } }, 'Stream ', h('span', { class: 'pill ' + (s.live ? 'ok' : ''), style: s.live ? { background: '#ff3b3b', color: '#fff' } : {} }, s.live ? 'LIVE' : 'Offline')),
-            h('div', { class: 'dim small' }, s.live ? `Live for ${ago(s.since)} · ${s.viewers} watching${s.kbps ? ` · ${(s.kbps / 1000).toFixed(1)} Mb/s in` : ''}${s.tracks && s.tracks.length ? ' · ' + s.tracks.join(', ') : ''}` : r.enabled ? 'Nothing is being sent to this channel right now.' : '')),
+          h('div', {}, h('h2', { style: { margin: 0 } }, 'Live stream ', liveTag(s.live)),
+            h('div', { class: 'dim small' }, [ch ? 'On ' + ch.data.name : '', s.live ? `live for ${ago(s.since)} · ${s.viewers} watching${s.kbps ? ` · ${(s.kbps / 1000).toFixed(1)} Mb/s in` : ''}${s.tracks && s.tracks.length ? ' · ' + s.tracks.join(', ') : ''}` : r.enabled ? 'nothing coming in right now' : '', s.videos ? `${s.videos} recording${s.videos === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · '))),
           h('div', { class: 'row' }, h('button', { class: 'sm', onclick: () => copy(watch) }, 'Copy watch link'), h('a', { class: 'btn sm primary', href: watch, target: '_blank', rel: 'noopener' }, 'Watch ↗'))),
-      ];
-      if (!r.enabled) {
-        kids.push(h('p', { class: 'dim', style: { marginBottom: 0 } }, 'This website has no streaming server yet. ', App.machine && App.machine.siteAdmin ? h('a', { href: '#/settings', onclick: () => { App.settingsTab = 'server'; } }, 'Set one up (Settings → Server)') : 'Ask whoever runs this website to set one up.', ' The channel and its stream key are kept and work as soon as the server is there.'));
-      } else if (r.health && r.health.lastError) {
-        kids.push(h('p', { class: 'pill warn' }, 'The streaming server is not answering: ' + r.health.lastError));
-      }
-      if (ing) {
-        kids.push(
+        !r.enabled ? h('p', { class: 'dim', style: { marginBottom: 0 } }, 'This website has no streaming server yet. ', App.machine && App.machine.siteAdmin ? h('a', { href: '#/settings', onclick: () => { App.settingsTab = 'server'; } }, 'Set one up (Settings → Server)') : 'Ask whoever runs this website to set one up.', ' The stream key is kept and works as soon as the server is there.')
+          : r.health && r.health.lastError ? h('p', { class: 'pill warn' }, 'The streaming server is not answering: ' + r.health.lastError) : null,
+        ing ? [
           h('h3', { style: { marginTop: '16px' } }, 'OBS, vMix, Wirecast … over RTMP'),
           field('Server', ing.rtmpServer), field('Stream key', ing.rtmpKey, true),
           h('h3', { style: { marginTop: '16px' } }, 'SRT (vMix, OBS, encoders, Larix on a phone)'),
           field('Host', ing.srtHost), field('Port', String(ing.srtPort)), field('Stream ID', ing.srtStreamId, true), field('Full SRT URL', ing.srtUrl, true),
-          h('p', { class: 'dim small' }, 'vMix: Settings → Outputs/NDI/SRT (or Streaming → SRT), type Caller, then the host, port and stream ID above. OBS: Settings → Stream → Custom, paste the full SRT URL as the server and leave the key empty. SRT copes better with poor internet than RTMP. Video H.264, audio AAC (RTMP) or AAC/Opus; 2–6 Mb/s, keyframe every 2 seconds.'),
-          App.canEdit('channel') ? h('button', { class: 'sm danger', onclick: async () => {
+          h('p', { class: 'dim small' }, 'vMix: Settings → Outputs/NDI/SRT (or Streaming → SRT), type Caller, then the host, port and stream ID above. OBS: Settings → Stream → Custom, paste the full SRT URL as the server and leave the key empty. SRT copes better with poor internet than RTMP. Video H.264, audio AAC; 2–6 Mb/s, keyframe every 2 seconds.'),
+          App.canEdit('production') ? h('button', { class: 'sm danger', onclick: async () => {
             if (!(await confirmBox('Make a new stream key? Anything still using the old key stops streaming until you paste the new one.'))) return;
-            try { await api('POST', `/api/channels/${encodeURIComponent(doc.id)}/newkey?team=${App.team}`); toast('New stream key made'); paint(); } catch (e) { oops(e); }
-          } }, 'New stream key') : null);
-      } else if (r.enabled) {
-        kids.push(h('p', { class: 'dim small' }, 'Producers and Admins see the stream key here.'));
-      }
-      box.replaceChildren(...kids);
+            try { await api('POST', `/api/productions/${encodeURIComponent(doc.id)}/newkey?team=${App.team}`); toast('New stream key made'); paint(); } catch (e) { oops(e); }
+          } }, 'New stream key') : null] : r.enabled ? h('p', { class: 'dim small' }, 'Producers and Admins see the stream key here.') : null);
     };
     paint();
-    timer = setInterval(() => { if (alive) paint(); }, 5000);
+    timer = setInterval(paint, 5000);
+    box.repaint = paint;
+    return box;
+  }
+  const prodPanel = App.panels.production;
+  App.panels.production = (doc, form) => {
+    const base = prodPanel(doc, form);
+    const stream = App.docs.has(doc.id) && App.can('edit') && !App.cfg.bridge ? streamCard(doc) : null;
+    const box = h('div', {}, stream, base);
+    box.repaint = () => { if (base && base.repaint) base.repaint(); if (stream) stream.repaint(); };
+    return box;
+  };
+
+  // ---- a channel: how it looks, its page, and the productions streaming on it
+  App.panels.channel = (doc) => {
+    const box = h('div', { class: 'card' });
+    const paint = async () => {
+      const d = (App.docs.get(doc.id) || doc).data;
+      let r = { list: [], base: '' };
+      try { r = await api('GET', '/api/streams?team=' + App.team); } catch (e) { /* no streams */ }
+      const club = d.owner === 'Club' ? App.docs.get(d.club) : d.owner === 'Team' && App.docs.get(d.squad) ? App.docs.get(App.docs.get(d.squad).data.club) : null;
+      const logo = d.logo || (club && club.data.image) || App.org().image || '';
+      const color = d.color || (club && club.data.primaryColor) || App.org().accentColor || '#00ff82';
+      const prods = App.list('production').filter((p) => p.data.streamChannel === doc.id).sort((a, b) => String(b.data.date || '').localeCompare(String(a.data.date || '')));
+      const page = (r.base || location.origin) + '/c/' + (d.slug || '');
+      box.replaceChildren(
+        h('div', { style: { borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--line)', marginBottom: '12px' } },
+          h('div', { style: { height: '110px', background: d.banner && App.img(d.banner) ? `center / cover url(${App.img(d.banner)})` : `linear-gradient(120deg, ${color}, #151515)` } }),
+          h('div', { class: 'row', style: { gap: '12px', padding: '10px 14px', alignItems: 'center' } },
+            logo && App.img(logo) ? h('img', { src: App.img(logo), alt: '', style: { width: '56px', height: '56px', objectFit: 'contain', borderRadius: '50%', background: '#111', border: `3px solid ${color}` } }) : null,
+            h('div', { style: { flex: 1 } }, h('b', { style: { fontSize: '18px' } }, d.name || 'Channel'), h('div', { class: 'dim small' }, [d.owner || 'Production company', (d.access || 'Public') === 'Public' ? 'on the public website' : d.access === 'Password' ? 'with a password' : 'team members only', d.disabled ? 'switched off' : ''].filter(Boolean).join(' · '))),
+            h('button', { class: 'sm', onclick: () => copy(page) }, 'Copy channel link'), (d.access || 'Public') === 'Public' ? h('a', { class: 'btn sm primary', href: page, target: '_blank', rel: 'noopener' }, 'Channel page ↗') : null)),
+        h('h3', {}, 'Productions streaming here'),
+        prods.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {}, prods.map((p) => {
+          const s = r.list.find((x) => x.id === p.id) || {};
+          return h('tr', { class: 'click', onclick: () => { location.hash = '#/edit/production/' + p.id; } }, h('td', { class: 'nowrap' }, UI.fmtDate(p.data.date)), h('td', {}, h('b', {}, p.data.streamTitle || p.data.name)), h('td', {}, liveTag(s.live)), h('td', { class: 'dim small' }, s.videos ? `${s.videos} video${s.videos === 1 ? '' : 's'}` : ''));
+        })))) : h('p', { class: 'dim', style: { margin: 0 } }, 'None yet. On a production, pick this channel under "Live stream on channel": each production gets its own stream key.'));
+    };
+    paint();
     box.repaint = paint;
     return box;
   };

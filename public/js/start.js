@@ -71,7 +71,7 @@
         local && !c.needsSetup ? h('p', { class: 'dim small', style: { marginTop: '12px', marginBottom: 0 } }, 'Accounts for this PC are kept on this PC. Forgot the password? Click in the black RFP Manager window and press P to set a new one.') : null].filter(Boolean));
     };
     paint();
-    root.replaceChildren(h('div', { class: 'login' }, h('div', { class: 'box card' }, h('div', { class: 'brand', style: { padding: 0 } }, h('span', { class: 'dot' }), c.name), h('h1', {}, c.needsSetup ? 'Set up this machine' : 'Sign in'),
+    root.replaceChildren(h('div', { class: 'login' }, h('div', { class: 'box card' }, h('div', { style: { textAlign: 'center', margin: '4px 0 14px' } }, h('img', { src: '/brand/rfp-logo.png', alt: c.name, style: { width: '170px', height: 'auto' } })), h('h1', {}, c.needsSetup ? 'Set up this machine' : 'Sign in'),
       h('p', { class: 'dim', style: { marginTop: '4px' } }, local ? 'Production PC' : 'Live production management'), err, box,
       c.androidApp && !/; wv\)|RFPManager/.test(navigator.userAgent) ? h('p', { class: 'small', style: { textAlign: 'center', marginTop: '16px', marginBottom: 0 } }, h('a', { href: '/app/rfp-manager.apk', download: 'rfp-manager.apk' }, '⬇ Get the Android app')) : null)));
   }
@@ -101,6 +101,7 @@
       h('form', { class: 'stack', onsubmit: async (ev) => { ev.preventDefault(); try { await api('POST', '/api/orgs', f); start(); } catch (e) { oops(e); } } },
         h('label', { class: 'f' }, h('span', {}, 'Production team name'), h('input', { required: true, placeholder: 'RegemarkFP', oninput: (e) => { f.name = e.target.value; } })),
         h('button', { class: 'primary', type: 'submit', style: { width: '100%' } }, 'Create'),
+        App.cfg.mode === 'cloud' ? h('a', { class: 'btn', style: { width: '100%' }, href: '/' }, 'Just watching? Back to the website') : null,
         h('button', { type: 'button', class: 'ghost', style: { width: '100%' }, onclick: async () => { await api('POST', '/api/auth/logout'); location.reload(); } }, 'Sign out')))));
   }
 
@@ -111,10 +112,10 @@
       document.title = App.cfg.name;
       try { await App.loadMe(); } catch (e) { if (e.status === 401) return login(); throw e; }
       if (App.cfg.bridge && !App.machine.linked) return App.linkGate(root);
-      if (!App.teams.length) return noTeam();
-      // Signed in after following a screen link (pc-name/scorer …): go back to that screen.
+      // Signed in after following a screen link (pc-name/scorer …) or from the website: go back there.
       const next = new URLSearchParams(location.search).get('next');
       if (next && /^\/(?!\/)[\w\-./?=&%]*$/.test(next)) { location.replace(next); return; }
+      if (!App.teams.length) return noTeam();
       let want = null;
       try { want = localStorage.getItem('rfp.team'); } catch { /* private window */ }
       await App.selectTeam((App.teams.find((t) => t.id === want) || App.teams[0]).id);

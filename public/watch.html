@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Watch</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23262626'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%23ff3b3b'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/png" href="/icons/favicon-64.png">
   <style>
     :root { --bg: #111; --panel: #1b1b1b; --line: #333; --text: #f2f2f2; --dim: #a3a3a3; --live: #ff3b3b; --accent: #00ff82; }
     * { box-sizing: border-box; }
@@ -26,15 +26,28 @@
     input { font: inherit; color: var(--text); background: #0d0d0d; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 100%; margin: 12px 0 8px; }
     .unmute { position: absolute; left: 12px; bottom: 12px; z-index: 2; background: rgba(0,0,0,.7); }
     .err { color: #ff8a8a; }
+    .bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; max-width: 1100px; margin: 0 auto; }
+    .bar img { height: 28px; } .bar a { color: var(--text); text-decoration: none; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .chrow { display: flex; align-items: center; gap: 12px; margin: 10px 0; flex-wrap: wrap; }
+    .chrow a { color: var(--text); text-decoration: none; display: flex; align-items: center; gap: 10px; }
+    .chrow .logo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #222; }
+    .chrow .sp { flex: 1; }
+    button.sub { background: var(--text); color: #111; border-color: var(--text); border-radius: 18px; font-weight: 600; } button.sub.on { background: #2b2b2b; color: var(--text); border-color: var(--line); }
+    .vids { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 10px; }
+    .vids a { display: block; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--text); text-decoration: none; }
+    .vids a.on { border-color: var(--accent); } .vids small { color: var(--dim); display: block; }
     @media (max-width: 600px) { main { padding: 0 0 16px; } .stage { border-radius: 0; } .info { padding: 0 16px; } }
   </style>
 </head>
 <body>
+  <div class="bar"><a href="/"><img src="/brand/rfp-logo-sm.png" alt="RFP"><span id="site">Home</span></a></div>
   <main>
     <div class="stage" id="stage"><div class="msg"><b>Loading…</b></div></div>
     <div class="info">
       <div class="head"><h1 id="title"></h1><span class="badge" id="badge">OFFLINE</span><span class="dim small" id="viewers"></span></div>
+      <div class="chrow" id="chrow"></div>
       <div class="desc" id="desc"></div>
+      <div id="vids"></div>
     </div>
   </main>
   <script src="/js/watch.js"></script>
