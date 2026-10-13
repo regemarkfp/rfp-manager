@@ -7,5 +7,8 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+:start
 node --disable-warning=ExperimentalWarning server.js
+rem exit code 75: RFP Manager updated itself, start it again
+if %errorlevel%==75 goto start
 pause

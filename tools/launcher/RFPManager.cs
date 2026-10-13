@@ -183,6 +183,7 @@ class Launcher : ApplicationContext
         if (quitting) return;
         int code = 0;
         try { code = node.ExitCode; } catch (Exception) { }
+        if (code == 75) { console.Append("RFP Manager was updated. Starting the new version…"); fastExits = 0; StartServer(); return; }
         console.Append("RFP Manager stopped (code " + code + ").");
         if ((DateTime.Now - started).TotalSeconds < 15) fastExits++; else fastExits = 0;
         if (fastExits >= 3) { console.Append("It keeps stopping: see the lines above. Fix it, then use Restart."); console.ShowConsole(); return; }

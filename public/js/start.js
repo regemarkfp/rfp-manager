@@ -23,6 +23,21 @@
           try { await api('POST', '/api/auth/google', { credential: resp.credential }); start(); } catch (e) { holder.replaceChildren(...was); fail(errBox, e); }
         } });
         google.accounts.id.renderButton(holder, { theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with', width: 320 });
+        // the website: if the Google window is blocked (in-app browsers), sign in on this page instead
+        if (App.cfg.mode === 'cloud') {
+          const wrap = holder.parentNode;
+          const alt = h('p', { class: 'dim small', style: { textAlign: 'center', margin: '8px 0 0' } }, h('a', { href: '#', onclick: (e) => {
+            e.preventDefault();
+            try { const nx = new URLSearchParams(location.search).get('next'); if (nx) sessionStorage.setItem('rfp-next', nx); } catch (er) { /* ignore */ }
+            google.accounts.id.initialize({ client_id: App.cfg.googleClientId, ux_mode: 'redirect', login_uri: location.origin + '/api/auth/google/redirect' });
+            holder.replaceChildren();
+            google.accounts.id.renderButton(holder, { theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with', width: 320 });
+            alt.textContent = 'Now press the Google button: you sign in on Google\'s page and come back here.';
+          } }, 'Sign-in window blocked? Sign in on this page instead'));
+          if (wrap) wrap.insertBefore(alt, holder.nextSibling);
+          const er = new URLSearchParams(location.search).get('signin_error');
+          if (er) fail(errBox, new Error(er));
+        }
       } catch (e) { holder.textContent = 'Google sign-in could not load.'; }
     };
     s.onerror = () => { holder.replaceChildren(h('span', { class: 'dim small' }, 'Google sign-in needs an internet connection. Use your email and password instead.')); };
@@ -113,7 +128,8 @@
       try { await App.loadMe(); } catch (e) { if (e.status === 401) return login(); throw e; }
       if (App.cfg.bridge && !App.machine.linked) return App.linkGate(root);
       // Signed in after following a screen link (pc-name/scorer …) or from the website: go back there.
-      const next = new URLSearchParams(location.search).get('next');
+      let next = new URLSearchParams(location.search).get('next');
+      if (!next) { try { next = sessionStorage.getItem('rfp-next'); sessionStorage.removeItem('rfp-next'); } catch (e) { /* ignore */ } }
       if (next && /^\/(?!\/)[\w\-./?=&%]*$/.test(next)) { location.replace(next); return; }
       if (!App.teams.length) return noTeam();
       let want = null;

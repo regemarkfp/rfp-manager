@@ -31,15 +31,42 @@ test('email notifications: added to a team, booked, officiating, expenses, resul
   await admin.post('/api/members?team=' + team, { email: 'crew@example.com', role: 'Scorer' });
   assert.equal((await mails('crew@example.com')).length, 1, 'a role change is not a welcome');
 
-  // booked on a production (the crew member's email is on their crew record)
-  await admin.put(`/api/docs/crewMember/cm_crew?team=${team}`, { data: { name: 'Crew', surname: 'A', email: 'crew@example.com' } });
+  // a new production: the team hears of it (not whoever added it); hired once confirmed, with the call sheet
+  await admin.put(`/api/docs/crewMember/cm_crew?team=${team}`, { data: { name: 'Crew', surname: 'A', email: 'crew@example.com', phone: '000 000 0001' } });
+  await admin.put(`/api/docs/crewMember/cm_two?team=${team}`, { data: { name: 'Second Person', email: 'two@example.com' } });
   await admin.put(`/api/docs/crewRole/role_cam?team=${team}`, { data: { name: 'Camera operator' } });
-  await admin.put(`/api/docs/production/prod_one?team=${team}`, { data: { name: 'Saturday rugby', date: '2026-10-17', venue: 'venue_toyota', crew: [{ crewMember: 'cm_crew', role: 'role_cam', callTime: '09:00' }] } });
-  const booked = (await mails('crew@example.com')).find((m) => /Booked/.test(m.subject));
-  assert.ok(booked);
-  assert.match(booked.text, /Camera operator · Date: 2026-10-17 · Call \/ TX: 09:00 · Venue: Toyota Stadium/);
-  await admin.put(`/api/docs/production/prod_one?team=${team}`, { data: { name: 'Saturday rugby', date: '2026-10-17', notes: 'x', crew: [{ crewMember: 'cm_crew', role: 'role_cam' }] } });
-  assert.equal((await mails('crew@example.com')).filter((m) => /Booked/.test(m.subject)).length, 1, 'only when newly booked');
+  await admin.put(`/api/docs/crewRole/role_dir?team=${team}`, { data: { name: 'Director' } });
+  const prod = { name: 'Saturday rugby', date: '2026-10-17', venue: 'venue_toyota', txTime: '15:00', crewNotes: 'Parking: use gate 4\nBring headphones', hospitals: [{ name: 'Test Hospital', area: 'Centre', phone: '000 111' }],
+    crew: [{ crewMember: 'cm_crew', role: 'role_cam', location: 'Venue', callTime: '09:00' }, { crewMember: 'cm_two', role: 'role_dir', location: 'Gallery', callTime: '08:00' }] };
+  await admin.put(`/api/docs/production/prod_one?team=${team}`, { data: prod });
+  const fresh = (await mails('crew@example.com')).find((m) => /New production/.test(m.subject));
+  assert.ok(fresh, JSON.stringify(out.map((m) => m.subject)));
+  assert.match(fresh.subject, /New production: Saturday rugby on Sat, 17 Oct 2026/);
+  assert.match(fresh.text, /Toyota Stadium/);
+  assert.match(fresh.html, /https:\/\/rfp\.example\/app\/#\/calendar/);
+  assert.equal((await mails('admin@example.com')).filter((m) => /New production/.test(m.subject)).length, 0, 'not to whoever added it');
+  assert.equal((await mails('crew@example.com')).filter((m) => /Hired/.test(m.subject)).length, 0, 'on the call sheet, not confirmed yet');
+  prod.crew[0].confirmed = true;
+  await admin.put(`/api/docs/production/prod_one?team=${team}`, { data: prod });
+  const hired = (await mails('crew@example.com')).find((m) => /Hired/.test(m.subject));
+  assert.ok(hired);
+  assert.match(hired.subject, /Hired: Saturday rugby on Sat, 17 Oct 2026/);
+  assert.match(hired.text, /confirmed as Camera operator/);
+  assert.match(hired.text, /REGEMARKFP CALL SHEET/);
+  assert.match(hired.text, /Your call time  ·  09:00/);
+  assert.match(hired.text, /CREW YOU WILL WORK WITH\n.*Camera operator.*\nDirector  ·  Second Person  ·  Gallery · call 08:00/);
+  assert.match(hired.text, /Parking  ·  use gate 4/);
+  assert.match(hired.text, /Test Hospital/);
+  assert.match(hired.html, /#\/callsheet\/prod_one/);
+  assert.equal((await mails('two@example.com')).filter((m) => /Hired/.test(m.subject)).length, 0, 'the other person is not confirmed');
+  await admin.put(`/api/docs/production/prod_one?team=${team}`, { data: { ...prod, notes: 'x' } });
+  assert.equal((await mails('crew@example.com')).filter((m) => /Hired/.test(m.subject)).length, 1, 'only once');
+  assert.equal((await mails('crew@example.com')).filter((m) => /New production/.test(m.subject)).length, 1, 'only when new');
+  // switching off new-production emails keeps the others
+  assert.equal((await crew.post('/api/me', { emailNoNew: true })).status, 200);
+  await admin.put(`/api/docs/production/prod_two?team=${team}`, { data: { name: 'Sunday soccer', date: '2026-10-18', crew: [{ crewMember: 'cm_crew', role: 'role_cam', confirmed: true }] } });
+  assert.equal((await mails('crew@example.com')).filter((m) => /New production/.test(m.subject)).length, 1, 'switched off');
+  assert.equal((await mails('crew@example.com')).filter((m) => /Hired/.test(m.subject)).length, 2, 'hired still comes');
 
   // named as an official
   await admin.put(`/api/docs/fixture/fixture_one?team=${team}`, { data: { ...fx.data, officials: 'Referee: Ref One' } });

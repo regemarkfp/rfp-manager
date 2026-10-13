@@ -1,6 +1,8 @@
 /* The public website (/, /c/<channel>, /matches, /videos, /subscriptions): what is live now, coming up, the videos,
  * matches and channels of every production team, laid out like a video site. Production teams work in /app. */
 'use strict';
+// a ticket / pass link (?ticket=tk_…) is kept for the watch pages of this website
+try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.test(t || '')) { const k = 'rfp-tickets', l = JSON.parse(localStorage.getItem(k) || '[]'); localStorage.setItem(k, JSON.stringify([t, ...l.filter((x) => x !== t)].slice(0, 30))); } } catch (e) { /* private window */ }
 (() => {
   // replaceChildren / append skip empty parts (null, undefined, false)
   for (const P of [Element.prototype, DocumentFragment.prototype]) for (const name of ['replaceChildren', 'append']) { const orig = P[name]; P[name] = function (...kids) { return orig.apply(this, kids.flat(Infinity).filter((k) => k !== null && k !== undefined && k !== false)); }; }
@@ -45,7 +47,8 @@
     const href = '/watch/' + s.slug + (s.start ? '?v=' + encodeURIComponent(s.start) : '');
     const badges = s.live ? el('span', { class: 'badge live' }, '● LIVE') : s.start ? el('span', { class: 'badge dur' }, dur(s.duration)) : el('span', { class: 'badge when' }, day(s.date, s.time));
     const sub = s.live ? `${s.viewers || 0} watching` : s.start ? ago(s.start) : 'Upcoming · ' + day(s.date, s.time);
-    return el('a', { class: 'card', href }, thumb(s, badges),
+    const price = s.price && s.price.ticket ? el('span', { class: 'badge price' }, 'R ' + Number(s.price.ticket).toFixed(2).replace(/\.00$/, '')) : null;
+    return el('a', { class: 'card', href }, thumb(s, [badges, price]),
       el('div', { class: 'meta' }, opts.noChannel ? null : el('a', { href: '/c/' + s.channel.slug, 'data-nav': '' }, avatar(s.channel.logo, s.channel.name, 'chlogo')),
         el('div', {}, el('b', {}, s.title), el('div', { class: 'sub' }, opts.noChannel ? '' : s.channel.name, opts.noChannel ? null : el('br'), sub))));
   }

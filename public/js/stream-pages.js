@@ -98,6 +98,14 @@
     const paint = async (made) => {
       let s;
       try { s = await api('GET', '/api/server/setup'); } catch (e) { box.replaceChildren(h('div', { class: 'card' }, e.message)); return; }
+      if (!s.allowed) {
+        const me = (App.user && App.user.email) || 'your email';
+        box.replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Streaming server'),
+          h('p', {}, s.streaming ? 'This website runs with a streaming server at ' + s.host + '.' : 'This website has no streaming server yet.'),
+          h('p', {}, 'Only a site admin can set one up. ', s.siteAdmins ? 'You are not one of them.' : 'This website has no site admins yet.'),
+          h('p', { class: 'dim' }, 'Where this website runs (Render → your service → Environment), add ', h('code', {}, 'SITE_ADMINS'), ' = ', h('code', {}, me), ' (several emails: comma between them), save, wait for the restart, then open this tab again.')));
+        return;
+      }
       box.replaceChildren(
         h('div', { class: 'card' }, h('h2', {}, 'Streaming server'),
           s.streaming ? h('p', {}, h('span', { class: 'led ' + (s.health.lastError ? 'bad' : 'ok') }), ' This website runs with a streaming server at ', h('b', {}, s.host), s.health.lastError ? ' — not answering: ' + s.health.lastError : '.') :
@@ -116,5 +124,28 @@
     };
     paint();
     return box;
+  };
+
+  // ---- Streaming → Ticket sales (Producers and Admins)
+  App.pages.sales = () => {
+    const box = h('div', {}, pageHead('Ticket sales'), h('div', { class: 'card dim' }, 'Loading…'));
+    const zar = (n) => 'ZAR ' + (Number(n) || 0).toFixed(2);
+    api('GET', '/api/sales?team=' + App.team).then((r) => {
+      const byItem = new Map();
+      for (const x of r.list.filter((y) => y.status === 'Paid')) { const k = x.item; const o = byItem.get(k) || { item: k, n: 0, total: 0 }; o.n++; o.total += Number(x.amount) || 0; byItem.set(k, o); }
+      box.replaceChildren(pageHead('Ticket sales'),
+        !r.payments ? h('div', { class: 'card' }, h('h2', {}, 'Payments are not switched on'), h('p', { class: 'dim', style: { margin: 0 } }, 'Whoever runs this website adds the PayFast merchant details where it runs (PAYFAST_MERCHANT_ID, PAYFAST_MERCHANT_KEY, PAYFAST_PASSPHRASE). Then set a ticket price on a production (Live stream) and optionally a pass on its channel.')) : null,
+        r.sandbox ? h('div', { class: 'card' }, h('span', { class: 'pill warn' }, 'PayFast sandbox'), ' Test payments only: no real money moves.') : null,
+        h('div', { class: 'card' }, h('div', { style: { display: 'flex', gap: '40px', flexWrap: 'wrap' } },
+          h('div', {}, h('div', { class: 'dim small' }, 'Tickets and passes sold'), h('b', { style: { fontSize: '22px' } }, String(r.count))),
+          h('div', {}, h('div', { class: 'dim small' }, 'Paid'), h('b', { style: { fontSize: '22px' } }, zar(r.total))),
+          h('div', {}, h('div', { class: 'dim small' }, 'PayFast fees'), h('b', { style: { fontSize: '22px' } }, zar(Math.abs(r.fees)))))),
+        byItem.size ? h('div', { class: 'card' }, h('h2', {}, 'Per stream / pass'), h('table', { class: 't' }, h('tr', {}, h('th', {}, 'What'), h('th', {}, 'Sold'), h('th', {}, 'Total')),
+          [...byItem.values()].map((o) => h('tr', {}, h('td', {}, o.item), h('td', {}, String(o.n)), h('td', {}, zar(o.total)))))) : null,
+        h('div', { class: 'card' }, h('h2', {}, 'All payments'), r.list.length ? h('table', { class: 't' }, h('tr', {}, h('th', {}, 'When'), h('th', {}, 'What'), h('th', {}, 'Who'), h('th', {}, 'Amount'), h('th', {}, 'Status')),
+          r.list.map((x) => h('tr', {}, h('td', { class: 'nowrap' }, new Date(x.paidAt || x.createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })), h('td', {}, x.item),
+            h('td', {}, [x.name, x.email].filter(Boolean).join(' · ')), h('td', { class: 'nowrap' }, zar(x.amount)), h('td', {}, h('span', { class: 'pill ' + (x.status === 'Paid' ? 'ok' : x.status === 'Pending' ? '' : 'warn') }, x.status))))) : h('p', { class: 'dim', style: { margin: 0 } }, 'Nothing sold yet.')));
+    }).catch((e) => box.replaceChildren(pageHead('Ticket sales'), h('div', { class: 'card' }, e.message)));
+    return { el: box };
   };
 })();

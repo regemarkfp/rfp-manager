@@ -44,6 +44,7 @@ h2.sec .count { color: var(--dim); font-weight: 400; font-size: 14px; }
 .badge.live { left: 8px; top: 8px; background: var(--live); letter-spacing: .05em; }
 .badge.dur { right: 8px; bottom: 8px; }
 .badge.when { left: 8px; bottom: 8px; background: rgba(0,0,0,.75); }
+.badge.price { right: 8px; top: 8px; background: #ffd34d; color: #111; }
 .meta { display: flex; gap: 12px; padding-top: 10px; }
 .meta .chlogo { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--panel2); flex: none; display: inline-grid; place-items: center; font-weight: 700; color: var(--dim); }
 .thumb-name { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; text-align: center; font-size: 22px; font-weight: 800; letter-spacing: .02em; text-shadow: 0 2px 12px rgba(0,0,0,.6); }

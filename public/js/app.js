@@ -12,7 +12,11 @@ const App = {
   get(id) { const d = id && this.docs.get(id); return d ? d.data : null; },
   list(type) { return [...this.docs.values()].filter((d) => d.type === type); },
   can(what) { return Schema.CAN[what](this.role); },
-  title(type, id) { const d = this.get(id); if (!d) return ''; const e = Schema.ENTITIES[type]; return e ? e.title(d, (x) => this.get(x)) : d.name || ''; },
+  title(type, id) { const d = this.get(id); if (!d) { const sc = type === 'channel' && (this.sharedChannels || []).find((c) => c.id === id); return sc ? sc.name + (sc.teamName ? ' (' + sc.teamName + ')' : '') : ''; } const e = Schema.ENTITIES[type]; return e ? e.title(d, (x) => this.get(x)) : d.name || ''; },
+  loadSharedChannels() {
+    if (!this._shared || Date.now() - this._shared.at > 60000) this._shared = { at: Date.now(), p: api('GET', '/api/channels/shared').then((r) => (this.sharedChannels = r.list || [])) };
+    return this._shared.p;
+  },
   sorted(type) { return this.list(type).sort((a, b) => this.title(type, a.id).localeCompare(this.title(type, b.id), undefined, { numeric: true })); },
   sports() { return [...new Set([...Scoring.sportNames(), 'Rugby Sevens', ...this.list('squad').map((d) => d.data.sport).filter(Boolean)])]; },
   // Where a match is scored: the cricket scorer, the sports scorer, or nowhere if the sport has no rules engine yet.
@@ -185,7 +189,7 @@ function navFor() {
     ['Assets', [['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/theme', 'Themes'], ['#/images', 'Images']]],
     ['Advertising', [['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log']]],
     ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report']].concat(local ? [['#/bibles', 'Bibles']] : [])],
-    local ? null : ['Streaming', [['#/list/channel', 'Channels']]],
+    local ? null : ['Streaming', [['#/list/channel', 'Channels'], App.can('edit') ? ['#/sales', 'Ticket sales'] : null].filter(Boolean)],
     ['Live', [App.pcs ? ['#/pcs', 'Production PCs'] : null, pc ? ['#/monitors', 'Monitors'] : null, pc ? ['#/templates', 'Templates'] : null, pc ? ['#/adverts', 'Advert playout'] : null,
       ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers']].filter(Boolean)],
     ['', [['#/settings', 'Settings']]],
@@ -362,6 +366,15 @@ function fieldInput(f, value, onChange, ctx = {}) {
         App.editModal(f.ref, (doc) => { value = doc.id; sel.insertBefore(h('option', { value: doc.id }, App.title(f.ref, doc.id)), sel.lastChild); sel.value = doc.id; onChange(doc.id); });
       } }, h('option', { value: '' }, '—'), docs.map((d) => h('option', { value: d.id, selected: d.id === value }, App.title(f.ref, d.id))),
       App.canEdit(f.ref) && Schema.ENTITIES[f.ref] ? h('option', { value: '+' }, '+ New ' + Schema.ENTITIES[f.ref].label.toLowerCase() + '…') : null);
+      // channels: also the ones other production teams share with everyone
+      if (f.ref === 'channel' && App.cfg && App.cfg.mode === 'cloud') App.loadSharedChannels().then((list) => {
+        const mine = new Set(docs.map((d) => d.id));
+        const others = list.filter((c) => !mine.has(c.id));
+        if (!others.length) return;
+        const g = h('optgroup', { label: 'Shared by other production teams' }, others.map((c) => h('option', { value: c.id, selected: c.id === value }, App.title('channel', c.id))));
+        sel.insertBefore(g, sel.querySelector('option[value="+"]'));
+        if (value) sel.value = value;
+      }).catch(() => {});
       return sel;
     }
     case 'image': return imageField(value, onChange, f.k);

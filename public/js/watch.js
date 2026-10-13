@@ -16,8 +16,18 @@
   };
   let info = null, pc = null, playing = false, password = null, retry = null;
 
+  // tickets bought without signing in: kept in this browser (and in the ticket email)
+  const TKEY = 'rfp-tickets';
+  const tickets = () => { try { return JSON.parse(localStorage.getItem(TKEY) || '[]').filter((t) => /^tk_/.test(t)); } catch (e) { return []; } };
+  const keepTicket = (t) => { if (!/^tk_/.test(t || '')) return; try { localStorage.setItem(TKEY, JSON.stringify([t, ...tickets().filter((x) => x !== t)].slice(0, 30))); } catch (e) { /* private window */ } };
+  const params = new URLSearchParams(location.search);
+  if (params.get('ticket')) { keepTicket(params.get('ticket')); params.delete('ticket'); history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params : '')); }
+  let paidId = params.get('paid') || '';
+
   const api = async (method, body) => {
-    const r = await fetch('/api/watch/' + encodeURIComponent(slug) + (vodStart ? '?v=' + encodeURIComponent(vodStart) : ''), { method, credentials: 'same-origin', headers: body ? { 'content-type': 'application/json', 'x-rfp': '1' } : {}, body: body ? JSON.stringify(body) : undefined });
+    const hd = body ? { 'content-type': 'application/json', 'x-rfp': '1' } : {};
+    if (tickets().length) hd['x-rfp-tickets'] = tickets().join(',');
+    const r = await fetch('/api/watch/' + encodeURIComponent(slug) + (vodStart ? '?v=' + encodeURIComponent(vodStart) : ''), { method, credentials: 'same-origin', headers: hd, body: body ? JSON.stringify(body) : undefined });
     const out = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(out.error || 'Something went wrong'), { status: r.status });
     return out;
@@ -122,6 +132,7 @@
     if (info.needs === 'password') return askPassword();
     if (info.needs === 'signin') return message('Sign in to watch', 'This channel is for members of the production team.', el('p', {}, el('a', { class: 'btn primary', href: '/app?next=' + encodeURIComponent(location.pathname + location.search) }, 'Sign in')));
     if (info.needs === 'team') return message('This channel is for its production team', 'Ask the team to add you, or for a link you can use.');
+    if (info.needs === 'ticket') { if (paidId) return waitForPayment(); return buy(); }
     if (vodStart) { if (info.vod) { if (!playing) playVod(); return; } return message('This recording is no longer here', '', el('p', {}, el('a', { class: 'btn', href: location.pathname }, 'Back to the stream'))); }
     if (!info.streaming) return message('Streaming is not set up on this website yet', '');
     if (!info.live) { message('Not live yet', (info.videos || []).length ? 'Watch a recording below, or stay here: it starts playing by itself when the stream begins.' : 'This page starts playing by itself when the stream begins.'); return again(5000); }
@@ -132,6 +143,43 @@
       if (canHLS()) playHLS();
       else { message('Could not start the video', 'Retrying…'); again(5000); }
     }
+  }
+
+  // ---- paid streams
+  const zar = (n) => 'R ' + Number(n || 0).toFixed(2).replace(/\.00$/, '');
+  function buy(problem) {
+    const pr = info.price || {};
+    if (!info.payments) return message('This stream needs a ticket', 'Tickets are not on sale yet. Try again later.');
+    const email = el('input', { type: 'email', placeholder: 'Your email address (the ticket is sent there)', autocomplete: 'email', value: info.email || '' });
+    const name = el('input', { type: 'text', placeholder: 'Your name', autocomplete: 'name' });
+    const go = async (kind, btn) => {
+      btn.disabled = true;
+      try {
+        const r = await fetch('/api/pay/start', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-rfp': '1' }, body: JSON.stringify({ slug, kind, email: email.value, name: name.value }) });
+        const out = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(out.error || 'Could not start the payment');
+        const f = el('form', { method: 'POST', action: out.url, style: 'display:none' });
+        for (const [k, v] of out.fields) f.append(el('input', { type: 'hidden', name: k, value: v }));
+        document.body.append(f); f.submit();
+      } catch (e) { btn.disabled = false; buy(e.message); }
+    };
+    const tBtn = el('button', { class: 'primary', onclick: () => go('ticket', tBtn) }, `Buy a ticket · ${zar(pr.ticket)}`);
+    const pBtn = pr.pass ? el('button', { onclick: () => go('pass', pBtn) }, `${(info.channel || {}).name || 'Channel'} pass · ${zar(pr.pass.amount)} for ${pr.pass.days} days`) : null;
+    message('This stream needs a ticket', pr.pass ? 'A ticket is for this stream, live and its recordings. A pass covers every paid stream on this channel.' : 'Your ticket is for this stream, live and its recordings afterwards.',
+      problem ? el('p', { class: 'err' }, problem) : null,
+      info.signedIn ? el('p', { class: 'dim small' }, 'Signed in as ' + info.email + ': the ticket is kept on your account.') : el('div', { class: 'col' }, name, email, el('p', { class: 'dim small' }, el('a', { href: '/app?next=' + encodeURIComponent(location.pathname) }, 'Sign in'), ' to keep it on your account instead.')),
+      el('div', { class: 'row' }, tBtn, pBtn), el('p', { class: 'dim small' }, 'Paid safely with PayFast (card, Instant EFT, SnapScan and more).'));
+  }
+  async function waitForPayment(tries = 0) {
+    message('Checking your payment…', 'This takes a few seconds after PayFast.');
+    try {
+      const r = await fetch('/api/pay/status/' + encodeURIComponent(paidId));
+      const s = await r.json();
+      if (s.status === 'Paid') { keepTicket(s.ticket); paidId = ''; history.replaceState(null, '', location.pathname); return load(); }
+      if (s.status === 'Failed' || s.status === 'Cancelled') { paidId = ''; return buy('The payment did not go through (' + s.status.toLowerCase() + ').'); }
+    } catch (e) { /* try again */ }
+    if (tries > 40) { paidId = ''; return message('Your payment is still being processed', 'You get an email with your ticket as soon as PayFast confirms it. You can close this page.'); }
+    setTimeout(() => waitForPayment(tries + 1), 3000);
   }
 
   function askPassword(problem) {

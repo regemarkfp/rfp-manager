@@ -117,12 +117,13 @@
 
   function accountTab() {
     const linked = App.machine.linked;
-    const f = { name: App.me.name, phone: App.me.phone || '', emailOff: !!App.me.emailOff, password: '', currentPassword: '' };
+    const f = { name: App.me.name, phone: App.me.phone || '', emailOff: !!App.me.emailOff, emailNoNew: !!App.me.emailNoNew, password: '', currentPassword: '' };
     return h('div', { class: 'card' }, h('h2', {}, 'My account'), h('p', {}, h('b', {}, App.me.email), App.me.google ? h('span', { class: 'pill ok', style: { marginLeft: '8px' } }, 'Google') : null, App.me.hasPassword ? h('span', { class: 'pill', style: { marginLeft: '8px' } }, 'Password set') : null),
       linked ? h('p', { class: 'dim' }, 'This machine is linked to the website, so your name and sign-in are managed there and synced down.') : h('div', {}, h('div', { class: 'form' },
         h('label', { class: 'f' }, h('span', {}, 'Name'), h('input', { value: f.name, oninput: (e) => { f.name = e.target.value; } })),
         h('label', { class: 'f' }, h('span', {}, 'Phone'), h('input', { type: 'tel', value: f.phone, oninput: (e) => { f.phone = e.target.value; } })),
-        App.cfg.mail ? h('label', { class: 'row', style: { gap: '8px', gridColumn: '1 / -1' } }, h('input', { type: 'checkbox', checked: !f.emailOff, onchange: (e) => { f.emailOff = !e.target.checked; } }), 'Email me: bookings, matches I officiate, results of my teams, expenses') : null,
+        App.cfg.mail ? h('label', { class: 'row', style: { gap: '8px', gridColumn: '1 / -1' } }, h('input', { type: 'checkbox', checked: !f.emailOff, onchange: (e) => { f.emailOff = !e.target.checked; } }), 'Email me: when I am hired (with the call sheet), matches I officiate, results of my teams, expenses') : null,
+        App.cfg.mail ? h('label', { class: 'row', style: { gap: '8px', gridColumn: '1 / -1' } }, h('input', { type: 'checkbox', checked: !f.emailNoNew, onchange: (e) => { f.emailNoNew = !e.target.checked; } }), 'Email me when a new production is added to my team\'s calendar') : null,
         h('div', { class: 'f' }, h('span', { class: 'flabel' }, 'Picture'), h('div', { class: 'row', style: { gap: '10px' } }, App.avatar(App.me.image, App.me.name || App.me.email, 48), h('span', { class: 'dim small' }, App.me.google ? 'Your Google profile picture. Change it in your Google account; it updates here the next time you sign in.' : 'Sign in with Google to use your Google profile picture.'))),
         App.me.hasPassword ? h('label', { class: 'f' }, h('span', {}, 'Current password'), h('input', { type: 'password', autocomplete: 'current-password', oninput: (e) => { f.currentPassword = e.target.value; } })) : null,
         App.cfg.mode === 'local' || App.me.hasPassword ? h('label', { class: 'f' }, h('span', {}, 'New password (8+ characters)'), h('input', { type: 'password', autocomplete: 'new-password', oninput: (e) => { f.password = e.target.value; } })) : null),
@@ -208,7 +209,7 @@
     const tabs = (App.cfg.bridge ? [] : [['team', 'Production team']]).concat([['members', 'Members'], ['account', 'My account']]);   // team settings are made on the website
     if ((local || App.machine.remote) && App.machine.admin) tabs.push(['connections', 'Connections'], ['machine', local ? 'This machine' : 'Production PC']);
     if (!App.cfg.bridge && App.teams.some((t) => t.role === 'Admin')) tabs.push(['keys', 'Machine keys']);   // keys are made on the website
-    if (!local && App.machine.siteAdmin) tabs.push(['server', 'Server']);
+    if (!local) tabs.push(['server', 'Server']);
     if (App.settingsTab) { tab = App.settingsTab; App.settingsTab = null; }
     if (!App.cfg.bridge) tabs.push(['file', 'Save file']);
     if (App.cfg.bridge) tabs.sort((a, b) => ['connections', 'machine', 'members', 'account'].indexOf(a[0]) - ['connections', 'machine', 'members', 'account'].indexOf(b[0]));   // the PC: CasparCG and devices first

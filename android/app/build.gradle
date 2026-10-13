@@ -22,7 +22,7 @@ android {
         versionCode build
         versionName "1.0.${build}"
         manifestPlaceholders = [hostName: siteHost]
-        resValue 'string', 'launchUrl', site + '/'
+        resValue 'string', 'launchUrl', site + '/app?android=' + build
         resValue 'string', 'asset_statements', '[{\\"relation\\": [\\"delegate_permission/common.handle_all_urls\\"], \\"target\\": {\\"namespace\\": \\"web\\", \\"site\\": \\"' + site + '\\"}}]'
     }
 

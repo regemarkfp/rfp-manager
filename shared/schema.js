@@ -89,6 +89,7 @@
         { k: 'crewMember', l: 'Crew member', t: 'ref', ref: 'crewMember' }, { k: 'name', l: 'or name', t: 'text' }, { k: 'phone', l: 'Phone', t: 'text' }] },
       { k: 'crew', l: 'Crew', t: 'list', fields: [{ k: 'location', l: 'Location', t: 'combo', opts: ['Gallery', 'Venue', 'Studio', 'OB Van', 'Remote'], w: 150 }, { k: 'role', l: 'Role', t: 'ref', ref: 'crewRole' },
         { k: 'crewMember', l: 'Crew member', t: 'ref', ref: 'crewMember' }, { k: 'callTime', l: 'Call time', t: 'time' }, { k: 'productionTime', l: 'TX time', t: 'time' },
+        { k: 'confirmed', l: 'Confirmed', t: 'bool', w: 90, help: 'Tick when this person has said yes: they get an email that they are hired, with the call sheet.' },
         { k: 'rate', l: 'Day rate', t: 'money', w: 110, ph: 'role rate', help: 'Only if this person is paid differently from the role.' }, { k: 'paid', l: 'Paid', t: 'bool', w: 70 }] },
       { k: 'crewNotes', l: 'Additional information', t: 'textarea', ph: 'Entrance: please use the bottom gate. Bring a set of headphones for comms.', help: 'One point per line. Start a line with "Label:" to print the label in bold.' },
       { k: 'hospitals', l: 'Emergency: nearest hospitals', t: 'list', fields: [{ k: 'name', l: 'Hospital', t: 'text' }, { k: 'area', l: 'Area', t: 'text' }, { k: 'phone', l: 'Phone', t: 'text' }] },
@@ -98,6 +99,7 @@
       { k: 'streamChannel', l: 'Live stream on channel', t: 'ref', ref: 'channel', group: 'Live stream', help: 'Stream this production on a channel. The stream key is made for this production (shown below once saved).' },
       { k: 'streamTitle', l: 'Stream title', t: 'text', ph: 'The production name', group: 'Live stream' },
       { k: 'streamSlug', l: 'Stream web address', t: 'text', ph: 'Made from the name and date', group: 'Live stream', help: 'Viewers watch at /watch/<this>.' },
+      { k: 'streamPrice', l: 'Ticket price (ZAR)', t: 'money', group: 'Live stream', help: 'Empty or 0 = free to watch. Otherwise viewers buy a ticket (PayFast) to watch live and the recordings. Only on a Public channel.' },
       { k: 'streamPoster', l: 'Stream picture', t: 'image', group: 'Live stream', help: 'Shown before it starts and on the video afterwards. The channel\'s banner if empty.' },
       { k: 'streamRecord', l: 'Record the stream', t: 'bool', def: true, group: 'Live stream' },
       { k: 'streamVod', l: 'Show the recording on the website afterwards', t: 'bool', def: true, group: 'Live stream' },
@@ -181,7 +183,9 @@
       { k: 'color', l: 'Brand colour', t: 'color', solid: true },
       { k: 'description', l: 'About', t: 'textarea', help: 'Shown on the channel page.' },
       { k: 'access', l: 'Who can watch', t: 'select', opts: ['Public', 'Team members', 'Password'], def: 'Public', help: 'Public channels are on the public website. Team members: people in this production team (signed in). Password: anyone who types the password below.' },
+      { k: 'passPrice', l: 'Channel pass price (ZAR)', t: 'money', help: 'Optional. A pass lets a viewer watch every paid stream on this channel for the number of days below.' }, { k: 'passDays', l: 'Pass valid for (days)', t: 'number', ph: '30' },
       { k: 'viewerPassword', l: 'Viewer password', t: 'text', help: 'Only used when "Who can watch" is Password.' },
+      { k: 'teamOnly', l: 'Only this production team', t: 'bool', help: 'Off: any production team can stream its productions on this channel. On: only this team\'s productions.' },
       { k: 'disabled', l: 'Switched off', t: 'bool', help: 'Hidden, and nobody can stream to it or watch it.' }] },
     expense: { label: 'Expense', plural: 'Expenses', group: 'Productions', title: (d) => [d.description, d.amount ? Number(d.amount).toFixed(2) : ''].filter(Boolean).join(' · '), cols: ['date', 'production', 'description', 'category', 'amount', 'status'], fields: [
       { k: 'production', l: 'Production', t: 'ref', ref: 'production', req: true }, { k: 'date', l: 'Date', t: 'date' },
@@ -205,7 +209,7 @@
   // Everything else is managed on the website.
   const PC_EDIT = ['graphic', 'theme', 'dashboard', 'timeline', 'variable', 'gametrigger'];
 
-  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'songuse', 'user', 'machinekey'];
+  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'songuse', 'user', 'machinekey', 'purchase'];
   const ALL_TYPES = [...Object.keys(E), ...SYSTEM_TYPES];
 
   const has = (v) => v !== undefined && v !== null && v !== '';
