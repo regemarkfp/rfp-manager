@@ -53,12 +53,47 @@
     box.repaint = paint;
     return box;
   }
+  // ---- the matches in a production's stream: each one becomes its own video
+  function matchesCard(doc) {
+    const box = h('div', { class: 'card' });
+    const tm = (iso) => (iso ? new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—');
+    const local = (iso) => { if (!iso) return ''; const d = new Date(iso); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
+    const paint = async () => {
+      const cur = App.docs.get(doc.id) || doc;
+      const fx = (cur.data.fixtures || []).map((r) => App.docs.get(r.fixture)).filter(Boolean);
+      if (!cur.data.streamSlug || !fx.length) { box.replaceChildren(); box.style.display = 'none'; return; }
+      box.style.display = '';
+      let r = { clips: [] };
+      try { r = await api('GET', `/api/productions/${encodeURIComponent(doc.id)}/clips?team=${App.team}`); } catch (e) { /* show the matches anyway */ }
+      const byFx = new Map(r.clips.map((c) => [c.fixture, c]));
+      const send = async (fixture, body) => { try { await api('POST', `/api/productions/${encodeURIComponent(doc.id)}/clips?team=${App.team}`, { fixture, ...body }); paint(); } catch (e) { oops(e); } };
+      const edit = App.canEdit('production') && App.cfg.mode === 'cloud';
+      const watchBase = location.origin + '/watch/' + cur.data.streamSlug;
+      box.replaceChildren(h('h2', {}, 'Matches in this stream'),
+        h('p', { class: 'dim', style: { marginTop: 0 } }, 'Stream the whole production on its one stream key. Each match becomes its own video: it is marked when its scorer starts the match (it turns Live) and when it ends (Completed), with 30 seconds either side. Set or correct the times here if a match was not scored.'),
+        h('table', { class: 't' }, h('tr', {}, h('th', {}, 'Match'), h('th', {}, 'Starts'), h('th', {}, 'Ends'), h('th', {}, 'Video'), edit ? h('th', {}, '') : null),
+          fx.map((f) => {
+            const c = byFx.get(f.id), v = c && c.video;
+            const timeBox = (k) => h('input', { type: 'datetime-local', step: 1, value: local(c && c[k]), style: { width: '190px' }, onchange: (e) => send(f.id, { [k]: e.target.value ? new Date(e.target.value).toISOString() : '' }) });
+            return h('tr', {}, h('td', {}, App.title('fixture', f.id), c && c.auto === false ? h('span', { class: 'pill', style: { marginLeft: '6px' } }, 'set by hand') : null),
+              h('td', {}, edit && c ? timeBox('start') : tm(c && c.start)), h('td', {}, edit && c && c.end ? timeBox('end') : c && c.start && !c.end ? h('span', { class: 'dim' }, 'running') : tm(c && c.end)),
+              h('td', {}, v && v.duration ? h('a', { href: watchBase + '?m=' + encodeURIComponent(f.id), target: '_blank', rel: 'noopener' }, (v.live ? 'so far ' : '') + Math.round(v.duration / 60) + ' min ↗') : h('span', { class: 'dim' }, c ? 'not in a recording yet' : '—')),
+              edit ? h('td', { class: 'nowrap' },
+                !c || c.end ? h('button', { class: 'sm', onclick: () => send(f.id, { start: 'now', end: '' }) }, c ? 'Restart now' : 'Starts now') : h('button', { class: 'sm primary', onclick: () => send(f.id, { end: 'now' }) }, 'Ends now'),
+                c ? h('button', { class: 'sm ghost', onclick: async () => { if (await confirmBox('Remove the marks of this match? Its video goes (the recording stays).')) send(f.id, { clear: true }); } }, 'Clear') : null) : null);
+          })));
+    };
+    paint();
+    box.repaint = paint;
+    return box;
+  }
   const prodPanel = App.panels.production;
   App.panels.production = (doc, form) => {
     const base = prodPanel(doc, form);
     const stream = App.docs.has(doc.id) && App.can('edit') && !App.cfg.bridge ? streamCard(doc) : null;
-    const box = h('div', {}, stream, base);
-    box.repaint = () => { if (base && base.repaint) base.repaint(); if (stream) stream.repaint(); };
+    const matches = stream ? matchesCard(doc) : null;
+    const box = h('div', {}, stream, matches, base);
+    box.repaint = () => { if (base && base.repaint) base.repaint(); if (stream) stream.repaint(); if (matches) matches.repaint(); };
     return box;
   };
 

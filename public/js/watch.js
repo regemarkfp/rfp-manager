@@ -5,7 +5,8 @@
   // replaceChildren / append skip empty parts (null, undefined, false)
   for (const P of [Element.prototype, DocumentFragment.prototype]) for (const name of ['replaceChildren', 'append']) { const orig = P[name]; P[name] = function (...kids) { return orig.apply(this, kids.flat(Infinity).filter((k) => k !== null && k !== undefined && k !== false)); }; }
   const slug = decodeURIComponent(location.pathname.split('/')[2] || '');
-  const vodStart = new URLSearchParams(location.search).get('v') || '';
+  const matchId = new URLSearchParams(location.search).get('m') || '';
+  const vodStart = new URLSearchParams(location.search).get('v') || (matchId ? 'match' : '');
   let pub = null;
   const $ = (id) => document.getElementById(id);
   const el = (tag, attrs = {}, ...kids) => {
@@ -27,7 +28,7 @@
   const api = async (method, body) => {
     const hd = body ? { 'content-type': 'application/json', 'x-rfp': '1' } : {};
     if (tickets().length) hd['x-rfp-tickets'] = tickets().join(',');
-    const r = await fetch('/api/watch/' + encodeURIComponent(slug) + (vodStart ? '?v=' + encodeURIComponent(vodStart) : ''), { method, credentials: 'same-origin', headers: hd, body: body ? JSON.stringify(body) : undefined });
+    const r = await fetch('/api/watch/' + encodeURIComponent(slug) + (matchId ? '?m=' + encodeURIComponent(matchId) : vodStart ? '?v=' + encodeURIComponent(vodStart) : ''), { method, credentials: 'same-origin', headers: hd, body: body ? JSON.stringify(body) : undefined });
     const out = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(out.error || 'Something went wrong'), { status: r.status });
     return out;
@@ -43,8 +44,10 @@
   function header() {
     if (!info) return;
     const vod = vodStart && info.vod;
-    document.title = info.title + (info.live && !vod ? ' · LIVE' : '');
-    $('title').textContent = info.title;
+    document.title = info.title + (info.live && !vod ? ' · LIVE' : '') + (info.site ? ' · ' + info.site : '');
+    if (info.site) $('site').textContent = info.site;
+    $('title').textContent = vod && info.vod.title ? info.vod.title : info.title;
+    if (vod && info.vod.title) document.title = info.vod.title + (info.site ? ' · ' + info.site : '');
     $('badge').textContent = vod ? 'VIDEO' : info.live ? 'LIVE' : 'OFFLINE';
     $('badge').className = 'badge' + (info.live && !vod ? ' on' : '');
     $('viewers').textContent = vod ? new Date(info.vod.start).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : info.live && info.viewers ? `${info.viewers} watching` : '';
@@ -53,8 +56,9 @@
     const subOn = pub && pub.subscribed;
     $('chrow').replaceChildren(el('a', { href: '/c/' + ch.slug }, ch.logo ? el('img', { class: 'logo', src: imgUrl(ch.logo), alt: '' }) : null, el('div', {}, el('b', {}, ch.name || ''), el('div', { class: 'dim small' }, pub ? `${pub.subscribers} subscriber${pub.subscribers === 1 ? '' : 's'}` : ''))),
       el('span', { class: 'sp' }), pub ? el('button', { class: 'sub' + (subOn ? ' on' : ''), onclick: subscribe }, subOn ? 'Subscribed ✓' : 'Subscribe') : null);
-    const vids = info.videos || [];
-    $('vids').replaceChildren(...(vids.length ? [el('h3', {}, 'Recordings'), el('div', { class: 'vids' }, info.live ? el('a', { href: location.pathname, class: vodStart ? '' : 'on' }, el('b', {}, '● Live now'), el('small', {}, `${info.viewers || 0} watching`)) : null,
+    const vids = info.videos || [], mts = info.matches || [];
+    const mList = mts.length ? [el('h3', {}, 'Matches'), el('div', { class: 'vids' }, mts.map((m) => el('a', { href: '?m=' + encodeURIComponent(m.fixture), class: m.fixture === matchId ? 'on' : '' }, el('b', {}, m.title), el('small', {}, (m.live ? 'so far · ' : '') + dur(m.duration)))))] : [];
+    $('vids').replaceChildren(...mList, ...(vids.length ? [el('h3', {}, mts.length ? 'Full stream' : 'Recordings'), el('div', { class: 'vids' }, info.live ? el('a', { href: location.pathname, class: vodStart ? '' : 'on' }, el('b', {}, '● Live now'), el('small', {}, `${info.viewers || 0} watching`)) : null,
       vids.map((v) => el('a', { href: '?v=' + encodeURIComponent(v.start), class: v.start === vodStart ? 'on' : '' }, el('b', {}, new Date(v.start).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })), el('small', {}, dur(v.duration)))))] : []));
   }
   async function loadPublic() {
@@ -62,7 +66,7 @@
     try { const r = await fetch('/api/public/c/' + encodeURIComponent(info.channel.slug)); if (r.ok) { pub = await r.json(); header(); } } catch (e) { /* no channel page */ }
   }
   async function subscribe() {
-    if (!pub.signedIn) { location.href = '/app?next=' + encodeURIComponent(location.pathname + location.search); return; }
+    if (!pub.signedIn) { location.href = '/?signin=1&next=' + encodeURIComponent(location.pathname + location.search); return; }
     const r = await fetch('/api/public/subscribe', { method: 'POST', headers: { 'content-type': 'application/json', 'x-rfp': '1' }, body: JSON.stringify({ channel: info.channel.id, on: !pub.subscribed }) });
     if (r.ok) { pub.subscribed = (await r.json()).subscribed; pub.subscribers += pub.subscribed ? 1 : -1; header(); }
   }
@@ -130,10 +134,10 @@
     header();
     if (!pub) loadPublic();
     if (info.needs === 'password') return askPassword();
-    if (info.needs === 'signin') return message('Sign in to watch', 'This channel is for members of the production team.', el('p', {}, el('a', { class: 'btn primary', href: '/app?next=' + encodeURIComponent(location.pathname + location.search) }, 'Sign in')));
+    if (info.needs === 'signin') return message('Sign in to watch', 'This channel is for members of the production team.', el('p', {}, el('a', { class: 'btn primary', href: '/?signin=1&next=' + encodeURIComponent(location.pathname + location.search) }, 'Sign in')));
     if (info.needs === 'team') return message('This channel is for its production team', 'Ask the team to add you, or for a link you can use.');
     if (info.needs === 'ticket') { if (paidId) return waitForPayment(); return buy(); }
-    if (vodStart) { if (info.vod) { if (!playing) playVod(); return; } return message('This recording is no longer here', '', el('p', {}, el('a', { class: 'btn', href: location.pathname }, 'Back to the stream'))); }
+    if (vodStart) { if (info.vod) { if (!playing) playVod(); return; } return message(matchId ? 'This match video is not ready yet' : 'This recording is no longer here', '', el('p', {}, el('a', { class: 'btn', href: location.pathname }, 'Back to the stream'))); }
     if (!info.streaming) return message('Streaming is not set up on this website yet', '');
     if (!info.live) { message('Not live yet', (info.videos || []).length ? 'Watch a recording below, or stay here: it starts playing by itself when the stream begins.' : 'This page starts playing by itself when the stream begins.'); return again(5000); }
     if (playing) return;
@@ -167,7 +171,7 @@
     const pBtn = pr.pass ? el('button', { onclick: () => go('pass', pBtn) }, `${(info.channel || {}).name || 'Channel'} pass · ${zar(pr.pass.amount)} for ${pr.pass.days} days`) : null;
     message('This stream needs a ticket', pr.pass ? 'A ticket is for this stream, live and its recordings. A pass covers every paid stream on this channel.' : 'Your ticket is for this stream, live and its recordings afterwards.',
       problem ? el('p', { class: 'err' }, problem) : null,
-      info.signedIn ? el('p', { class: 'dim small' }, 'Signed in as ' + info.email + ': the ticket is kept on your account.') : el('div', { class: 'col' }, name, email, el('p', { class: 'dim small' }, el('a', { href: '/app?next=' + encodeURIComponent(location.pathname) }, 'Sign in'), ' to keep it on your account instead.')),
+      info.signedIn ? el('p', { class: 'dim small' }, 'Signed in as ' + info.email + ': the ticket is kept on your account.') : el('div', { class: 'col' }, name, email, el('p', { class: 'dim small' }, el('a', { href: '/?signin=1&next=' + encodeURIComponent(location.pathname) }, 'Sign in'), ' to keep it on your account instead.')),
       el('div', { class: 'row' }, tBtn, pBtn), el('p', { class: 'dim small' }, 'Paid safely with PayFast (card, Instant EFT, SnapScan and more).'));
   }
   async function waitForPayment(tries = 0) {

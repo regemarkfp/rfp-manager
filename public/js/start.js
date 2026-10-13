@@ -110,6 +110,9 @@
   }
 
   function noTeam() {
+    // the website: someone who is not in a production team is a viewer — back to the front page, signed in
+    // (only a site admin may start a new production team there)
+    if (App.cfg.mode === 'cloud' && !(App.machine && App.machine.siteAdmin)) { location.replace('/'); return; }
     const f = { name: '' };
     root.replaceChildren(h('div', { class: 'login' }, h('div', { class: 'box card' }, h('h1', {}, 'Create your production team'),
       h('p', { class: 'dim' }, `Signed in as ${App.me.email}. A production team holds your clubs, fixtures, productions and crew. If a colleague already has one, ask them to add your email under Settings → Members instead.`),

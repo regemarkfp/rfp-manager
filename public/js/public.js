@@ -44,9 +44,9 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       !bg && ch.logo ? el('img', { class: 'logo', src: img(ch.logo), alt: '' }) : !bg ? el('div', { class: 'thumb-name' }, ch.name || '') : null, badges);
   }
   function streamCard(s, opts = {}) {
-    const href = '/watch/' + s.slug + (s.start ? '?v=' + encodeURIComponent(s.start) : '');
+    const href = '/watch/' + s.slug + (s.match ? '?m=' + encodeURIComponent(s.match) : s.start ? '?v=' + encodeURIComponent(s.start) : '');
     const badges = s.live ? el('span', { class: 'badge live' }, '● LIVE') : s.start ? el('span', { class: 'badge dur' }, dur(s.duration)) : el('span', { class: 'badge when' }, day(s.date, s.time));
-    const sub = s.live ? `${s.viewers || 0} watching` : s.start ? ago(s.start) : 'Upcoming · ' + day(s.date, s.time);
+    const sub = s.live ? `${s.viewers || 0} watching` : s.start ? (s.of ? s.of + ' · ' : '') + ago(s.start) : 'Upcoming · ' + day(s.date, s.time);
     const price = s.price && s.price.ticket ? el('span', { class: 'badge price' }, 'R ' + Number(s.price.ticket).toFixed(2).replace(/\.00$/, '')) : null;
     return el('a', { class: 'card', href }, thumb(s, [badges, price]),
       el('div', { class: 'meta' }, opts.noChannel ? null : el('a', { href: '/c/' + s.channel.slug, 'data-nav': '' }, avatar(s.channel.logo, s.channel.name, 'chlogo')),
@@ -59,9 +59,18 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       el('div', { class: 'top-line' }, el('span', {}, m.competition ? m.competition.name : m.sport), live ? el('span', { class: 'status-live' }, '● LIVE' + (m.period ? ' · ' + m.period : '')) : el('span', {}, m.status === 'Completed' ? 'Full time' : day(m.date, m.time))),
       team(m.teams[0] || { name: 'Home' }), team(m.teams[1] || { name: 'Away' }),
       m.score ? el('div', { class: 'score' }, m.score) : null,
-      el('div', { class: 'foot' }, [m.venue, m.company].filter(Boolean).join(' · ')));
+      el('div', { class: 'foot' }, [m.venue, m.company].filter(Boolean).join(' · ')),
+      m.watch ? el('a', { class: 'watch-btn' + (m.watch.live ? ' live' : ''), href: m.watch.href }, m.watch.live ? '● Watch live' : '▶ Watch the match') : null);
   }
-  const chanChip = (c) => el('a', { class: 'chan', href: '/c/' + c.slug, 'data-nav': '' }, c.logo ? el('img', { src: img(c.logo), alt: '' }) : el('span', { class: 'ph', style: { background: `linear-gradient(135deg, ${c.color}, #222)` } }, c.name.slice(0, 1)), el('b', {}, c.name), el('span', { class: 'sub' }, c.owner === 'Production company' ? c.company : c.owner));
+  // the channel's next stream (live now, or the next one coming up)
+  const nextOf = (c) => {
+    if (!D) return null;
+    const l = (D.live || []).find((x) => x.channel.id === c.id);
+    if (l) return el('span', { class: 'next live' }, '● LIVE');
+    const u = (D.upcoming || []).find((x) => x.channel.id === c.id);
+    return u ? el('span', { class: 'next' }, 'Next: ' + day(u.date, u.time)) : null;
+  };
+  const chanChip = (c) => el('a', { class: 'chan', href: '/c/' + c.slug, 'data-nav': '' }, c.logo ? el('img', { src: img(c.logo), alt: '' }) : el('span', { class: 'ph', style: { background: `linear-gradient(135deg, ${c.color}, #222)` } }, c.name.slice(0, 1)), el('b', {}, c.name), el('span', { class: 'sub' }, c.owner === 'Production company' ? c.company : c.owner), nextOf(c));
   const section = (title, kids, count) => (kids && (!Array.isArray(kids) || kids.length) ? [el('h2', { class: 'sec' }, title, count ? el('span', { class: 'count' }, count) : null), kids] : []);
 
   // ---- pages
@@ -121,29 +130,67 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     try { c = await get('/api/public/c/' + encodeURIComponent(slug)); } catch (e) { return el('div', { class: 'empty' }, e.message); }
     CH = c;
     const ch = c.channel;
-    document.title = ch.name + ' · ' + (D.site || 'RFP Manager');
+    document.title = ch.name + ' · ' + (D.site || 'RegemarkFP');
     const live = c.streams.filter((s) => s.live), today = new Date().toISOString().slice(0, 10);
-    const up = c.streams.filter((s) => !s.live && s.date >= today).sort((a, b) => String(a.date + a.time).localeCompare(String(b.date + b.time)));
+    const up = c.streams.filter((s) => !s.live && (s.date ? s.date >= today : !s.videos.length)).sort((a, b) => String(a.date + a.time || '9').localeCompare(String(b.date + b.time || '9')));
     const vids = [];
-    for (const s of c.streams) for (const v of s.videos) vids.push({ ...s, live: false, start: v.start, duration: v.duration });
+    for (const s of c.streams) {
+      for (const m of s.matches || []) if (m.duration > 0) vids.push({ ...s, live: false, title: m.title, of: s.title, match: m.fixture, start: m.start, duration: m.duration });
+      for (const v of s.videos) vids.push({ ...s, live: false, title: s.title + ((s.matches || []).length ? ' (full stream)' : ''), start: v.start, duration: v.duration });
+    }
     vids.sort((a, b) => String(b.start).localeCompare(String(a.start)));
     const sub = el('button', { class: 'primary' + (c.subscribed ? ' on' : ''), onclick: () => subscribe(ch.id, !c.subscribed) }, c.subscribed ? 'Subscribed ✓' : 'Subscribe');
     const t = tab || 'home';
     const tabLink = (k, label) => el('a', { href: `/c/${ch.slug}${k === 'home' ? '' : '?tab=' + k}`, 'data-nav': '', class: t === k ? 'on' : '' }, label);
-    const body = t === 'about' ? el('div', { class: 'about' }, ch.description || 'No description yet.', el('p', {}, `${c.subscribers} subscriber${c.subscribers === 1 ? '' : 's'} · ${ch.owner === 'Production company' ? 'by ' + ch.company : ch.owner + ' channel · ' + ch.company}`))
+    const upRow = (s) => el('a', { class: 'up-row', href: '/watch/' + s.slug }, el('div', { class: 'when' }, el('b', {}, s.date ? day(s.date, '') : 'Date to follow'), el('span', {}, s.time || '')),
+      el('div', { class: 'what' }, el('b', {}, s.title), el('span', { class: 'sub' }, s.price && s.price.ticket ? 'Ticket R ' + Number(s.price.ticket).toFixed(2).replace(/\.00$/, '') : 'Free to watch')), el('span', { class: 'go' }, 'Watch page ›'));
+    const body = t === 'upcoming' ? (up.length ? [el('div', { class: 'up-list' }, up.map(upRow)), c.subscribed ? null : el('p', { class: 'sub' }, 'Subscribe to get an email when a stream starts.')] : el('div', { class: 'empty' }, 'Nothing scheduled yet.'))
+      : t === 'about' ? el('div', { class: 'about' }, ch.description || 'No description yet.', el('p', {}, `${c.subscribers} subscriber${c.subscribers === 1 ? '' : 's'} · ${ch.owner === 'Production company' ? 'by ' + ch.company : ch.owner + ' channel · ' + ch.company}`))
       : t === 'videos' ? (vids.length ? el('div', { class: 'grid' }, vids.map((s) => streamCard(s, { noChannel: true }))) : el('div', { class: 'empty' }, 'No videos yet.'))
-        : [section('Live now', live.length ? el('div', { class: 'grid' }, live.map((s) => streamCard(s, { noChannel: true }))) : null), section('Coming up', up.length ? el('div', { class: 'grid' }, up.map((s) => streamCard(s, { noChannel: true }))) : null),
+        : [section('Live now', live.length ? el('div', { class: 'grid' }, live.map((s) => streamCard(s, { noChannel: true }))) : null), section('Coming up', up.length ? el('div', { class: 'grid' }, up.slice(0, 8).map((s) => streamCard(s, { noChannel: true }))) : null),
           section('Videos', vids.length ? el('div', { class: 'grid' }, vids.slice(0, 12).map((s) => streamCard(s, { noChannel: true }))) : null), !live.length && !up.length && !vids.length ? el('div', { class: 'empty' }, 'Nothing here yet.') : null];
     return [el('div', { class: 'banner', style: { backgroundImage: ch.banner ? `url("${img(ch.banner)}")` : `linear-gradient(120deg, ${ch.color}, #151515 75%)` } }),
       el('div', { class: 'chead' }, ch.logo ? el('img', { class: 'big', src: img(ch.logo), alt: '' }) : el('span', { class: 'big avatar', style: { fontSize: '44px' } }, ch.name.slice(0, 1)),
         el('div', { style: { flex: 1, minWidth: '200px' } }, el('h1', {}, ch.name), el('div', { class: 'sub' }, `/c/${ch.slug} · ${c.subscribers} subscriber${c.subscribers === 1 ? '' : 's'} · ${vids.length} video${vids.length === 1 ? '' : 's'}`)), sub),
-      el('div', { class: 'tabs' }, tabLink('home', 'Home'), tabLink('videos', 'Videos'), tabLink('about', 'About')), body];
+      el('div', { class: 'tabs' }, tabLink('home', 'Home'), tabLink('upcoming', 'Upcoming' + (up.length ? ` (${up.length})` : '')), tabLink('videos', 'Videos'), tabLink('about', 'About')), body];
   }
 
   // ---- signing in and subscribing
-  const signInButton = () => el('button', { class: 'primary', onclick: () => { location.href = '/app?next=' + encodeURIComponent(location.pathname + location.search); } }, 'Sign in');
+  // Everyone signs in here with Google and stays on the website (subscriptions, tickets). Members of a production
+  // team are taken to the Studio (/app); nobody is asked to make a production team.
+  let gsi = null, backTo = '';
+  const loadGsi = () => gsi || (gsi = new Promise((resolve, reject) => { const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = resolve; s.onerror = () => reject(new Error('Google sign-in could not load')); document.head.append(s); }));
+  function signIn(why) {
+    const old = document.getElementById('signin-modal'); if (old) old.remove();
+    const holder = el('div', { style: { display: 'flex', justifyContent: 'center', minHeight: '44px' } }, el('span', { class: 'sub' }, 'Loading…'));
+    const err = el('p', { class: 'err', style: { display: 'none' } });
+    const close = () => wrap.remove();
+    const wrap = el('div', { id: 'signin-modal', class: 'modal', onclick: (e) => { if (e.target === wrap) close(); } },
+      el('div', { class: 'modal-box' }, el('button', { class: 'icon x', onclick: close, 'aria-label': 'Close' }, '✕'),
+        el('img', { src: '/brand/rfp-logo-sm.png', alt: '', style: { height: '34px' } }), el('h2', {}, 'Sign in'),
+        el('p', { class: 'sub' }, why || 'Subscribe to channels, keep your tickets and get an email when they go live.'), holder, err,
+        el('p', { class: 'sub small' }, 'Production team members go to their Studio after signing in.')));
+    document.body.append(wrap);
+    if (!D.googleClientId) { holder.replaceChildren(el('span', { class: 'sub' }, 'Sign-in is not set up on this website yet.')); return; }
+    loadGsi().then(() => {
+      google.accounts.id.initialize({ client_id: D.googleClientId, callback: async (resp) => {
+        holder.replaceChildren(el('span', { class: 'sub' }, 'Signing in…'));
+        try {
+          await post('/api/auth/google', { credential: resp.credential });
+          D = await get('/api/public/home');
+          if (backTo) { location.href = backTo; return; }
+          if (D.me && D.me.teams) { location.href = '/app'; return; }
+          close(); render();
+        } catch (e) { err.textContent = e.message; err.style.display = ''; holder.replaceChildren(); }
+      } });
+      holder.replaceChildren();
+      google.accounts.id.renderButton(holder, { theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with', width: 300 });
+    }).catch((e) => { holder.replaceChildren(el('span', { class: 'sub' }, e.message)); });
+  }
+  const signInButton = () => el('button', { class: 'primary', onclick: () => signIn() }, 'Sign in');
+  async function signOut() { try { await post('/api/auth/logout', {}); } catch (e) { /* signed out anyway */ } D = await get('/api/public/home'); render(); }
   async function subscribe(id, on) {
-    if (!D.me) { location.href = '/app?next=' + encodeURIComponent(location.pathname + location.search); return; }
+    if (!D.me) { signIn('Sign in to subscribe. The channel emails you when it goes live.'); return; }
     try {
       const r = await post('/api/public/subscribe', { channel: id, on });
       D.me.subscriptions = r.subscriptions;
@@ -161,17 +208,23 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const subs = D && D.me ? D.channels.filter((c) => (D.me.subscriptions || []).includes(c.id)) : [];
     $('side').replaceChildren(link('/', 'Home', '⌂'), link('/matches', 'Matches', '◎'), link('/videos', 'Videos', '▶'), link('/subscriptions', 'Subscriptions', '★'), link('/channels', 'Channels', '◉'),
       subs.length ? [el('hr'), el('h4', {}, 'Subscriptions'), subs.map((c) => el('a', { href: '/c/' + c.slug, 'data-nav': '', class: p === '/c/' + c.slug ? 'on' : '' }, c.logo ? el('img', { class: 'chip-logo', src: img(c.logo), alt: '' }) : el('span', { class: 'chip-logo' }), c.name))] : null,
-      el('hr'), el('a', { href: '/app', class: 'studio-link' }, el('span', {}, '⚙'), D && D.me && D.me.teams ? 'RFP Manager (production teams)' : 'For production teams'));
+      D && D.me && D.me.teams ? [el('hr'), el('a', { href: '/app', class: 'studio-link' }, el('span', {}, '⚙'), 'Studio (your production team)')] : null,
+      D && !D.me ? [el('hr'), el('a', { href: '#', class: 'studio-link', onclick: (e) => { e.preventDefault(); signIn('Production team members: sign in to open your Studio.'); } }, el('span', {}, '⚙'), 'Production teams: sign in')] : null);
   }
   function meBox() {
     const m = D && D.me;
+    let menu = null;
+    const toggle = (e) => { e.stopPropagation(); if (menu) { menu.remove(); menu = null; return; }
+      menu = el('div', { class: 'me-menu' }, el('div', { class: 'who' }, el('b', {}, m.name || ''), el('div', { class: 'sub' }, m.email)),
+        m.teams ? el('a', { href: '/app' }, 'Studio') : null, el('a', { href: '/subscriptions', 'data-nav': '' }, 'Subscriptions'), el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); signOut(); } }, 'Sign out'));
+      $('me').append(menu); document.addEventListener('click', () => { if (menu) { menu.remove(); menu = null; } }, { once: true }); };
     $('me').replaceChildren(m && m.teams ? el('a', { href: '/app' }, el('button', { class: 'studio' }, 'Studio')) : null,
-      m ? el('a', { href: '/app#/settings', title: m.email }, avatar(m.image, m.name || m.email)) : signInButton());
+      m ? el('button', { class: 'icon avatar-btn', title: m.email, onclick: toggle }, avatar(m.image, m.name || m.email)) : signInButton());
   }
   async function render() {
     side(); meBox();
     const p = location.pathname, params = new URLSearchParams(location.search);
-    document.title = D.site || 'RFP Manager';
+    document.title = D.site || 'RegemarkFP';
     let view;
     if (p.startsWith('/c/')) view = await channelPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')), params.get('tab'));
     else if (p === '/videos') view = videosPage();
@@ -194,7 +247,12 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
 
   async function load() {
     try { D = await get('/api/public/home'); } catch (e) { $('main').replaceChildren(el('div', { class: 'empty' }, 'Cannot reach the website right now. ', el('a', { href: '/' }, 'Try again'))); return; }
-    $('site-name').textContent = D.site || 'RFP Manager';
+    $('site-name').textContent = D.site || 'RegemarkFP';
+    const sp = new URLSearchParams(location.search);
+    const nx = sp.get('next') || '';
+    if (/^\/(?!\/)[\w\-./?=&%]*$/.test(nx)) backTo = nx;
+    if (sp.get('signin') === '1') { if (D.me && backTo) { location.replace(backTo); return; } if (!D.me) signIn(); }
+    if (sp.has('signin')) { sp.delete('signin'); sp.delete('next'); history.replaceState(null, '', location.pathname + (sp.toString() ? '?' + sp : '')); }
     render();
   }
   load();
