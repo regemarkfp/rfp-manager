@@ -212,23 +212,42 @@ Anyone with that address reaches the PC's sign-in page, so keep members' roles t
 (or `tailscale funnel reset`) turns it off. Only for devices on your own tailnet, `tailscale serve --bg 8090` is
 the private version.
 
-### Live streaming: Channels (SRT / RTMP in, watch pages out)
+### The public website (front page)
 
-The website can run its own streaming server, so you do not need YouTube or Facebook. Each production team makes
-**Channels** (Streaming → Channels). A channel has its own stream key and a watch page at
-`https://<site>/watch/<channel>` that plays in any browser (WebRTC, under a second of delay; HLS on iPhones when
-WebRTC cannot play). Who can watch is set per channel: **Public**, **Team members** (signed in) or **Password**.
-A paywall can be added later on the same check.
+On the website, `/` is the public front page, laid out like a video site. It shows what is **live now** at the
+top, then streams **coming up**, **videos** (recordings, newest first), **fixtures** and **results**, and the
+**channels**. Viewers can search, open a channel at `/c/<channel>`, watch at `/watch/<stream>`, and sign in with
+Google to **subscribe**. Subscribers get an email when a channel goes live (needs email set up), and their
+channels are under **Subscriptions**.
 
-Send to a channel from OBS, vMix, Wirecast, an encoder or Larix on a phone. The channel page shows exactly what to
-type and has Copy buttons:
+Everything else (the app for production teams) is at **`/app`**; the front page has a *Studio* button for
+members. Old links to `/#/…` still work and lead to `/app`. Matches are on the front page only for teams that tick
+*Show our matches on the public website* (Settings → Production team). Only **Public** channels are shown.
 
-* **RTMP**: server `rtmp://<site>/live`, stream key `<channel>?user=publish&pass=<key>`.
-* **SRT** (better on poor internet): host `<site>`, port 8890, stream ID `publish:live/<channel>:publish:<key>`
+### Live streaming: channels and streams (SRT / RTMP in, watch pages and videos out)
+
+The website can run its own streaming server, so you do not need YouTube or Facebook.
+
+* A **channel** (Streaming → Channels) is a branded page: the production company's, or a club's, a team's or a
+  production's own (*Channel of*). It has its own logo, banner, colour and description; a club or team channel
+  takes the club's logo and colour unless you set them. Who can watch is set per channel: **Public**, **Team
+  members** (signed in) or **Password**.
+* **Stream keys belong to productions.** On a production, pick the channel under *Live stream on channel* and
+  save: the production gets its own stream key and watch page `https://<site>/watch/<stream>` (WebRTC, under a
+  second of delay; HLS on iPhones). The production page shows what to type into OBS / vMix, whether it is live,
+  how many watch and the bitrate coming in. **New stream key** stops the old key straight away.
+* **Videos:** streams are recorded (unless *Record the stream* is off) and appear as videos on the channel, the
+  front page and the watch page (*Show the recording on the website afterwards*). Recordings are kept 90 days
+  (change with `--keep-days` on the server setup command; 0 keeps them).
+
+Send from OBS, vMix, Wirecast, an encoder or Larix on a phone. The production page shows exactly what to type and
+has Copy buttons:
+
+* **RTMP**: server `rtmp://<site>/live`, stream key `<stream>?user=publish&pass=<key>`.
+* **SRT** (better on poor internet): host `<site>`, port 8890, stream ID `publish:live/<stream>:publish:<key>`
   (or the full `srt://…` URL in OBS).
 
-The channel page also shows whether it is live, for how long, how many watch and the bitrate coming in.
-**New stream key** stops the old key straight away. **Switched off** blocks streaming and watching.
+**Switched off** on a channel hides it and blocks streaming and watching.
 
 **Setting up the server** (once; Oracle Cloud, Hetzner or any Ubuntu 22.04 / 24.04 VM, arm64 or x64):
 
@@ -244,7 +263,7 @@ The channel page also shows whether it is live, for how long, how many watch and
    the domain's A record at the server first). Add that address to the Google client's *Authorised JavaScript
    origins*, then use it from then on and link the production PCs to it. Render can stay as a spare.
 
-To update the server later, make a new setup command and run it again. The settings and stream keys stay. Logs:
+To update the server later, make a new setup command and run it again. The settings, stream keys and recordings stay. Logs:
 `journalctl -u rfp-manager -f` and `journalctl -u mediamtx -f`. Bandwidth: one 4 Mb/s stream uses about 1.8 GB
 an hour for each viewer (Oracle includes 10 TB a month).
 
@@ -751,6 +770,23 @@ Settings → Members (Admins). The roles:
   It updates when they next sign in after changing it in their Google account. Settings → My account has their
   phone number too.
 
+### Calendar, and what crew members see
+
+**Productions → Calendar** shows every production by month (or as a list on a phone); tick *Matches too* to add the
+fixtures. Click one to open it.
+
+People with the **Crew** role see only: **My gigs** (their upcoming gigs, what they earned in the last 30 days and
+what they are still owed), the **Calendar**, **My expenses** and Settings. On the calendar their own gigs are green;
+clicking one shows the details, their role and call time, the crew they work with (with phone numbers), notes and
+hospitals. Crew are matched by the email on their Crew record. Pay is the crew role's day rate × days (or the
+*Day rate* on that booking); producers tick **Paid** on the booking once paid. *Still owed* is past gigs not yet paid
+plus approved expenses not yet paid back. Crew never see rates, costs or what others are paid.
+
+### Verse of the day
+
+Every dashboard shows a verse of the day, the same for everyone that day. It comes from a Bible on the production
+PC (worship control), or else the King James Version from bible-api.com.
+
 ### Expenses and receipts
 
 On a production, **+ Add expense**: what it was for, category, amount (and VAT), and the receipt. On a phone
@@ -915,13 +951,13 @@ To change a sport's rules or add a variant, edit its entry in `shared/sports.js`
 
 ## 7. Tests
 
-`npm test` runs 59 tests: the cricket engine (ICC conditions, DLS, super over, two-innings matches), the rules
+`npm test` runs 60 tests: the cricket engine (ICC conditions, DLS, super over, two-innings matches), the rules
 and statistics of every other sport, worship control (slides, outputs, CCLI log, song and Bible file formats),
 the short screen links, the live scorer and graphics control over the WebSocket against a stand-in CasparCG
 server, the rundown monitor, accounts and roles, the image folder, Google token checks (against a locally
 generated key), XML export and import, sync between an online instance and production PCs, scorer buttons and
 macros per theme, advert options and the play log, vMix, ATEM, HyperDeck, Raspberry Pi GPIO, OBS, Companion, OSC, Art-Net, MIDI and X-keys (the Windows helper's line protocol, and Linux device files) against small stand-ins, input mappings, the Companion addresses, who took each graphic, the Timeline (cues, holds, GO,
-crew screens, comments, rundown import), custom variables, game triggers (adverts on tries), dashboards, text of several lines (JSON, XML and `{nl}`), linking a PC by signing in on the website or with Google on the PC (a stand-in Google key), and remote access through the website (live pages, WebSocket, settings, adverts, screen keys, team checks, a forged identity, the PC going offline), the bridge PC (records read-only on the PC, no scoring through the website, working offline and catching up afterwards), coaches, officials and expenses (who may change what, team sheets used by the graphics, results, receipts and who may open them, costing), email notifications (each kind, switching off, an SMTP conversation), the Android app files (app link, manifest, service worker), streaming channels (stream keys, who may publish and watch, viewer tokens, passwords, live status against a stand-in MediaMTX) and the server setup command (bundle, settings, who may make it).
+crew screens, comments, rundown import), custom variables, game triggers (adverts on tries), dashboards, text of several lines (JSON, XML and `{nl}`), linking a PC by signing in on the website or with Google on the PC (a stand-in Google key), and remote access through the website (live pages, WebSocket, settings, adverts, screen keys, team checks, a forged identity, the PC going offline), the bridge PC (records read-only on the PC, no scoring through the website, working offline and catching up afterwards), coaches, officials and expenses (who may change what, team sheets used by the graphics, results, receipts and who may open them, costing), email notifications (each kind, switching off, an SMTP conversation), the Android app files (app link, manifest, service worker), the crew view (gigs, earnings, what is owed, no rates shown), the verse of the day (against a stand-in), streams on productions and branded channels (recordings as videos, the public front page, subscribing and the go-live email), streaming (stream keys, who may publish and watch, viewer tokens, passwords, live status against a stand-in MediaMTX) and the server setup command (bundle, settings, who may make it).
 
 Not covered by the tests, so check these on your own setup first: a real CasparCG server, real vMix, ATEM,
 HyperDeck, OBS, Companion, lighting desks and X-keys / MIDI hardware (built from their published protocols, tested only
