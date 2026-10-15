@@ -1,0 +1,88 @@
+# Builds RFP Manager for Windows whenever main changes (or by hand: Actions → Windows app → Run workflow):
+# RFP Manager.exe (tray app with its own windows, WebView2), a portable Node.js in node\, and the whole program,
+# zipped as RFPManager-Windows.zip. It is published as the release "windows-latest" (Releases on the repo page) and
+# kept as a download on the workflow run. config.json and data\ are not in it, so it can be unzipped over an
+# existing RFP Manager folder. After that, RFP Manager updates itself from the website when it starts.
+name: Windows app
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['android/**', 'public/app/**', '.github/workflows/android.yml', '**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-app
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test
+        run: npm test
+        continue-on-error: true
+
+      - name: Build RFP Manager.exe
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tools\build-exe.ps1 -Ci
+
+      - name: Package
+        id: pkg
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $stage = Join-Path $env:RUNNER_TEMP 'RFP Manager'
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          $skip = '^(android/|\.github/|tests/|shots/|render\.yaml$|config\.json$|data/|public/app/rfp-manager\.apk$)'
+          foreach ($f in (git ls-files)) {
+            if ($f -match $skip) { continue }
+            $dest = Join-Path $stage $f
+            New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
+            Copy-Item -LiteralPath $f -Destination $dest
+          }
+          Copy-Item 'RFP Manager.exe' $stage
+          Copy-Item -Recurse 'tools\launcher\webview2' (Join-Path $stage 'tools\launcher\webview2')
+          New-Item -ItemType Directory -Force -Path (Join-Path $stage 'node') | Out-Null
+          Copy-Item (Get-Command node).Source (Join-Path $stage 'node\node.exe')
+          Set-Content -Path (Join-Path $stage 'START HERE.txt') -Value @"
+          RFP Manager $ver for Windows
+
+          First time: unzip into a new folder (for example Documents\RFP Manager) and double-click "RFP Manager.exe".
+          Already have RFP Manager: close it (tray icon -> Quit), unzip into your RFP Manager folder (the one with server.js) and choose
+          "Replace the files". Your settings (config.json), data and images stay as they are.
+
+          Node.js is included (node\node.exe). From now on RFP Manager checks for updates when it starts and offers
+          to install them; they come from the website this PC is linked to.
+          "@
+          $zip = Join-Path $env:RUNNER_TEMP 'RFPManager-Windows.zip'
+          Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
+          "version=$ver" >> $env:GITHUB_OUTPUT
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+
+      - name: Publish the release "windows-latest"
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          gh release delete windows-latest --yes --cleanup-tag 2>$null
+          $global:LASTEXITCODE = 0
+          gh release create windows-latest "${{ steps.pkg.outputs.zip }}" --target $env:GITHUB_SHA --latest `
+            --title "RFP Manager ${{ steps.pkg.outputs.version }} for Windows" `
+            --notes "Download RFPManager-Windows.zip, unzip it and start RFP Manager.exe (Node.js is included). Over an existing install: quit RFP Manager first, unzip over its folder and replace the files; settings and data are kept. Built from $env:GITHUB_SHA."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RFPManager-Windows-${{ steps.pkg.outputs.version }}
+          path: ${{ steps.pkg.outputs.zip }}
