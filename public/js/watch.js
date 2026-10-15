@@ -78,7 +78,7 @@
     playing = true;
   }
 
-  function stop() { if (pc) { try { pc.close(); } catch (e) { /* closed */ } } pc = null; playing = false; }
+  function stop() { if (pc) { try { pc.close(); } catch (e) { /* closed */ } } pc = null; if (hls) { try { hls.destroy(); } catch (e) { /* gone */ } hls = null; } playing = false; }
 
   async function playWebRTC() {
     const video = el('video', { autoplay: '', playsinline: '', muted: '' });
@@ -102,16 +102,28 @@
     if (r.status !== 201 && r.status !== 200) throw new Error('WebRTC ' + r.status);
     await pc.setRemoteDescription({ type: 'answer', sdp: await r.text() });
     show(video);
+    // no picture after a few seconds (a blocked network, or video WebRTC cannot show): play HLS instead
+    setTimeout(() => { if (mine === pc && !video.videoWidth) { stop(); hlsOnly = true; playHLS(); } }, 7000);
   }
 
+  let hls = null, hlsOnly = false;
   function playHLS() {
     const video = el('video', { autoplay: '', playsinline: '', controls: '', muted: '' });
     video.muted = true;
-    video.src = info.hls + (info.token ? '?token=' + encodeURIComponent(info.token) : '');
-    video.onerror = () => again(4000);
+    const tok = (u) => (info.token ? u + (u.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(info.token) : u);
+    if (canHLS()) { video.src = tok(info.hls); video.onerror = () => again(4000); }       // Safari, iPhone, iPad
+    else if (window.Hls && window.Hls.isSupported()) {
+      hls = new window.Hls({ enableWorker: false, lowLatencyMode: true, liveSyncDurationCount: 3, manifestLoadingMaxRetry: 20, manifestLoadingRetryDelay: 1500,
+        xhrSetup: (xhr, url) => { if (info.token && !/[?&]token=/.test(url)) xhr.open('GET', tok(url), true); } });
+      hls.on(window.Hls.Events.ERROR, (ev, d) => { if (d && d.fatal) again(4000); });
+      hls.loadSource(tok(info.hls));
+      hls.attachMedia(video);
+    } else { message('This browser cannot play the stream', 'Try Chrome, Edge, Firefox or Safari.'); return; }
     show(video);
   }
   const canHLS = () => !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
+  // WebRTC is quickest, but carries no AAC sound (what OBS and vMix send): then the stream plays as HLS
+  const webrtcFits = () => !hlsOnly && typeof RTCPeerConnection === 'function' && !(info.tracks || []).some((t) => /MPEG-4 Audio|AAC/i.test(t));
 
   function show(video) {
     playing = true;
@@ -142,12 +154,9 @@
     if (!info.streaming) return message('Streaming is not set up on this website yet', '');
     if (!info.live) { message('Not live yet', (info.videos || []).length ? 'Watch a recording below, or stay here: it starts playing by itself when the stream begins.' : 'This page starts playing by itself when the stream begins.'); return again(5000); }
     if (playing) return;
+    if (!webrtcFits()) return playHLS();
     try { await playWebRTC(); }
-    catch (e) {
-      stop();
-      if (canHLS()) playHLS();
-      else { message('Could not start the video', 'Retrying…'); again(5000); }
-    }
+    catch (e) { stop(); playHLS(); }
   }
 
   // ---- paid streams

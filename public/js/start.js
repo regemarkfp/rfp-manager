@@ -45,8 +45,41 @@
     return true;
   }
 
+  // The production PC: you sign in with your website account (Google, or email and password). The first time,
+  // that connects this PC to the website by itself; afterwards it also works offline.
+  function pcLogin() {
+    const c = App.cfg;
+    const site = (c.cloudUrl || 'the website').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const err = h('div', { class: 'toast error hide', role: 'alert', style: { marginBottom: '12px' } });
+    const first = !c.linked;
+    const busy = first ? `Connecting this PC to ${site}… the first time takes a moment.` : 'Signing in…';
+    const gHolder = h('div', { style: { display: 'flex', justifyContent: 'center', minHeight: '44px' } });
+    const hasGoogle = googleButton(gHolder, err, busy);
+    const f = { email: '', password: '' };
+    const btn = h('button', { class: 'primary', type: 'submit', style: { width: '100%' } }, 'Sign in');
+    const form = h('form', { class: 'stack', onsubmit: async (ev) => {
+      ev.preventDefault(); err.classList.add('hide');
+      btn.disabled = true; btn.textContent = busy;
+      try { await api('POST', '/api/auth/login', f); start(); } catch (e) { fail(err, e); btn.disabled = false; btn.textContent = 'Sign in'; }
+    } },
+    h('label', { class: 'f' }, h('span', {}, 'Email'), h('input', { type: 'email', required: true, autocomplete: 'username', oninput: (e) => { f.email = e.target.value; } })),
+    h('label', { class: 'f' }, h('span', {}, 'Password'), h('input', { type: 'password', required: true, autocomplete: 'current-password', oninput: (e) => { f.password = e.target.value; } })),
+    btn);
+    root.replaceChildren(h('div', { class: 'login' }, h('div', { class: 'box card' },
+      h('div', { style: { textAlign: 'center', margin: '4px 0 14px' } }, h('img', { src: '/brand/rfp-logo.png', alt: c.name, style: { width: '170px', height: 'auto' } })),
+      h('h1', {}, 'Sign in'),
+      h('p', { class: 'dim', style: { marginTop: '4px' } }, `Use your ${c.publicName || 'website'} account – the same one you use on ${site}.`),
+      err,
+      hasGoogle ? [gHolder, h('div', { class: 'or' }, 'or')] : null,
+      form,
+      h('div', { class: 'dim small', style: { marginTop: '14px', whiteSpace: 'normal', overflow: 'visible', lineHeight: 1.45 } }, first
+        ? `The first sign-in connects this PC to ${site} and brings your team's data down (an Admin of the team signs in first). After that, everyone in the team signs in with their own account, also when the internet is down.`
+        : `Signed in with Google on the website? Use the Google button, or set a password there under Settings → My account.`))));
+  }
+
   function login() {
     const c = App.cfg, local = c.mode === 'local';
+    if (local && c.bridge) return pcLogin();
     const err = h('div', { class: 'toast error hide', role: 'alert', style: { marginBottom: '12px' } });
     const gHolder = h('div', { style: { display: 'flex', justifyContent: 'center', minHeight: '44px' } });
     const hasGoogle = googleButton(gHolder, err, local && !c.linked ? 'Signing in and linking this PC to the website… A free website can take up to a minute to wake up.' : 'Signing in…');

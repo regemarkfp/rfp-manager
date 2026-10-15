@@ -52,13 +52,14 @@
   const before = App.pages.dashboard;
   App.pages.dashboard = () => (App.cfg.bridge ? bridgeHome() : before());
 
-  // A production PC that is not linked to the website yet: it has to be, before it can be used.
+  // Signed in with an account of this PC only (from before), and not connected to the website: sign in with the website account instead.
   App.linkGate = (root) => {
-    const admin = App.teams.some((t) => t.role === 'Admin');
-    root.replaceChildren(h('div', { class: 'login' }, h('div', { class: 'box card' }, h('div', { class: 'brand', style: { padding: 0, gap: '10px' } }, h('img', { src: '/brand/rfp-logo-sm.png', alt: 'RFP', style: { height: '30px' } }), App.cfg.name),
-      h('h1', {}, 'Link this PC to the website'),
-      h('p', { class: 'dim' }, 'This PC is the CasparCG bridge for your production team. It gets clubs, fixtures, crew, adverts and the rest from the website, and keeps its own copy for when the internet is down. It needs to be linked once.'),
-      admin ? App.linkFlow({ onDone: () => setTimeout(() => location.reload(), 2500) }) : h('p', { class: 'toast error' }, 'Only an Admin can link this PC. Ask an Admin to sign in here, or to sign in with Google on this PC.'),
-      h('button', { class: 'ghost', style: { width: '100%', marginTop: '10px' }, onclick: async () => { await api('POST', '/api/auth/logout'); location.reload(); } }, 'Sign out'))));
+    const site = (App.cfg.cloudUrl || 'the website').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const out = async () => { await api('POST', '/api/auth/logout'); location.reload(); };
+    root.replaceChildren(h('div', { class: 'login' }, h('div', { class: 'box card' },
+      h('h1', {}, 'Sign in with your website account'),
+      h('p', { class: 'dim' }, `This PC is not connected to ${site} yet. Sign out, then sign in with the account you use on the website (an Admin of your production team). That connects this PC and brings your data down.`),
+      h('button', { class: 'primary', style: { width: '100%' }, onclick: out }, 'Sign out and sign in again'),
+      App.teams.some((t) => t.role === 'Admin') ? h('details', { style: { marginTop: '12px' } }, h('summary', { class: 'dim small' }, 'Other ways to connect'), h('div', { style: { marginTop: '10px' } }, App.linkFlow({ onDone: () => setTimeout(() => location.reload(), 2500) }))) : null)));
   };
 })();

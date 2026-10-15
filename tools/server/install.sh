@@ -59,6 +59,8 @@ SSLIP="$(echo "$IP" | tr . -).sslip.io"
 # Caddy serves (and gets HTTPS certificates for) the website, the Studio address and always the sslip.io address
 HOSTS="$DOMAIN"; [ -n "$ADMIN" ] && HOSTS="$HOSTS, $ADMIN"; [ "$DOMAIN" != "$SSLIP" ] && HOSTS="$HOSTS, $SSLIP"
 WWW=""; case "$DOMAIN" in www.*|*.sslip.io) ;; *) [ "$(echo "$DOMAIN" | tr -cd . | wc -c)" = 1 ] && WWW="www.$DOMAIN" ;; esac
+# www. serves the same website (no redirect: while DNS moves, an old host that sends regemarkfp.com → www would loop)
+[ -n "$WWW" ] && HOSTS="$DOMAIN, $WWW${HOSTS#"$DOMAIN"}"
 echo "Public IP $IP   ·   website https://$DOMAIN${ADMIN:+   ·   studio https://$ADMIN}"
 
 say "Firewall (this server)"
@@ -162,6 +164,8 @@ srtAddress: :8890
 hls: true
 hlsAddress: 127.0.0.1:8888
 hlsVariant: fmp4
+hlsAlwaysRemux: true
+hlsSegmentCount: 7
 webrtc: true
 webrtcAddress: 127.0.0.1:8889
 webrtcLocalUDPAddress: :8189
@@ -200,7 +204,6 @@ EOF
 
 {
   if [ -n "$EMAIL" ]; then printf '{\n  email %s\n}\n\n' "$EMAIL"; fi
-  if [ -n "$WWW" ]; then printf '%s {\n  redir https://%s{uri} permanent\n}\n\n' "$WWW" "$DOMAIN"; fi
   cat <<EOF
 $HOSTS {
   handle_path /webrtc/* {
