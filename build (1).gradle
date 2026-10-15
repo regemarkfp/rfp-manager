@@ -1,0 +1,53 @@
+plugins {
+    id 'com.android.application'
+}
+
+// ---- the website the app opens. Change this one line if the website moves (e.g. to your own server),
+// ---- then the website at that address must serve /.well-known/assetlinks.json (RFP Manager does).
+def site = 'https://rfp-manager-f3r7.onrender.com'
+
+def siteHost = new URI(site).host
+def keys = new Properties()
+file('../keystore.properties').withInputStream { keys.load(it) }
+def build = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'com.regemarkfp.rfpmanager'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.regemarkfp.rfpmanager'
+        minSdk 21
+        targetSdk 34
+        versionCode build
+        versionName "1.0.${build}"
+        manifestPlaceholders = [hostName: siteHost]
+        resValue 'string', 'launchUrl', site + '/app?android=' + build
+        resValue 'string', 'asset_statements', '[{\\"relation\\": [\\"delegate_permission/common.handle_all_urls\\"], \\"target\\": {\\"namespace\\": \\"web\\", \\"site\\": \\"' + site + '\\"}}]'
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('../' + keys['storeFile'])
+            storePassword keys['storePassword']
+            keyAlias keys['keyAlias']
+            keyPassword keys['keyPassword']
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}

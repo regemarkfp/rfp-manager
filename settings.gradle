@@ -1,0 +1,11 @@
+// RFP Manager for Android: a Trusted Web Activity that opens the website full screen in Chrome
+// (so Google sign-in, the camera for receipts and everything else work as on the website).
+pluginManagement {
+    repositories { google(); mavenCentral(); gradlePluginPortal() }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories { google(); mavenCentral() }
+}
+rootProject.name = 'RFPManager'
+include ':app'
