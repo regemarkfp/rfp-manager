@@ -66,7 +66,7 @@
   };
   // the preset editor (a modal)
   function editPreset(p, ads, saved) {
-    const d = { kind: 'ads', name: '', ads: [], image: '', seconds: 20, pos: 'tr', sound: 'ad', text: '', ...(p || {}) };
+    const d = { kind: 'ads', name: '', ads: [], image: '', seconds: 20, pos: 'tr', sound: 'live', text: '', ...(p || {}) };
     const body = h('div', {});
     const paint = () => {
       const list = ads.filter((a) => (a.kind || 'ad') === (d.kind === 'squeeze' ? 'squeeze' : 'ad'));
@@ -78,7 +78,7 @@
         videoTable(list, { picked: d.ads, onPick: (id, on) => { d.ads = on ? [...d.ads, id] : d.ads.filter((x) => x !== id); paint(); } }),
         d.kind === 'squeeze' ? h('div', { style: { marginTop: '10px' } },
           h('div', { class: 'row', style: { gap: '10px', flexWrap: 'wrap', alignItems: 'center' } },
-            h('span', { class: 'small' }, 'Live picture'), sel('pos', POS), h('span', { class: 'small' }, 'Sound'), sel('sound', [['ad', 'The advert'], ['live', 'The live stream']]),
+            h('span', { class: 'small' }, 'Live picture'), sel('pos', POS), h('span', { class: 'small' }, 'Sound'), sel('sound', [['live', 'The live stream'], ['ad', 'The advert']]),
             h('input', { value: d.text, placeholder: 'Text on the board (optional)', style: { width: '220px' }, oninput: (e) => { d.text = e.target.value; } })),
           h('div', { class: 'row', style: { gap: '10px', flexWrap: 'wrap', alignItems: 'flex-start', marginTop: '8px' } },
             h('div', { style: { minWidth: '220px' } }, h('div', { class: 'dim small' }, 'Sponsor board (behind the picture, or on its own)'), typeof imageField === 'function' ? imageField(d.image, (v) => { d.image = v || ''; }, 'sponsor') : null),
@@ -126,7 +126,7 @@
     const id = row.id, title = row.title || 'Stream';
     const url = `/api/productions/${encodeURIComponent(id)}/mcr?team=${App.team}`;
     let st = null, skew = 0, ads = [], presets = [], picked = [], sqPicked = [], timer = null, tick = null, events = null;
-    const sqOpt = { image: '', seconds: 20, pos: 'tr', sound: 'ad', text: '' };
+    const sqOpt = { image: '', seconds: 20, pos: 'tr', sound: 'live', text: '' };
     const adList = () => ads.filter((a) => (a.kind || 'ad') === 'ad'), sqList = () => ads.filter((a) => a.kind === 'squeeze');
     let slateOpt = { minutes: 0, mute: false, title: '', text: '', countTo: '' }, custom = '';
     const status = h('div', { class: 'mcr-status' });
@@ -214,7 +214,7 @@
         videoTable(sqList(), { picked: sqPicked, onPick: (id, on) => { sqPicked = on ? [...sqPicked, id] : sqPicked.filter((x) => x !== id); paintSqueeze(); }, reload: loadAds }),
         h('div', { class: 'row', style: { gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginTop: '8px' } },
           h('span', { class: 'small' }, 'Live picture'), sel('pos', POS),
-          h('span', { class: 'small' }, 'Sound'), sel('sound', [['ad', 'The advert'], ['live', 'The live stream']]),
+          h('span', { class: 'small' }, 'Sound'), sel('sound', [['live', 'The live stream'], ['ad', 'The advert']]),
           h('input', { value: sqOpt.text, placeholder: 'Text on the board (optional)', style: { width: '220px' }, oninput: (e) => { sqOpt.text = e.target.value; } })),
         h('div', { class: 'row', style: { gap: '10px', flexWrap: 'wrap', alignItems: 'flex-start', marginTop: '8px' } },
           h('div', { style: { minWidth: '220px' } }, h('div', { class: 'dim small' }, 'Sponsor board (behind the picture, or on its own)'), board),

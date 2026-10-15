@@ -197,9 +197,19 @@ test('master control: slates (timed, cued), video adverts with a countdown, over
   await mcr({ action: 'slate', kind: 'weather' });
   v = await viewer();
   assert.equal(v.slate.music, mu.data.ad.url);
+  assert.equal((await client(cloud.url).get('/api/watch/' + slug)).data.slateMusic, mu.data.ad.url, 'also under the page\'s own slates');
   await mcr({ action: 'slate', kind: 'break', music: '' });
   assert.equal((await viewer()).slate.music, '', 'one slate without music');
   assert.equal((await mcr({ action: 'setMusic', music: 'vad_nothere' })).status, 400);
+  const mp3 = path.join(dir, 'm.mp3'); execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=330:duration=2', '-y', mp3]);
+  const mu2 = await up2(fs.readFileSync(mp3), 'Loop.mp3', 'music', 'audio/mpeg');
+  assert.equal(mu2.status, 200, JSON.stringify(mu2.data));
+  assert.ok(!fs.readdirSync(path.join(cloud.config.dataDir, 'ads')).some((f) => /\.in\.|\.tmp\./.test(f)), 'no work files left');
+  // the players load the squeeze-back media and the slate music ahead
+  await mcr({ action: 'clearSlate' });
+  const pre = (await viewer()).preload;
+  assert.ok(pre.some((x) => x.kind === 'video' && x.url === `/ads/${sq1.data.ad.id}.mp4`), JSON.stringify(pre));
+  assert.ok(pre.some((x) => x.kind === 'audio' && x.url === mu.data.ad.url));
 });
 
 test('several venues at once: a stream per match, each with its own key, page, ending and restreams', async (t) => {
@@ -302,6 +312,7 @@ test('squeeze-backs, by hand and automatically on game events from the scorer', 
   assert.equal((await mcr({ action: 'squeeze' })).status, 400, 'nothing to show');
   let r = await mcr({ action: 'squeeze', image: img, seconds: 30, pos: 'tr', text: 'Brought to you by …' });
   assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.state.squeeze.sound, 'live', 'squeeze-backs keep the stream sound unless asked');
   let v = await viewer();
   assert.equal(v.squeeze.image, img); assert.equal(v.squeeze.pos, 'tr');
   assert.ok(Math.abs(Date.parse(v.squeeze.endsAt) - Date.parse(v.squeeze.startedAt) - 30000) < 50);

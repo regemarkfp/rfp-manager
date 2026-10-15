@@ -60,10 +60,22 @@
       ended ? null : el('div', { class: 'sbars' }, el('i'), el('i'), el('i')));
   }
   function showSlate(kind) {
+    if (slateKind === kind && $('stage').querySelector(':scope > .slate')) return;      // already up (its music keeps playing)
     stop();
     slateKind = kind;
     $('ctrl').replaceChildren(); $('player').classList.remove('has-bar');
-    $('stage').replaceChildren(slateEl(kind));
+    $('stage').replaceChildren(withMusic(slateEl(kind), kind));
+  }
+  // the stream's slate music under the slates this page shows by itself (countdown, technical difficulties); not when it has ended
+  function withMusic(slate, kind) {
+    if (!info || !info.slateMusic || kind === 'ended') return slate;
+    const audio = mediaFor('audio', info.slateMusic, { loop: '', preload: 'auto', src: info.slateMusic });
+    const snd = el('button', { class: 'unmute slatesnd', onclick: (e) => { e.stopPropagation(); audio.muted = false; window.RFPPlayer.saveSound(audio); audio.play().catch(() => {}); snd.remove(); } }, '🔊 Tap for music');
+    slate.append(audio);
+    startAd(audio, window.RFPPlayer.sound().muted, snd, slate);
+    // stops when the slate goes
+    new MutationObserver((m, o) => { if (!slate.isConnected) { audio.pause(); o.disconnect(); } }).observe(document.getElementById('stage'), { childList: true });
+    return slate;
   }
 
   // the control bar under the picture (player.js); prev / next walk the matches and recordings
@@ -211,7 +223,7 @@
     slateKind = '';
     // the picture stops coming for a while: the slate over it, gone again as soon as it plays
     let stallT = null, over = null;
-    const stalled = () => { clearTimeout(stallT); stallT = setTimeout(() => { if (video.isConnected && !over) { over = slateEl('difficulties'); $('stage').append(over); } }, 8000); };
+    const stalled = () => { clearTimeout(stallT); stallT = setTimeout(() => { if (video.isConnected && !over) { over = withMusic(slateEl('difficulties'), 'difficulties'); $('stage').append(over); } }, 8000); };
     const fine = () => { clearTimeout(stallT); if (over) { over.remove(); over = null; } };
     for (const ev of ['waiting', 'stalled']) video.addEventListener(ev, stalled);
     for (const ev of ['playing', 'timeupdate']) video.addEventListener(ev, () => { if (!video.paused && video.readyState >= 3) fine(); });
@@ -240,7 +252,7 @@
     if (!info.live && info.ended) { showSlate('ended'); return; }
     if (!info.live && (info.dropped || slateKind === 'difficulties')) { showSlate('difficulties'); return again(5000); }
     if (!info.live && info.startsAt && Date.parse(info.startsAt) > Date.now() - 30 * 60e3) {
-      if (slateKind !== 'countdown' || !$('stage').querySelector('.slate.countdown')) showSlate('countdown');
+      showSlate('countdown');
       return again(5000);
     }
     if (!info.live) { message('Not live yet', (info.videos || []).length ? 'Watch a recording below, or stay here: it starts playing by itself when the stream begins.' : 'This page starts playing by itself when the stream begins.'); return again(5000); }
@@ -398,14 +410,35 @@
       if (!p || p.i === idx || !video.isConnected && idx >= 0) return;
       const first = idx < 0;
       idx = p.i;
-      video.src = items[p.i].url;
-      video.addEventListener('loadedmetadata', () => { if (p.off > 0.5) { try { video.currentTime = p.off; } catch (e) { /* not yet */ } } }, { once: true });
+      const seek = () => { if (p.off > 0.5) { try { video.currentTime = p.off; } catch (e) { /* not yet */ } } };
+      if (video.getAttribute('src') !== items[p.i].url) { video.src = items[p.i].url; video.addEventListener('loadedmetadata', seek, { once: true }); }
+      else if (video.readyState >= 1) seek(); else video.addEventListener('loadedmetadata', seek, { once: true });
       if (first) onStart(); else video.play().catch(() => {});
     };
     video.addEventListener('ended', playAt);
     // a stuck advert (slow connection): try again from where the clock is
     video.addEventListener('error', () => { idx = -2; setTimeout(playAt, 1500); });
     playAt();
+  }
+  // media loaded ahead (squeeze-back videos and boards, slate music), so they start at once when called
+  M.pre = new Map();
+  const preBox = el('div', { style: 'position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;left:-9px;top:-9px', 'aria-hidden': 'true' });
+  function preload(list) {
+    if (!preBox.isConnected) document.body.append(preBox);
+    const want = new Set((list || []).map((x) => x.url));
+    for (const [u, e] of M.pre) if (!want.has(u)) { if (e.removeAttribute) { try { e.removeAttribute('src'); e.load && e.load(); } catch (er) { /* gone */ } } if (e.remove) e.remove(); M.pre.delete(u); }
+    for (const x of list || []) {
+      if (M.pre.has(x.url)) continue;
+      if (x.kind === 'image') { const im = new Image(); im.src = x.url; M.pre.set(x.url, im); continue; }
+      const m = el(x.kind === 'audio' ? 'audio' : 'video', { preload: 'auto', playsinline: '', muted: '', src: x.url });
+      m.muted = true; preBox.append(m); m.load(); M.pre.set(x.url, m);
+    }
+  }
+  // a loaded-ahead element for this address (taken out of the cache), else a new one
+  function mediaFor(tag, url, attrs) {
+    const m = M.pre.get(url);
+    if (m && m.tagName === tag.toUpperCase()) { M.pre.delete(url); m.remove(); m.muted = false; for (const [k, v] of Object.entries(attrs)) m.setAttribute(k, v); return m; }
+    return el(tag, attrs);
   }
   function mcrLayer() {
     if (!M.layer) M.layer = el('div', { class: 'mcr' });
@@ -424,7 +457,7 @@
       sl.countTo ? el('div', { class: 'scount', 'data-count-to': sl.countTo }) : el('div', { class: 'sbars' }, el('i'), el('i'), el('i')));
     // music under the slate: a loop, with the viewer's sound settings; the live sound stays off while it plays
     if (sl.music) {
-      const audio = el('audio', { loop: '', preload: 'auto', src: sl.music });
+      const audio = mediaFor('audio', sl.music, { loop: '', preload: 'auto', src: sl.music });
       const snd = el('button', { class: 'unmute adsnd', onclick: (e) => { e.stopPropagation(); audio.muted = false; window.RFPPlayer.saveSound(audio); audio.play().catch(() => {}); snd.remove(); } }, '🔊 Tap for sound');
       M.slate.audio = audio; M.slate.snd = snd;
       M.slate.append(audio);
@@ -468,7 +501,7 @@
     if (sq.image) bg.append(el('img', { src: imgUrl(sq.image), alt: '' }));
     let video = null;
     if (sq.items.length) {
-      video = el('video', { class: 'advid', playsinline: '', preload: 'auto' });
+      video = mediaFor('video', sq.items[0].url, { class: 'advid', playsinline: '', preload: 'auto' });
       bg.append(video);
       const muted = sq.sound === 'live' ? true : !soundOn();
       sequence(video, sq.items, sq.startedAt, () => startAd(video, muted, null, null));
@@ -519,6 +552,7 @@
       const x = await r.json();
       M.skew = x.now - Math.round((t0 + Date.now()) / 2);
       M.state = x;
+      preload(x.preload);
     } catch (e) { /* next time */ }
   }
   // countdown slates tick: days, hours, minutes, seconds to their time (by the website's clock when known)
