@@ -255,3 +255,9 @@ table.cs-plain td { padding: 2px 26px 2px 0; }
 .cal-ev.booked { background: var(--accent); color: var(--on-accent); font-weight: 600; }
 @media (max-width: 700px) { .cal-day { min-height: 70px; padding: 2px; } .cal-ev { font-size: 10px; padding: 1px 3px; } .cal-head { font-size: 10px; padding: 4px; } }
 .brand-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Send call sheet: who gets it */
+.cs-picks { max-height: 46vh; overflow: auto; border: 1px solid var(--line, #333); border-radius: 8px; margin-bottom: 10px; }
+.cs-pick { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line, #333); cursor: pointer; }
+.cs-pick:last-child { border-bottom: 0; }
+.cs-pick input { width: 18px; height: 18px; flex: none; }
+.cs-pick .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }

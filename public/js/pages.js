@@ -207,7 +207,7 @@
         const fx = (p.fixtures || []).map((r) => App.docs.get(r.fixture)).filter(Boolean);
         box.replaceChildren(...[
           fx.length ? h('div', { class: 'card' }, h('h2', {}, 'Matches in this production'), fx.map((d) => App.fixtureRow(d))) : null,
-          h('div', { class: 'card' }, h('div', { class: 'spread' }, h('h2', {}, 'Costing'), h('div', { class: 'row no-print' }, h('a', { class: 'btn sm', href: '#/rundown/production/' + doc.id }, `Rundown (${(p.rundown || []).length})`), h('a', { class: 'btn sm', href: '#/callsheet/' + doc.id }, 'Call sheet'))),
+          h('div', { class: 'card' }, h('div', { class: 'spread' }, h('h2', {}, 'Costing'), h('div', { class: 'row no-print' }, h('a', { class: 'btn sm', href: '#/rundown/production/' + doc.id }, `Rundown (${(p.rundown || []).length})`), h('a', { class: 'btn sm', href: '#/callsheet/' + doc.id }, 'Call sheet'), App.canEdit('production') ? h('button', { class: 'sm', onclick: (e) => { e.preventDefault(); App.sendCallsheet(doc.id); } }, 'Send call sheet') : null)),
             warn.concat(clash.length ? ['Booked twice: ' + [...new Set(clash)].join(', ')] : []).map((w) => h('div', { class: 'pill warn', style: { marginBottom: '8px', marginRight: '6px' } }, w)),
             c.lines.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' },
               h('thead', {}, h('tr', {}, h('th', {}, 'Item'), h('th', { class: 'r' }, 'Qty'), h('th', { class: 'r' }, 'Days'), h('th', { class: 'r' }, 'Cost'), h('th', { class: 'r' }, 'Invoice'))),
@@ -274,6 +274,44 @@
   // ---- call sheet (print) ---------------------------------------------------------------------
   // Laid out like a broadcast call sheet: company header, event details, key contacts, crew by location with
   // call and TX times, additional information and emergency contacts.
+  // Send call sheet: pick the crew, add a note, email it (the sheet in the email and as a PDF attachment)
+  const csPdf = (id, dl) => `/api/productions/${encodeURIComponent(id)}/callsheet.pdf?team=${App.team}${dl ? '&download=1' : ''}`;
+  App.sendCallsheet = async (id) => {
+    let r;
+    try { r = await api('GET', `/api/productions/${encodeURIComponent(id)}/callsheet/recipients?team=${App.team}`); } catch (e) { oops(e); return; }
+    if (r.bridge) {
+      UI.modal({ title: 'Send call sheet', body: h('p', {}, 'Call sheets are emailed from the website, not from this PC. ', r.site ? h('a', { href: r.site + '/app/#/callsheet/' + id, target: '_blank', rel: 'noopener' }, 'Open it on the website ↗') : null), actions: [{ label: 'Close' }] });
+      return;
+    }
+    if (!r.mail) { UI.modal({ title: 'Send call sheet', body: h('p', {}, 'Email is not set up on this website yet. Settings → My account → "Send me a test email" shows what is missing.'), actions: [{ label: 'Close' }] }); return; }
+    const boxes = new Map();
+    const row = (x) => {
+      const cb = h('input', { type: 'checkbox', checked: x.hasEmail, disabled: !x.hasEmail });
+      if (x.hasEmail) boxes.set(x.crewMember, cb);
+      return h('label', { class: 'cs-pick' + (x.hasEmail ? '' : ' dim') }, cb,
+        h('span', { class: 'grow' }, h('b', {}, x.name || 'Unnamed'), ' ', h('span', { class: 'dim small' }, [x.roles.join(', '), x.call && 'call ' + x.call].filter(Boolean).join(' · ')),
+          h('div', { class: 'small dim' }, x.hasEmail ? x.email : h('a', { href: '#/edit/crewMember/' + x.crewMember }, 'No email address – add one'))),
+        x.confirmed ? h('span', { class: 'pill ok' }, 'Confirmed') : null);
+    };
+    const setAll = (fn) => { for (const [k, cb] of boxes) cb.checked = fn(r.list.find((x) => x.crewMember === k)); };
+    const extra = h('input', { placeholder: 'other@example.com, client@example.com' });
+    const note = h('textarea', { rows: 2, placeholder: 'Optional, e.g. "Please confirm you got this"' });
+    const body = h('div', {},
+      r.list.length ? [
+        h('div', { class: 'row', style: { marginBottom: '6px' } }, h('button', { class: 'sm', onclick: () => setAll((x) => true) }, 'Everyone'), h('button', { class: 'sm', onclick: () => setAll((x) => x.confirmed) }, 'Confirmed only'), h('button', { class: 'sm', onclick: () => setAll(() => false) }, 'None')),
+        h('div', { class: 'cs-picks' }, r.list.map(row))] : h('p', { class: 'dim' }, 'Nobody is on the crew yet. Add crew members on the production, or type addresses below.'),
+      h('label', { class: 'f' }, h('span', {}, 'Also send to'), extra),
+      h('label', { class: 'f' }, h('span', {}, 'Message'), note),
+      h('p', { class: 'dim small' }, 'Everyone gets the whole call sheet in the email, with it attached as a PDF. ', h('a', { href: csPdf(id), target: '_blank', rel: 'noopener' }, 'Preview the PDF ↗')));
+    UI.modal({ title: 'Send call sheet', wide: true, body, actions: [{ label: 'Cancel' }, { label: 'Send', primary: true, onClick: async () => {
+      const to = [...boxes].filter(([, cb]) => cb.checked).map(([k]) => k);
+      if (!to.length && !extra.value.trim()) { toast('Pick who gets it', 'error'); return false; }
+      const res = await api('POST', `/api/productions/${encodeURIComponent(id)}/callsheet/send?team=${App.team}`, { to, extra: extra.value, note: note.value });
+      const notes = [...res.skipped, ...res.failed].map((x) => `${x.name}: ${x.why}`);
+      toast(`Call sheet sent to ${res.sent} ${res.sent === 1 ? 'person' : 'people'}${notes.length ? ' · not sent: ' + notes.join('; ') : ''}`, notes.length ? 'error' : '');
+    } }] });
+  };
+
   App.pages.callsheet = (id) => {
     const p = App.get(id);
     if (!p) return App.pages.notfound();
@@ -313,7 +351,7 @@
       Object.keys(eq).length ? h('div', { class: 'cs-more' }, h('p', {}, h('b', {}, h('u', {}, 'Equipment'))), Object.entries(eq).map(([c, items]) => h('p', {}, h('b', {}, c + ': '), items.join(', ')))) : null,
       (p.rundown || []).length ? h('div', { class: 'cs-more cs-break' }, App.rundownSheet('production', p, p.rundown)) : null,
       company ? h('div', { class: 'cs-foot' }, `${org.name || ''}  ·  ${company}`) : null);
-    const el = h('div', {}, h('div', { class: 'no-print' }, pageHead(h('div', {}, h('a', { class: 'small', href: '#/edit/production/' + id }, '← Production'), h('h1', {}, 'Call sheet')), h('button', { class: 'primary', onclick: () => window.print() }, 'Print / save as PDF')),
+    const el = h('div', {}, h('div', { class: 'no-print' }, pageHead(h('div', {}, h('a', { class: 'small', href: '#/edit/production/' + id }, '← Production'), h('h1', {}, 'Call sheet')), h('a', { class: 'btn', href: csPdf(id, true) }, 'Download PDF'), h('button', { onclick: () => window.print() }, 'Print'), App.canEdit('production') ? h('button', { class: 'primary', onclick: () => App.sendCallsheet(id) }, 'Send call sheet') : null),
       contacts.length && (p.crew || []).length ? null : h('p', { class: 'dim' }, 'Fill in Key contacts, Crew (with a location for each), Additional information and Emergency hospitals on the production to complete this sheet. Your company name and logo come from Settings → Production team.')), sheet);
     return { el };
   };

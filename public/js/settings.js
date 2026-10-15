@@ -127,7 +127,8 @@
         h('div', { class: 'f' }, h('span', { class: 'flabel' }, 'Picture'), h('div', { class: 'row', style: { gap: '10px' } }, App.avatar(App.me.image, App.me.name || App.me.email, 48), h('span', { class: 'dim small' }, App.me.google ? 'Your Google profile picture. Change it in your Google account; it updates here the next time you sign in.' : 'Sign in with Google to use your Google profile picture.'))),
         App.me.hasPassword ? h('label', { class: 'f' }, h('span', {}, 'Current password'), h('input', { type: 'password', autocomplete: 'current-password', oninput: (e) => { f.currentPassword = e.target.value; } })) : null,
         App.cfg.mode === 'local' || App.me.hasPassword ? h('label', { class: 'f' }, h('span', {}, 'New password (8+ characters)'), h('input', { type: 'password', autocomplete: 'new-password', oninput: (e) => { f.password = e.target.value; } })) : null),
-      h('button', { class: 'primary', style: { marginTop: '12px' }, onclick: async () => { try { await api('POST', '/api/me', f); await App.loadMe(); toast('Account saved'); route(); } catch (e) { oops(e); } } }, 'Save')));
+      h('div', { class: 'row', style: { marginTop: '12px' } }, h('button', { class: 'primary', onclick: async () => { try { await api('POST', '/api/me', f); await App.loadMe(); toast('Account saved'); route(); } catch (e) { oops(e); } } }, 'Save'),
+        App.cfg.mode === 'cloud' ? h('button', { onclick: async (e) => { const b = e.target; b.disabled = true; try { const r = await api('POST', '/api/mail/test'); if (r.ok) toast('Test email sent to ' + App.me.email + ' – check your inbox (and spam)'); else oops(new Error('Email did not go out: ' + r.error)); } catch (x) { oops(x); } b.disabled = false; } }, 'Send me a test email') : null)));
   }
 
   function machineTab() {

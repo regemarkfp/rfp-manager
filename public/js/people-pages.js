@@ -200,23 +200,19 @@
   function waitingCard() {
     const list = App.waitingBookings();
     if (!list.length) return null;
-    const admin = App.can('admin'), me = String(App.me.email || '').toLowerCase();
-    const producers = App.list('member').filter((m) => ['Producer', 'Admin'].includes(m.data.role));
-    const allocate = async (b, email) => {
-      try { const r = await api('PUT', `/api/docs/booking/${encodeURIComponent(b.id)}?team=${App.team}`, { data: { ...b.data, producer: email } }); App.docs.set(r.doc.id, r.doc); toast(email ? 'Allocated – they get an email' : 'Allocation removed'); route(); } catch (e) { oops(e); }
-    };
+    const me = String(App.me.email || '').toLowerCase();
+    const who = (email) => { const m = App.list('member').find((x) => x.data.email === email); return m ? m.data.name || m.data.email : email; };
+    // short rows: who and what, the date and where it stands; tap one for the details (allocate, accept, decline)
     return h('div', { class: 'card', style: { marginBottom: '16px', borderColor: 'var(--accent)' } },
-      h('div', { class: 'spread' }, h('h2', { style: { margin: 0 } }, `Bookings waiting for a response (${list.length})`), h('a', { class: 'btn sm', href: '#/list/booking' }, 'All booking requests')),
-      h('table', { class: 't', style: { marginTop: '10px' } }, h('tr', {}, h('th', {}, 'Received'), h('th', {}, 'Who'), h('th', {}, 'Service'), h('th', {}, 'Date'), h('th', {}, 'Producer'), h('th', {}, 'Status'), h('th', {}, '')),
-        list.map((b) => {
-          const d = b.data, mine = String(d.producer || '').toLowerCase() === me;
-          return h('tr', {}, h('td', { class: 'nowrap dim' }, d.received || ''), h('td', {}, h('a', { href: '#/edit/booking/' + b.id }, d.name || '—'), d.organisation ? h('div', { class: 'dim small' }, d.organisation) : null),
-            h('td', {}, d.service || ''), h('td', { class: 'nowrap' }, d.date ? UI.fmtDate(d.date) : ''),
-            h('td', {}, admin ? h('select', { onchange: (e) => allocate(b, e.target.value) }, h('option', { value: '' }, 'Choose a Producer…'),
-              producers.map((m) => h('option', { value: m.data.email, selected: m.data.email === d.producer }, m.data.name || m.data.email))) : (d.producer || '')),
-            h('td', {}, h('span', { class: 'pill' + (d.status === 'Declined by producer' ? ' warn' : '') }, d.status || 'New'), d.status === 'Declined by producer' && d.response ? h('div', { class: 'dim small' }, '"' + d.response + '"') : null),
-            h('td', { class: 'nowrap' }, mine && d.status === 'Assigned' ? [h('button', { class: 'sm primary', onclick: () => respondTo(b.id, true) }, 'Accept'), ' ', h('button', { class: 'sm danger', onclick: () => respondTo(b.id, false) }, 'Decline')] : h('a', { class: 'btn sm', href: '#/edit/booking/' + b.id }, 'Open')));
-        })));
+      h('div', { class: 'spread' }, h('h2', { style: { margin: 0 } }, `Bookings waiting (${list.length})`), h('a', { class: 'btn sm', href: '#/list/booking' }, 'All')),
+      h('div', { style: { display: 'grid', gap: '6px', marginTop: '10px' } }, list.map((b) => {
+        const d = b.data, mine = String(d.producer || '').toLowerCase() === me && d.status === 'Assigned';
+        const state = d.status === 'Declined by producer' ? 'Declined – reallocate' : d.status === 'Assigned' ? (mine ? 'Waiting for you' : 'With ' + who(d.producer)) : 'New – allocate';
+        return h('a', { href: '#/edit/booking/' + b.id, class: 'row', style: { justifyContent: 'space-between', flexWrap: 'nowrap', gap: '10px', padding: '10px 12px', borderRadius: '8px', background: 'var(--panel2, #2a2a2a)', color: 'inherit', textDecoration: 'none', minWidth: 0 } },
+          h('div', { style: { minWidth: 0 } }, h('b', { style: { display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, [d.name || 'Booking', d.service].filter(Boolean).join(' · ')),
+            h('span', { class: 'dim small' }, d.date ? UI.fmtDate(d.date, { day: 'numeric', month: 'short' }) : 'No date yet')),
+          h('span', { class: 'pill' + (mine ? ' ok' : d.status === 'Declined by producer' ? ' warn' : ''), style: { flex: 'none' } }, state));
+      })));
   }
   // dashboard, under the team's name: the verse of the day (small), then bookings waiting for a response
   App.dashBelowHero = () => { const v = App.verseCard(true); v.style.marginBottom = '16px'; return [v, waitingCard()]; };
