@@ -4,6 +4,8 @@
 # into tools\launcher\webview2; later builds use that copy. Without internet the exe is built without it and opens
 # windows in Edge / Chrome app mode instead.
 #   powershell -ExecutionPolicy Bypass -File tools\build-exe.ps1            (or double-click "Build RFP Manager app.cmd")
+#   -Ci: on GitHub (Actions): no running-app check, no shortcuts, WebView2 required
+param([switch]$Ci)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $src = Join-Path $PSScriptRoot 'launcher\RFPManager.cs'
@@ -19,7 +21,7 @@ foreach ($c in @(
 if (-not $csc) { Write-Host 'The C# compiler of .NET Framework 4 was not found (it comes with Windows 10 and 11).' -ForegroundColor Red; exit 1 }
 
 # a running RFP Manager.exe holds the file: ask it to close first
-$running = Get-Process -Name 'RFP Manager' -ErrorAction SilentlyContinue
+$running = if ($Ci) { $null } else { Get-Process -Name 'RFP Manager' -ErrorAction SilentlyContinue }
 if ($running) { Write-Host 'Close RFP Manager (tray icon -> Quit) and run this again.' -ForegroundColor Yellow; exit 1 }
 
 # ---- the WebView2 SDK (once)
@@ -59,6 +61,7 @@ function Get-WebView2 {
   }
 }
 $hasWv = Get-WebView2
+if ($Ci -and -not $hasWv) { Write-Host 'The WebView2 SDK is needed for the published build.' -ForegroundColor Red; exit 1 }
 
 Write-Host "Building $out ..."
 $refs = @('/r:System.dll', '/r:System.Core.dll', '/r:System.Drawing.dll', '/r:System.Windows.Forms.dll')
@@ -75,6 +78,8 @@ if ($hasWv) {
   $rt = @('HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}') | Where-Object { Test-Path $_ }
   if (-not $rt) { Write-Host 'The Microsoft Edge WebView2 Runtime seems to be missing. Install it from https://go.microsoft.com/fwlink/p/?LinkId=2124703 (RFP Manager uses Edge / Chrome windows until then).' -ForegroundColor Yellow }
 }
+
+if ($Ci) { Write-Host "Built $out"; exit 0 }
 
 # shortcuts on the desktop and in the Start menu
 $ws = New-Object -ComObject WScript.Shell

@@ -158,7 +158,14 @@ class Launcher : ApplicationContext
     {
         if (s.StartsWith("ACCOUNT ") || s == "ACCOUNTS-END") { console.Account(s); return; }
         console.Append(s);
+        // the update check at start found a newer RFP Manager: say so from the tray as well (the window offers to install it)
+        if (s.Contains(" is available (this PC has ") && !updateTold)
+        {
+            updateTold = true;
+            try { console.BeginInvoke((MethodInvoker)delegate { tray.ShowBalloonTip(8000, "Update available", Regex.Replace(s, "^\\[[^\\]]*\\] ", "").Replace(" Install it from the app.", "") + " Open RFP Manager to install it.", ToolTipIcon.Info); }); } catch (Exception) { }
+        }
     }
+    bool updateTold = false;
     void WaitUntilUp()
     {
         for (int i = 0; i < 120 && !quitting; i++)
