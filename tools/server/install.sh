@@ -45,7 +45,7 @@ export DEBIAN_FRONTEND=noninteractive
 echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
 echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
 apt-get update -y -q
-apt-get install -y -q curl ca-certificates tar xz-utils jq gnupg openssl iptables-persistent debian-keyring debian-archive-keyring apt-transport-https
+apt-get install -y -q curl ca-certificates tar xz-utils jq gnupg openssl ffmpeg iptables-persistent debian-keyring debian-archive-keyring apt-transport-https
 
 IP="$(curl -fsS --max-time 10 https://api.ipify.org || curl -fsS --max-time 10 https://ifconfig.me || true)"
 [ -n "$IP" ] || { echo "Could not find this server's public IP address."; exit 1; }

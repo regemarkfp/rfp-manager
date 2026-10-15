@@ -38,6 +38,21 @@
     stop();
     const poster = info && info.poster ? el('img', { class: 'poster', src: '/media/' + encodeURIComponent(info.poster), alt: '' }) : null;
     $('stage').replaceChildren(...[poster, el('div', { class: 'msg' }, el('b', {}, title), text ? el('p', {}, text) : null, ...extra)].filter(Boolean));
+    $('ctrl').replaceChildren(); $('player').classList.remove('has-bar');
+  }
+  // the control bar under the picture (player.js); prev / next walk the matches and recordings
+  function bar(video, opts) {
+    const items = [...(info.matches || []).map((m) => '?m=' + encodeURIComponent(m.fixture)), ...(info.videos || []).map((v) => '?v=' + encodeURIComponent(v.start))];
+    const here = matchId ? '?m=' + encodeURIComponent(matchId) : vodStart ? '?v=' + encodeURIComponent(vodStart) : '';
+    const i = items.indexOf(here);
+    const go = (q) => () => { location.search = q; };
+    const live = !!opts.live;
+    const b = window.RFPPlayer.mount(video, { player: $('player'), live, since: live ? info.since : 0, tracks: opts.tracks || null, onUnmute: opts.onUnmute,
+      prev: live ? null : i > 0 ? go(items[i - 1]) : null, next: live ? (items.length ? go(items[0]) : null) : i >= 0 && i < items.length - 1 ? go(items[i + 1]) : null,
+      prevLabel: 'Previous video', nextLabel: live ? 'Recordings' : 'Next video',
+      onList: (items.length || (info.matches || []).length) ? () => $('vids').scrollIntoView({ behavior: 'smooth' }) : null });
+    $('ctrl').replaceChildren(b.el); $('player').classList.add('has-bar');
+    return b;
   }
   const imgUrl = (id) => (!id ? '' : /^https?:/.test(id) ? id : '/media/' + encodeURIComponent(id));
   const dur = (sec) => { sec = Math.round(sec || 0); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0'); };
@@ -72,9 +87,9 @@
   }
   function playVod() {
     stop();
-    const video = el('video', { controls: '', playsinline: '', autoplay: '', src: info.vod.url });
-    video.addEventListener('dblclick', () => { (video.requestFullscreen || video.webkitEnterFullscreen || (() => {})).call(video); });
+    const video = el('video', { playsinline: '', autoplay: '', src: info.vod.url });
     $('stage').replaceChildren(video);
+    bar(video, { live: false });
     playing = true;
     beats(video, matchId ? { kind: 'match', match: matchId, title: info.vod.title || '' } : { kind: 'vod', start: info.vod.start });
   }
@@ -121,30 +136,41 @@
     setTimeout(() => { if (mine === pc && !video.videoWidth) { stop(); hlsOnly = true; playHLS(); } }, 7000);
   }
 
-  let hls = null, hlsOnly = false;
+  let hls = null, hlsOnly = false, withTracks = false;
   function playHLS() {
-    const video = el('video', { autoplay: '', playsinline: '', controls: '', muted: '' });
+    const video = el('video', { autoplay: '', playsinline: '', muted: '' });
     video.muted = true;
+    const src = info.audio ? info.audio.hls : info.hls;
+    withTracks = !!info.audio;
     const tok = (u) => (info.token ? u + (u.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(info.token) : u);
-    if (canHLS()) { video.src = tok(info.hls); video.onerror = () => again(4000); }       // Safari, iPhone, iPad
+    let tracks = null;
+    if (canHLS()) {                                                                              // Safari, iPhone, iPad
+      video.src = tok(src); video.onerror = () => again(4000);
+      if (info.audio && video.audioTracks) tracks = { list: () => [...video.audioTracks].map((t, i) => ({ name: t.label || (info.audio.tracks[i] || {}).name || 'Track ' + (i + 1) })), current: () => [...video.audioTracks].findIndex((t) => t.enabled), pick: (i) => { [...video.audioTracks].forEach((t, j) => { t.enabled = j === i; }); } };
+    }
     else if (window.Hls && window.Hls.isSupported()) {
       hls = new window.Hls({ enableWorker: false, lowLatencyMode: true, liveSyncDurationCount: 3, manifestLoadingMaxRetry: 20, manifestLoadingRetryDelay: 1500,
         xhrSetup: (xhr, url) => { if (info.token && !/[?&]token=/.test(url)) xhr.open('GET', tok(url), true); } });
       hls.on(window.Hls.Events.ERROR, (ev, d) => { if (d && d.fatal) again(4000); });
-      hls.loadSource(tok(info.hls));
+      hls.loadSource(tok(src));
       hls.attachMedia(video);
+      const h0 = hls;
+      if (info.audio) tracks = { list: () => (h0.audioTracks || []).map((t) => ({ name: t.name, note: (info.audio.tracks.find((x) => x.name === t.name) || {}).team ? 'team' : '' })), current: () => h0.audioTrack, pick: (i) => { h0.audioTrack = i; } };
     } else { message('This browser cannot play the stream', 'Try Chrome, Edge, Firefox or Safari.'); return; }
-    show(video);
+    show(video, tracks);
+    if (tracks && hls) hls.on(window.Hls.Events.AUDIO_TRACKS_UPDATED, () => current && current.paint());
+    if (tracks && video.audioTracks) video.audioTracks.addEventListener && video.audioTracks.addEventListener('addtrack', () => current && current.paint());
   }
   const canHLS = () => !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
   // WebRTC is quickest, but carries no AAC sound (what OBS and vMix send): then the stream plays as HLS
-  const webrtcFits = () => !hlsOnly && typeof RTCPeerConnection === 'function' && !(info.tracks || []).some((t) => /MPEG-4 Audio|AAC/i.test(t));
+  const webrtcFits = () => !hlsOnly && !info.audio && typeof RTCPeerConnection === 'function' && !(info.tracks || []).some((t) => /MPEG-4 Audio|AAC/i.test(t));
 
-  function show(video) {
+  let current = null;
+  function show(video, tracks) {
     playing = true;
-    const unmute = el('button', { class: 'unmute', onclick: () => { video.muted = false; video.play().catch(() => {}); unmute.remove(); } }, '🔊 Tap for sound');
-    video.addEventListener('dblclick', () => { (video.requestFullscreen || video.webkitEnterFullscreen || (() => {})).call(video); });
+    const unmute = el('button', { class: 'unmute', onclick: (e) => { e.stopPropagation(); video.muted = false; video.play().catch(() => {}); unmute.remove(); } }, '🔊 Tap for sound');
     $('stage').replaceChildren(video, unmute);
+    current = bar(video, { live: true, tracks, onUnmute: () => unmute.remove() });
     video.play().catch(() => {});
     beats(video, { kind: 'live' });
   }
@@ -169,7 +195,7 @@
     if (vodStart) { if (info.vod) { if (!playing) playVod(); return; } return message(matchId ? 'This match video is not ready yet' : 'This recording is no longer here', '', el('p', {}, el('a', { class: 'btn', href: location.pathname }, 'Back to the stream'))); }
     if (!info.streaming) return message('Streaming is not set up on this website yet', '');
     if (!info.live) { message('Not live yet', (info.videos || []).length ? 'Watch a recording below, or stay here: it starts playing by itself when the stream begins.' : 'This page starts playing by itself when the stream begins.'); return again(5000); }
-    if (playing) return;
+    if (playing) { if (!vodStart && info.audio && !withTracks) { stop(); playHLS(); } return; }   // the audio tracks became ready: switch to them
     if (!webrtcFits()) return playHLS();
     try { await playWebRTC(); }
     catch (e) { stop(); playHLS(); }
@@ -264,6 +290,8 @@
       const now = await api(password === null ? 'GET' : 'POST', password === null ? null : { password });
       const was = info.live; info = { ...info, ...now }; header();
       if (!was && info.live && !playing) load();
+      else if (info.live && playing && info.audio && !withTracks) { stop(); playHLS(); }                  // audio tracks ready: switch to them
+      else if (!info.live && playing && was) { stop(); load(); }
     } catch (e) { /* next time */ }
   }, 10000);
 

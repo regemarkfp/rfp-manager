@@ -105,6 +105,10 @@
       { k: 'streamPoster', l: 'Stream picture', t: 'image', group: 'Live stream', help: 'Shown before it starts and on the video afterwards. The channel\'s banner if empty.' },
       { k: 'streamRecord', l: 'Record the stream', t: 'bool', def: true, group: 'Live stream' },
       { k: 'streamVod', l: 'Show the recording on the website afterwards', t: 'bool', def: true, group: 'Live stream' },
+      { k: 'streamAudio', l: 'Audio tracks (several languages or mixes)', t: 'list', group: 'Live stream', help: 'Leave empty for one normal sound. Otherwise one row per stereo pair you send: name it, and choose who hears it. Viewers pick a track under the video. Send the pairs as separate audio tracks over SRT (OBS: track 1 = 1+2, track 2 = 3+4 …) or as one track with all the channels.',
+        fields: [{ k: 'channels', l: 'Channels', t: 'select', opts: ['1+2', '3+4', '5+6', '7+8', '9+10', '11+12', '13+14', '15+16'], w: 100 }, { k: 'name', l: 'Name', t: 'text', ph: 'ENGLISH' },
+          { k: 'language', l: 'Language', t: 'select', opts: ['', 'English', 'Afrikaans', 'isiZulu', 'isiXhosa', 'Sesotho', 'Setswana', 'Sepedi', 'Xitsonga', 'siSwati', 'Tshivenda', 'isiNdebele', 'Portuguese', 'French', 'German', 'Spanish', 'Other'], w: 130 },
+          { k: 'audience', l: 'Who hears it', t: 'select', opts: ['Everyone', 'Production team', 'Nobody'], def: 'Everyone', w: 175 }] },
       RUNDOWN] },
 
     graphic: { label: 'Template graphic', plural: 'Template graphics', group: 'Live', title: (d) => d.name, cols: ['name', 'template', 'kind', 'layer'], fields: [

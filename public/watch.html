@@ -24,6 +24,7 @@
     button, .btn { font: inherit; color: var(--text); background: #2b2b2b; border: 1px solid var(--line); border-radius: 6px; padding: 8px 14px; cursor: pointer; text-decoration: none; display: inline-block; }
     button.primary, .btn.primary { background: var(--accent); color: #0b0b0b; border-color: var(--accent); font-weight: 600; }
     input { font: inherit; color: var(--text); background: #0d0d0d; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 100%; margin: 12px 0 8px; }
+    .player.has-bar .stage { border-radius: 10px 10px 0 0; }
     .unmute { position: absolute; left: 12px; bottom: 12px; z-index: 2; background: rgba(0,0,0,.7); }
     .err { color: #ff8a8a; }
     .msg a { color: var(--accent); }
@@ -51,7 +52,7 @@
 <body>
   <div class="bar"><a href="/"><img src="/brand/rfp-logo-sm.png" alt="RFP"><span id="site">RegemarkFP</span></a></div>
   <main>
-    <div class="stage" id="stage"><div class="msg"><b>Loading…</b></div></div>
+    <div class="player" id="player"><div class="stage" id="stage"><div class="msg"><b>Loading…</b></div></div><div id="ctrl"></div></div>
     <div class="info">
       <div class="head"><h1 id="title"></h1><span class="badge" id="badge">OFFLINE</span><span class="dim small" id="viewers"></span></div>
       <div class="chrow" id="chrow"></div>
@@ -61,6 +62,7 @@
     </div>
   </main>
   <script src="/js/vendor/hls.min.js"></script>
+  <script src="/js/player.js"></script>
   <script src="/js/watch.js"></script>
 </body>
 </html>
