@@ -210,7 +210,10 @@ $HOSTS {
     reverse_proxy 127.0.0.1:8889
   }
   handle_path /hls/* {
-    reverse_proxy 127.0.0.1:8888
+    # MediaMTX sends players to /<path>/index.m3u8?cookieCheck=1 first: keep them under /hls/
+    reverse_proxy 127.0.0.1:8888 {
+      header_down Location "^/(.*)$" "/hls/\$1"
+    }
   }
   handle_path /vod/* {
     reverse_proxy 127.0.0.1:9996

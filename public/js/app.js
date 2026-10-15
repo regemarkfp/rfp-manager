@@ -192,7 +192,7 @@ function navFor() {
     ['Assets', [['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/theme', 'Themes'], ['#/images', 'Images']]],
     ['Advertising', [['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log']]],
     ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report']].concat(local ? [['#/bibles', 'Bibles']] : [])],
-    local ? null : ['Streaming', [['#/list/channel', 'Channels'], App.can('edit') ? ['#/sales', 'Ticket sales'] : null].filter(Boolean)],
+    local ? null : ['Streaming', [['#/list/channel', 'Channels'], App.can('edit') ? ['#/analytics', 'Analytics'] : null, App.can('edit') ? ['#/sales', 'Ticket sales'] : null].filter(Boolean)],
     ['Live', [App.pcs ? ['#/pcs', 'Production PCs'] : null, pc ? ['#/monitors', 'Monitors'] : null, pc ? ['#/templates', 'Templates'] : null, pc ? ['#/adverts', 'Advert playout'] : null,
       ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers']].filter(Boolean)],
     ['', [['#/settings', 'Settings']]],

@@ -59,7 +59,7 @@
     const vids = info.videos || [], mts = info.matches || [];
     const mList = mts.length ? [el('h3', {}, 'Matches'), el('div', { class: 'vids' }, mts.map((m) => el('a', { href: '?m=' + encodeURIComponent(m.fixture), class: m.fixture === matchId ? 'on' : '' }, el('b', {}, m.title), el('small', {}, (m.live ? 'so far · ' : '') + dur(m.duration)))))] : [];
     $('vids').replaceChildren(...mList, ...(vids.length ? [el('h3', {}, mts.length ? 'Full stream' : 'Recordings'), el('div', { class: 'vids' }, info.live ? el('a', { href: location.pathname, class: vodStart ? '' : 'on' }, el('b', {}, '● Live now'), el('small', {}, `${info.viewers || 0} watching`)) : null,
-      vids.map((v) => el('a', { href: '?v=' + encodeURIComponent(v.start), class: v.start === vodStart ? 'on' : '' }, el('b', {}, new Date(v.start).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })), el('small', {}, dur(v.duration)))))] : []));
+      vids.map((v) => el('a', { href: '?v=' + encodeURIComponent(v.start), class: v.start === vodStart ? 'on' : '' }, el('b', {}, v.title || new Date(v.start).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })), el('small', {}, (v.title ? new Date(v.start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' · ' : '') + dur(v.duration)))))] : []));
   }
   async function loadPublic() {
     if (!info || !info.channel || info.access !== 'Public') return;
@@ -76,6 +76,21 @@
     video.addEventListener('dblclick', () => { (video.requestFullscreen || video.webkitEnterFullscreen || (() => {})).call(video); });
     $('stage').replaceChildren(video);
     playing = true;
+    beats(video, matchId ? { kind: 'match', match: matchId, title: info.vod.title || '' } : { kind: 'vod', start: info.vod.start });
+  }
+
+  // video analytics: every 30 s while the video plays, the website hears that someone is watching (no personal data)
+  const SID = (() => { try { let x = sessionStorage.getItem('rfp-sid'); if (!x) { x = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36)).replace(/-/g, ''); sessionStorage.setItem('rfp-sid', x); } return x; } catch (e) { return 'x' + Math.random().toString(36).slice(2) + Date.now().toString(36); } })();
+  let beatTimer = null;
+  function beats(video, what) {
+    clearInterval(beatTimer);
+    const send = () => {
+      if (!video.isConnected) { clearInterval(beatTimer); return; }
+      if (video.paused || video.readyState < 2) return;
+      fetch('/api/watch/' + encodeURIComponent(slug) + '/beat', { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json', 'x-rfp': '1' }, body: JSON.stringify({ sid: SID, ...what }) }).catch(() => {});
+    };
+    setTimeout(send, 4000);
+    beatTimer = setInterval(send, 30000);
   }
 
   function stop() { if (pc) { try { pc.close(); } catch (e) { /* closed */ } } pc = null; if (hls) { try { hls.destroy(); } catch (e) { /* gone */ } hls = null; } playing = false; }
@@ -131,6 +146,7 @@
     video.addEventListener('dblclick', () => { (video.requestFullscreen || video.webkitEnterFullscreen || (() => {})).call(video); });
     $('stage').replaceChildren(video, unmute);
     video.play().catch(() => {});
+    beats(video, { kind: 'live' });
   }
 
   function again(ms) { stop(); clearTimeout(retry); retry = setTimeout(load, ms); }

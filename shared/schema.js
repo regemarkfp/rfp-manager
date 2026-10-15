@@ -218,7 +218,7 @@
   // Everything else is managed on the website.
   const PC_EDIT = ['graphic', 'theme', 'dashboard', 'timeline', 'variable', 'gametrigger'];
 
-  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'songuse', 'user', 'machinekey', 'purchase', 'streamclip', 'comment'];
+  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'songuse', 'user', 'machinekey', 'purchase', 'streamclip', 'comment', 'viewstat', 'streamvideo'];
   const ALL_TYPES = [...Object.keys(E), ...SYSTEM_TYPES];
 
   const has = (v) => v !== undefined && v !== null && v !== '';
