@@ -12,12 +12,13 @@
 #   --keep-days 90            how long recordings (the videos) are kept; 0 = for ever
 set -euo pipefail
 
-FROM=""; TOKEN=""; DOMAIN=""; EMAIL=""; KEEP_DAYS=90
+FROM=""; TOKEN=""; DOMAIN=""; ADMIN=""; EMAIL=""; KEEP_DAYS=90
 while [ $# -gt 0 ]; do
   case "$1" in
     --from) FROM="${2%/}"; shift 2 ;;
     --token) TOKEN="$2"; shift 2 ;;
-    --domain) DOMAIN="$2"; shift 2 ;;
+    --domain) DOMAIN="${2#https://}"; DOMAIN="${DOMAIN%/}"; shift 2 ;;
+    --admin-domain) ADMIN="${2#https://}"; ADMIN="${ADMIN%/}"; shift 2 ;;
     --email) EMAIL="$2"; shift 2 ;;
     --keep-days) KEEP_DAYS="$2"; shift 2 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
@@ -48,8 +49,17 @@ apt-get install -y -q curl ca-certificates tar xz-utils jq gnupg openssl iptable
 
 IP="$(curl -fsS --max-time 10 https://api.ipify.org || curl -fsS --max-time 10 https://ifconfig.me || true)"
 [ -n "$IP" ] || { echo "Could not find this server's public IP address."; exit 1; }
-[ -n "$DOMAIN" ] || DOMAIN="$(echo "$IP" | tr . -).sslip.io"
-echo "Public IP $IP   ·   address https://$DOMAIN"
+# an update keeps the addresses set up before (from the last install's env file)
+ETC0=/etc/rfp-manager
+if [ -z "$DOMAIN" ] && [ -f "$ETC0/env" ]; then DOMAIN="$(grep -E '^PUBLIC_URL=' "$ETC0/env" | cut -d= -f2- | sed -e 's|^https://||' -e 's|/$||')"; fi
+if [ -z "$ADMIN" ] && [ -f "$ETC0/env" ]; then ADMIN="$(grep -E '^ADMIN_URL=' "$ETC0/env" | cut -d= -f2- | sed -e 's|^https://||' -e 's|/$||')"; fi
+SSLIP="$(echo "$IP" | tr . -).sslip.io"
+[ -n "$DOMAIN" ] || DOMAIN="$SSLIP"
+[ "$ADMIN" = "$DOMAIN" ] && ADMIN=""
+# Caddy serves (and gets HTTPS certificates for) the website, the Studio address and always the sslip.io address
+HOSTS="$DOMAIN"; [ -n "$ADMIN" ] && HOSTS="$HOSTS, $ADMIN"; [ "$DOMAIN" != "$SSLIP" ] && HOSTS="$HOSTS, $SSLIP"
+WWW=""; case "$DOMAIN" in www.*|*.sslip.io) ;; *) [ "$(echo "$DOMAIN" | tr -cd . | wc -c)" = 1 ] && WWW="www.$DOMAIN" ;; esac
+echo "Public IP $IP   ·   website https://$DOMAIN${ADMIN:+   ·   studio https://$ADMIN}"
 
 say "Firewall (this server)"
 # Oracle's Ubuntu images reject everything but SSH; open the web and streaming ports. Also open them in the cloud
@@ -105,6 +115,7 @@ SECRET=""
   cat /tmp/rfp-site.env
   echo "PORT=3000"
   echo "PUBLIC_URL=https://$DOMAIN"
+  [ -n "$ADMIN" ] && echo "ADMIN_URL=https://$ADMIN"
   echo "DATA_DIR=$DATA"
   echo "CONFIG=$DATA/config.json"
   echo "STREAM_HOST=$DOMAIN"
@@ -189,8 +200,9 @@ EOF
 
 {
   if [ -n "$EMAIL" ]; then printf '{\n  email %s\n}\n\n' "$EMAIL"; fi
+  if [ -n "$WWW" ]; then printf '%s {\n  redir https://%s{uri} permanent\n}\n\n' "$WWW" "$DOMAIN"; fi
   cat <<EOF
-$DOMAIN {
+$HOSTS {
   handle_path /webrtc/* {
     reverse_proxy 127.0.0.1:8889
   }
@@ -223,16 +235,17 @@ cat <<EOF
 ────────────────────────────────────────────────────────────────
   RFP Manager is running on this server.
 
-  Website     https://$DOMAIN
+  Website     https://$DOMAIN${ADMIN:+
+  Studio      https://$ADMIN/app}
   RTMP in     rtmp://$DOMAIN/live            (stream key: see the channel)
   SRT in      srt://$DOMAIN:8890             (stream id: see the channel)
   Watch       https://$DOMAIN/watch/<stream>      Website  https://$DOMAIN/
 
   Still to do:
-   · Google sign-in: add https://$DOMAIN to "Authorised JavaScript origins"
+   · Google sign-in: add https://$DOMAIN${ADMIN:+ and https://$ADMIN} to "Authorised JavaScript origins"
      of the OAuth client (Google Cloud console → APIs & Services → Credentials).
    · Cloud firewall: open TCP 80, 443, 1935, 8189 and UDP 443, 8189, 8890.
-   · Production PCs: link them to https://$DOMAIN (Settings → This machine).
+   · Production PCs: link them to https://${ADMIN:-$DOMAIN} (Settings → This machine).
 
   Logs: journalctl -u rfp-manager -f     journalctl -u mediamtx -f
 ────────────────────────────────────────────────────────────────

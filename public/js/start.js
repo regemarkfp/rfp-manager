@@ -112,14 +112,14 @@
   function noTeam() {
     // the website: someone who is not in a production team is a viewer — back to the front page, signed in
     // (only a site admin may start a new production team there)
-    if (App.cfg.mode === 'cloud' && !(App.machine && App.machine.siteAdmin)) { location.replace('/'); return; }
+    if (App.cfg.mode === 'cloud' && !(App.machine && App.machine.siteAdmin)) { location.replace((App.cfg.siteUrl || '') + '/'); return; }
     const f = { name: '' };
     root.replaceChildren(h('div', { class: 'login' }, h('div', { class: 'box card' }, h('h1', {}, 'Create your production team'),
       h('p', { class: 'dim' }, `Signed in as ${App.me.email}. A production team holds your clubs, fixtures, productions and crew. If a colleague already has one, ask them to add your email under Settings → Members instead.`),
       h('form', { class: 'stack', onsubmit: async (ev) => { ev.preventDefault(); try { await api('POST', '/api/orgs', f); start(); } catch (e) { oops(e); } } },
         h('label', { class: 'f' }, h('span', {}, 'Production team name'), h('input', { required: true, placeholder: 'RegemarkFP', oninput: (e) => { f.name = e.target.value; } })),
         h('button', { class: 'primary', type: 'submit', style: { width: '100%' } }, 'Create'),
-        App.cfg.mode === 'cloud' ? h('a', { class: 'btn', style: { width: '100%' }, href: '/' }, 'Just watching? Back to the website') : null,
+        App.cfg.mode === 'cloud' ? h('a', { class: 'btn', style: { width: '100%' }, href: (App.cfg.siteUrl || '') + '/' }, 'Just watching? Back to the website') : null,
         h('button', { type: 'button', class: 'ghost', style: { width: '100%' }, onclick: async () => { await api('POST', '/api/auth/logout'); location.reload(); } }, 'Sign out')))));
   }
 

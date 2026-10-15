@@ -223,7 +223,7 @@
         h('h3', { style: { marginTop: '16px' } }, 'Services'),
         fieldInput({ k: 'services', t: 'list', fields: [{ k: 'title', l: 'Service', t: 'text' }, { k: 'text', l: 'Short description', t: 'text' }] }, f.services, (v) => { f.services = v; }),
         h('div', { class: 'row', style: { marginTop: '14px' } }, h('button', { class: 'primary', onclick: async () => { try { await api('PUT', '/api/site/landing', f); toast('Home page saved'); } catch (e) { oops(e); } } }, 'Save'),
-          h('a', { class: 'btn', href: '/', target: '_blank', rel: 'noopener' }, 'View the home page ↗')));
+          h('a', { class: 'btn', href: (App.cfg.siteUrl || '') + '/', target: '_blank', rel: 'noopener' }, 'View the home page ↗')));
     }).catch((e) => { box.textContent = e.message; });
     return box;
   }
