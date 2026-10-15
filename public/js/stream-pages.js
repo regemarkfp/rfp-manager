@@ -34,7 +34,10 @@
         h('div', { class: 'spread' },
           h('div', {}, h('h2', { style: { margin: 0 } }, 'Live stream ', liveTag(s.live)),
             h('div', { class: 'dim small' }, [ch ? 'On ' + ch.data.name : '', s.live ? `live for ${ago(s.since)} · ${s.viewers} watching${s.kbps ? ` · ${(s.kbps / 1000).toFixed(1)} Mb/s in` : ''}${s.tracks && s.tracks.length ? ' · ' + s.tracks.join(', ') : ''}` : r.enabled ? 'nothing coming in right now' : '', s.videos ? `${s.videos} recording${s.videos === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · '))),
-          h('div', { class: 'row' }, h('button', { class: 'sm', onclick: () => copy(watch) }, 'Copy watch link'), h('a', { class: 'btn sm primary', href: watch, target: '_blank', rel: 'noopener' }, 'Watch ↗'))),
+          h('div', { class: 'row' }, App.canEdit('production') && App.mcrPanel && r.enabled ? h('button', { class: 'sm', onclick: () => App.mcrPanel(s) }, 'Master control') : null,
+            h('button', { class: 'sm', onclick: () => copy(watch) }, 'Copy watch link'), h('a', { class: 'btn sm primary', href: watch, target: '_blank', rel: 'noopener' }, 'Watch ↗'))),
+        s.mcr && App.mcrStatus ? h('div', { class: 'mcr-pill ' + App.mcrStatus(s.mcr, Date.now()).cls, style: { marginTop: '8px' } }, App.mcrStatus(s.mcr, Date.now()).text) : null,
+        restreamList(s),
         !r.enabled ? h('p', { class: 'dim', style: { marginBottom: 0 } }, 'This website has no streaming server yet. ', App.machine && App.machine.siteAdmin ? h('a', { href: '#/settings', onclick: () => { App.settingsTab = 'server'; } }, 'Set one up (Settings → Server)') : 'Ask whoever runs this website to set one up.', ' The stream key is kept and works as soon as the server is there.')
           : r.health && r.health.lastError ? h('p', { class: 'pill warn' }, 'The streaming server is not answering: ' + r.health.lastError) : null,
         ing ? [
@@ -47,15 +50,56 @@
             h('h3', { style: { marginTop: 0 } }, `Audio tracks (${cur.data.streamAudio.length})`),
             h('p', { class: 'small', style: { margin: '0 0 6px' } }, cur.data.streamAudio.map((r, i) => `${r.channels || ''} ${r.name || 'Track ' + (i + 1)}${r.audience && r.audience !== 'Everyone' ? ' (' + r.audience.toLowerCase() + ')' : ''}`).join('  ·  ')),
             h('div', { class: 'dim small', style: { margin: 0, whiteSpace: 'normal', lineHeight: 1.5 } }, 'Send them over SRT (RTMP carries one track only). OBS: Settings → Output → Output Mode Advanced → Recording → Type "Custom Output (FFmpeg)" → "Output to URL", paste the Full SRT URL above, Container format mpegts, video H.264, audio AAC, and tick audio tracks 1–', String(Math.min(6, cur.data.streamAudio.length)), ' (track 1 = 1+2, track 2 = 3+4 …). Then press Start Recording. vMix and hardware encoders: send an 8-channel (or multi-track) SRT stream; the pairs are split on the server. Viewers pick the track under the video, about 10 seconds after you start.')) : null,
+          cur.data.streamClosed ? h('p', { class: 'pill warn', style: { marginTop: '12px' } }, 'This stream was ended and its key is closed: nothing can stream on it until you open it again.') : null,
+          App.canEdit('production') ? h('div', { class: 'row', style: { gap: '8px', margin: '8px 0' } },
+            cur.data.streamClosed ? h('button', { class: 'sm primary', onclick: async () => { if (await reopenStream(doc.id)) paint(); } }, 'Open the stream key again')
+              : h('button', { class: 'sm danger', onclick: async () => { if (await endStream(doc.id, cur.data.streamTitle || cur.data.name)) paint(); } }, s.live ? 'End stream now' : 'Close the stream key')) : null,
           App.canEdit('production') ? h('button', { class: 'sm danger', onclick: async () => {
             if (!(await confirmBox('Make a new stream key? Anything still using the old key stops streaming until you paste the new one.'))) return;
             try { await api('POST', `/api/productions/${encodeURIComponent(doc.id)}/newkey?team=${App.team}`); toast('New stream key made'); paint(); } catch (e) { oops(e); }
-          } }, 'New stream key') : null] : r.enabled ? h('p', { class: 'dim small' }, 'Producers and Admins see the stream key here.') : null);
+          } }, 'New stream key') : null] : r.enabled ? h('p', { class: 'dim small' }, 'Producers and Admins see the stream key here.') : null,
+        matchStreams(cur, r, paint));
     };
     paint();
     timer = setInterval(paint, 5000);
     box.repaint = paint;
     return box;
+  }
+  // restreams: where a copy of the stream goes (YouTube, Facebook …) and how it is doing
+  const RS = { live: 'sending', retrying: 'trying again', starting: 'starting', waiting: 'starts when live', off: 'off' };
+  function restreamList(s) {
+    if (!(s.restream || []).length) return null;
+    return h('div', { style: { margin: '10px 0 0' } }, h('div', { class: 'dim small' }, 'Restreaming to'),
+      h('div', { class: 'row', style: { gap: '6px', flexWrap: 'wrap', marginTop: '4px' } }, s.restream.map((x) => h('span', { class: 'pill', title: (x.error ? x.error + ' · ' : '') + x.server,
+        style: x.state === 'live' ? { background: '#1f6f3a', color: '#fff' } : x.state === 'retrying' ? { background: '#7a2020', color: '#fff' } : {} }, `${x.name}: ${RS[x.state] || x.state}`))));
+  }
+  // one stream per match: each match's own key and watch page (several venues at once)
+  const keysOpen = new Set();
+  function matchStreams(cur, r, repaint) {
+    const list = r.list.filter((x) => x.parent === cur.id);
+    if (!cur.data.streamPerMatch && !list.length) return null;
+    const can = App.canEdit('production');
+    return h('div', { style: { marginTop: '18px' } },
+      h('h3', {}, `Match streams (${list.length})`),
+      !list.length ? h('p', { class: 'dim small' }, 'Add matches to this production (and save): each gets its own stream key and watch page here.') :
+        list.map((m) => {
+          const watch = (r.base || location.origin) + '/watch/' + m.slug, ing = m.ingest;
+          const open = h('div', { style: { display: keysOpen.has(m.id) ? '' : 'none' } },
+            ing ? [field('RTMP server', ing.rtmpServer), field('RTMP stream key', ing.rtmpKey, true), field('SRT URL', ing.srtUrl, true), field('SRT stream ID', ing.srtStreamId, true)] : null);
+          return h('div', { class: 'card', style: { background: 'var(--panel2)', margin: '8px 0', padding: '10px 12px' } },
+            h('div', { class: 'spread' },
+              h('div', {}, h('b', {}, m.title), ' ', liveTag(m.live), m.closed ? h('span', { class: 'pill warn', style: { marginLeft: '6px' } }, 'key closed') : null,
+                h('div', { class: 'dim small' }, m.live ? `live for ${ago(m.since)} · ${m.viewers} watching${m.source ? ' · ' + m.source : ''}` : '/watch/' + m.slug)),
+              h('div', { class: 'row', style: { gap: '6px', flexWrap: 'wrap' } },
+                ing ? h('button', { class: 'sm ghost', onclick: (e) => { const o = open.style.display === 'none'; open.style.display = o ? '' : 'none'; if (o) keysOpen.add(m.id); else keysOpen.delete(m.id); e.target.textContent = o ? 'Hide keys' : 'Stream keys'; } }, keysOpen.has(m.id) ? 'Hide keys' : 'Stream keys') : null,
+                can && App.mcrPanel ? h('button', { class: 'sm', onclick: () => App.mcrPanel(m) }, 'Master control') : null,
+                h('button', { class: 'sm', onclick: () => copy(watch) }, 'Copy link'),
+                h('a', { class: 'btn sm', href: watch, target: '_blank', rel: 'noopener' }, 'Watch ↗'),
+                can ? (m.closed ? h('button', { class: 'sm', onclick: async () => { if (await reopenStream(m.id)) repaint(); } }, 'Open key') : h('button', { class: 'sm danger', onclick: async () => { if (await endStream(m.id, m.title)) repaint(); } }, m.live ? 'End' : 'Close key')) : null,
+                can ? h('button', { class: 'sm ghost danger', onclick: async () => { if (!(await confirmBox('Make a new stream key for this match? Whatever uses the old one stops.', 'New key'))) return; try { await api('POST', `/api/productions/${encodeURIComponent(m.id)}/newkey?team=${App.team}`); toast('New key made'); repaint(); } catch (e) { oops(e); } } }, 'New key') : null)),
+            m.mcr && App.mcrStatus ? h('div', { class: 'mcr-pill ' + App.mcrStatus(m.mcr, Date.now()).cls, style: { marginTop: '6px' } }, App.mcrStatus(m.mcr, Date.now()).text) : null,
+            restreamList(m), open);
+        }));
   }
   // ---- the matches in a production's stream: each one becomes its own video
   function matchesCard(doc) {
@@ -164,6 +208,59 @@
     };
     paint();
     return box;
+  };
+
+  // ---- Streaming → Live streams: every stream of the team at a glance; end one (its key closes) or open it again
+  const endStream = async (id, title) => {
+    if (!(await confirmBox(`End "${title}" now? The camera or encoder is cut off, viewers see that the stream has ended, and its stream key stays closed until you open it again.`, 'End stream'))) return false;
+    try { const r = await api('POST', `/api/productions/${encodeURIComponent(id)}/stream/end?team=${App.team}`); if (r.doc) App.docs.set(r.doc.id, r.doc); toast(r.kicked ? 'Stream ended and the key closed' : 'Key closed (nothing was streaming)'); return true; } catch (e) { oops(e); return false; }
+  };
+  const reopenStream = async (id) => {
+    try { const r = await api('POST', `/api/productions/${encodeURIComponent(id)}/stream/reopen?team=${App.team}`); if (r.doc) App.docs.set(r.doc.id, r.doc); toast('Stream key open: you can stream again'); return true; } catch (e) { oops(e); return false; }
+  };
+  App.endStream = endStream; App.reopenStream = reopenStream;
+  let liveFilter = 'Live';
+  App.pages.streams = () => {
+    const tabs = h('div', { class: 'tabs' }), body = h('div', {}, h('div', { class: 'card dim' }, 'Loading…'));
+    let timer = null;
+    const paint = async () => {
+      if (!body.isConnected && timer) { clearInterval(timer); return; }
+      let r;
+      try { r = await api('GET', '/api/streams?team=' + App.team); } catch (e) { body.replaceChildren(h('div', { class: 'card' }, e.message)); return; }
+      const rows = r.list.map((s) => ({ ...s, doc: App.docs.get(s.parent || s.id) })).filter((s) => s.doc);
+      const groups = { Live: rows.filter((s) => s.live), Closed: rows.filter((s) => s.closed && !s.live), All: rows };
+      tabs.replaceChildren(...Object.keys(groups).map((t) => h('button', { class: t === liveFilter ? 'on' : '', onclick: () => { liveFilter = t; paint(); } }, `${t} (${groups[t].length})`)));
+      const list = groups[liveFilter].sort((a, b) => (b.live - a.live) || String(b.doc.data.date || '').localeCompare(String(a.doc.data.date || '')));
+      const can = App.canEdit('production');
+      const card = (s) => {
+        const d = s.doc.data, ch = App.docs.get(d.streamChannel);
+        const watch = (r.base || location.origin) + '/watch/' + s.slug;
+        const name = s.title || d.streamTitle || d.name;
+        const ms = App.mcrStatus ? App.mcrStatus(s.mcr, Date.now()) : null;
+        const state = s.live ? h('span', { class: 'pill', style: { background: '#ff3b3b', color: '#fff' } }, 'LIVE') : s.closed ? h('span', { class: 'pill warn' }, 'Ended · key closed') : h('span', { class: 'pill' }, 'Offline');
+        const poster = App.img(d.streamPoster) || (ch && App.img(ch.data.banner)) || '';
+        return h('div', { class: 'card', style: { margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' } },
+          h('div', { style: { aspectRatio: '16 / 9', borderRadius: '8px', background: poster ? `center / cover url(${poster})` : 'linear-gradient(135deg, #222, #111)', position: 'relative', overflow: 'hidden' } },
+            h('div', { style: { position: 'absolute', left: '8px', top: '8px' } }, state),
+            s.live ? h('div', { class: 'small', style: { position: 'absolute', right: '8px', bottom: '8px', background: 'rgba(0,0,0,.7)', padding: '3px 8px', borderRadius: '6px' } }, `${ago(s.since)} · ${s.viewers || 0} watching`) : null),
+          h('div', {}, h('b', {}, name), h('div', { class: 'dim small' }, [s.parent ? (d.streamTitle || d.name) : '', ch ? ch.data.name : '', UI.fmtDate(d.date)].filter(Boolean).join(' · '))),
+          ms ? h('div', { class: 'mcr-pill ' + ms.cls }, ms.text) : null,
+          (s.restream || []).length ? h('div', { class: 'small' }, s.restream.map((x) => h('span', { class: 'pill', title: x.error || x.server, style: { marginRight: '4px', ...(x.state === 'live' ? { background: '#1f6f3a', color: '#fff' } : x.state === 'retrying' ? { background: '#7a2020', color: '#fff' } : {}) } }, `${x.name}: ${{ live: 'sending', retrying: 'trying again', starting: 'starting', waiting: 'when live', off: 'off' }[x.state] || x.state}`))) : null,
+          s.live ? h('div', { class: 'dim small' }, [s.source && 'In: ' + s.source, s.kbps ? (s.kbps / 1000).toFixed(1) + ' Mb/s' : '', (s.tracks || []).join(', '), s.audioTracks ? s.audioTracks + ' audio tracks' : ''].filter(Boolean).join(' · ')) : s.closed && s.endedAt ? h('div', { class: 'dim small' }, 'Ended ' + new Date(s.endedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })) : null,
+          h('div', { class: 'row', style: { gap: '6px', flexWrap: 'wrap', marginTop: 'auto' } },
+            h('a', { class: 'btn sm', href: watch, target: '_blank', rel: 'noopener' }, 'Watch ↗'),
+            h('a', { class: 'btn sm', href: '#/edit/production/' + (s.parent || s.id) }, 'Production'),
+            can && App.mcrPanel ? h('button', { class: 'sm primary', onclick: () => App.mcrPanel(s) }, 'Master control') : null,
+            can && (s.live || !s.closed) ? h('button', { class: 'sm danger', onclick: async () => { if (await endStream(s.id, name)) paint(); } }, 'End stream') : null,
+            can && s.closed ? h('button', { class: 'sm', onclick: async () => { if (await reopenStream(s.id)) paint(); } }, 'Open key again') : null));
+      };
+      body.replaceChildren(list.length ? h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' } }, list.map(card))
+        : h('div', { class: 'card empty' }, liveFilter === 'Live' ? 'Nothing is live right now. Streams show up here the moment a camera or encoder connects.' : 'None.'),
+        !r.enabled ? h('p', { class: 'dim' }, 'This website has no streaming server yet.') : r.health && r.health.lastError ? h('p', { class: 'pill warn' }, 'The streaming server is not answering: ' + r.health.lastError) : null);
+    };
+    paint();
+    timer = setInterval(paint, 5000);
+    return { el: h('div', {}, pageHead('Live streams'), h('p', { class: 'dim', style: { marginTop: '-8px' } }, 'Every stream of your production team, matches streaming on their own included. Master control puts slates, ad breaks and graphics on what viewers see in the app (the stream and recording stay clean). End stream cuts the camera off, shows viewers that it has ended and closes the stream key until you open it again.'), tabs, body), keepScroll: true, destroy: () => clearInterval(timer) };
   };
 
   // ---- Streaming → Ticket sales (Producers and Admins)

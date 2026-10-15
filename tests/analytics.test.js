@@ -17,6 +17,8 @@ async function fakeMediaMtx(t) {
     if (u.pathname === '/list') { state.auth.push(req.headers.authorization || ''); return json(state.recordings[u.searchParams.get('path')] || []); }
     if (u.pathname.startsWith('/v3/recordings/get/')) { const name = decodeURIComponent(u.pathname.slice(19)); return json({ name, segments: (state.recordings[name] || []).map((r) => ({ start: r.start })) }); }
     if (u.pathname === '/v3/recordings/deletesegment' && req.method === 'DELETE') { const name = u.searchParams.get('path'), st = u.searchParams.get('start'); state.deleted = (state.deleted || []).concat([[name, st]]); state.recordings[name] = (state.recordings[name] || []).filter((r) => r.start !== st); return json({}); }
+    if (u.pathname.startsWith('/v3/paths/get/')) { const it = state.items.find((x) => x.name === decodeURIComponent(u.pathname.slice(14))); return it ? json({ ...it, source: { type: 'rtmpConn', id: 'conn-1' } }) : (res.writeHead(404), res.end()); }
+    if (u.pathname.startsWith('/v3/rtmpconns/kick/') && req.method === 'POST') { state.kicked = (state.kicked || []).concat([u.pathname.slice(19)]); state.items = []; return json({}); }
     if (u.pathname === '/v3/config/paths/list') return json({ items: state.pathConfigs });
     if (u.pathname.startsWith('/v3/config/paths/add/')) { let b = ''; req.on('data', (c) => { b += c; }); req.on('end', () => { state.pathConfigs.push({ name: decodeURIComponent(u.pathname.slice(21)), ...JSON.parse(b) }); json({}); }); return; }
     res.writeHead(404); res.end();
@@ -100,4 +102,38 @@ test('video analytics from watch beats, and managing recordings (title, hide, de
   assert.deepEqual(mtx.state.deleted, [[path, b]]);
   list = (await web.get(`/api/productions/prod_show/recordings?team=${team}`)).data;
   assert.deepEqual(list.list.map((v) => v.start), [a]);
+});
+
+test('ending a stream from the website: the camera is cut off, the key closes, viewers see it ended; open again', async (t) => {
+  const { cloud, web, team, mtx, hook } = await site(t);
+  const put = (type, id, data) => web.put(`/api/docs/${type}/${id}?team=${team}`, { data });
+  await put('channel', 'channel_tv', { name: 'Schools TV' });
+  await put('production', 'prod_end', { name: 'Final', date: '2026-10-15', streamChannel: 'channel_tv' });
+  const prod = await cloud.store.get('prod_end');
+  const slug = prod.data.streamSlug, path = 'live/' + slug, key = prod.data.streamKey;
+  mtx.state.items = [{ name: path, ready: true, readyTime: new Date().toISOString(), tracks: ['H264'], bytesReceived: 1, readers: [] }];
+  await cloud.streaming.poll();
+  let list = (await web.get(`/api/streams?team=${team}`)).data.list;
+  assert.equal(list[0].live, true);
+  assert.equal(list[0].closed, false);
+  assert.equal(await hook({ action: 'publish', path, password: key }), 200, 'the key works');
+  const r = await web.post(`/api/productions/prod_end/stream/end?team=${team}`, {});
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.kicked, 1);
+  assert.deepEqual(mtx.state.kicked, ['conn-1']);
+  assert.equal(await hook({ action: 'publish', path, password: key }), 401, 'the key is closed');
+  await cloud.streaming.poll();
+  const w = await fetch(cloud.url + `/api/watch/${slug}`).then((x) => x.json());
+  assert.equal(w.live, false); assert.equal(w.ended, true); assert.equal(w.dropped, false);
+  list = (await web.get(`/api/streams?team=${team}`)).data.list;
+  assert.equal(list[0].closed, true);
+  assert.equal((await web.post(`/api/productions/prod_end/stream/reopen?team=${team}`, {})).status, 200);
+  assert.equal(await hook({ action: 'publish', path, password: key }), 200, 'open again');
+  // a signal that just goes away (not ended): viewers are told it is technical difficulties
+  mtx.state.items = [{ name: path, ready: true, readyTime: new Date().toISOString(), tracks: ['H264'], bytesReceived: 1, readers: [] }];
+  await cloud.streaming.poll();
+  mtx.state.items = [];
+  await cloud.streaming.poll();
+  const w2 = await fetch(cloud.url + `/api/watch/${slug}`).then((x) => x.json());
+  assert.equal(w2.ended, false); assert.equal(w2.dropped, true);
 });

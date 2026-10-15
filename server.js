@@ -28,6 +28,7 @@ async function start(overrides = {}, { configPath = process.env.CONFIG || path.j
   const api = makeApi(app);
   const hub = makeHub(app);
   const server = http.createServer((req, res) => { api.handle(req, res); });
+  server.requestTimeout = 60 * 60 * 1000;          // video adverts (up to 500 MB) can take a while to upload
   server.on('upgrade', (req, sock) => {
     const p = new URL(req.url, 'http://x').pathname;
     if (p === '/relay' && app.relayServer) return app.relayServer.upgrade(req, sock).catch(() => sock.destroy());

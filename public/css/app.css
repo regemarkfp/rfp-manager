@@ -261,3 +261,24 @@ table.cs-plain td { padding: 2px 26px 2px 0; }
 .cs-pick:last-child { border-bottom: 0; }
 .cs-pick input { width: 18px; height: 18px; flex: none; }
 .cs-pick .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
+/* master control (mcr-pages.js) */
+.mcr h3 { margin: 18px 0 8px; }
+.mcr-status { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel2); font-variant-numeric: tabular-nums; }
+.mcr-status b { font-size: 17px; }
+.mcr-status.ad { background: #3a2a00; border-color: var(--warn); } .mcr-status.ad b { color: var(--warn); font-size: 22px; }
+.mcr-status.slate { background: #3a1414; border-color: var(--danger); } .mcr-status.slate b { color: #ffb3b3; }
+.mcr-btns { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.mcr-btns button { padding: 14px 10px; font-weight: 600; white-space: normal; border-left: 4px solid var(--line); }
+.mcr-btns .k-technical, .mcr-btns .k-connection { border-left-color: var(--danger); } .mcr-btns .k-weather { border-left-color: #4da3ff; }
+.mcr-btns .k-break, .mcr-btns .k-starting { border-left-color: var(--warn); } .mcr-btns .k-custom { border-left-color: var(--accent); }
+.mcr-btns button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.mcr-custom { display: grid; gap: 6px; margin-top: 8px; }
+.mcr-ov { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; } .mcr-ov.on { border-color: var(--accent); }
+.mcr-ov input:not([type]), .mcr-ov input[type=text] { width: auto; }
+.mcr-ov .switch { display: flex; align-items: center; gap: 6px; cursor: pointer; } .mcr-ov .switch input { width: 18px; height: 18px; }
+.mcr-pill { display: block; font-size: 12px; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mcr-pill.ad { background: #3a2a00; color: var(--warn); } .mcr-pill.slate { background: #3a1414; color: #ffb3b3; } .mcr-pill.ok { background: var(--panel2); color: var(--dim); font-weight: 400; }
+.mcr-banner { position: fixed; right: 14px; bottom: 14px; z-index: 40; display: grid; gap: 6px; max-width: min(460px, calc(100vw - 28px)); text-decoration: none !important; }
+.mcr-banner div { padding: 10px 14px; border-radius: 8px; color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.5); font-variant-numeric: tabular-nums; }
+.mcr-banner .ad { background: #8a5a00; } .mcr-banner .slate { background: #8a1f1f; }

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><title>RFP Manager – ad break countdown</title>
+<link rel="icon" type="image/png" href="/icons/favicon-64.png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { height: 100%; margin: 0; background: #111; color: #f2f2f2; font: 18px system-ui, 'Segoe UI', sans-serif; }
+  body { display: flex; flex-direction: column; gap: 2vh; padding: 3vh 3vw; box-sizing: border-box; }
+  .idle { margin: auto; text-align: center; color: #8a8a8a; }
+  .idle b { display: block; font-size: 6vw; color: #2fd47a; letter-spacing: .04em; }
+  .row { flex: 1; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2vw; padding: 2vh 3vw; border-radius: 14px; background: #1d1d1d; border-left: 14px solid #555; min-height: 0; }
+  .row.ad { border-left-color: #ffb000; } .row.slate { border-left-color: #ff4d4d; }
+  .what { font-size: 2.6vw; font-weight: 700; letter-spacing: .06em; } .what small { display: block; font-size: 1.8vw; color: #a8a8a8; font-weight: 500; letter-spacing: 0; margin-top: .6vh; }
+  .ad .what { color: #ffb000; } .slate .what { color: #ff8080; }
+  .cd { font-size: 12vw; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .row.end .cd { color: #ff4d4d; animation: bl .5s steps(2) infinite; } @keyframes bl { 50% { opacity: .3; } }
+  .note { color: #6f6f6f; font-size: 14px; text-align: center; }
+</style></head>
+<body><div class="idle"><b>CLEAN</b>Viewers in the app see the live picture.</div>
+<script>
+'use strict';
+// A confidence monitor for master control: while the app's viewers see an ad break or a slate, how long until they are back on the live picture.
+(function () {
+  const key = new URLSearchParams(location.search).get('key');
+  let data = { now: 0, list: [] }, skew = 0, err = '';
+  const fmt = (s) => { s = Math.max(0, Math.ceil(s)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s % 60).padStart(2, '0'); };
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  async function poll() {
+    try {
+      const r = await fetch('/api/mcr/active' + (key ? '?key=' + encodeURIComponent(key) : ''), { credentials: 'same-origin', cache: 'no-store' });
+      if (r.status === 401) { err = 'Open this screen from the production PC (its link has the screen key) or sign in first.'; return; }
+      if (r.ok) { data = await r.json(); skew = data.now - Date.now(); err = ''; }
+    } catch (e) { err = 'Not connected'; }
+  }
+  function paint() {
+    const t = Date.now() + skew;
+    const rows = (data.list || []).filter((x) => (x.ad && Date.parse(x.ad.endsAt) > t) || (x.squeeze && Date.parse(x.squeeze.endsAt) > t) || (x.slate && (!x.slate.until || Date.parse(x.slate.until) > t)));
+    document.body.replaceChildren();
+    if (!rows.length) { const i = el('div', 'idle'); i.append(el('b', '', 'CLEAN'), err || 'Viewers in the app see the live picture.'); document.body.append(i); return; }
+    for (const x of rows) {
+      const ad = x.ad && Date.parse(x.ad.endsAt) > t ? x.ad : null, sq = !ad && x.squeeze && Date.parse(x.squeeze.endsAt) > t ? x.squeeze : null;
+      const end = ad ? ad.endsAt : sq ? sq.endsAt : x.slate.until;
+      const left = end ? (Date.parse(end) - t) / 1000 : null;
+      const row = el('div', 'row ' + (ad || sq ? 'ad' : 'slate') + (left !== null && left <= 10 ? ' end' : ''));
+      const what = el('div', 'what', ad ? 'AD BREAK' + (ad.count > 1 ? ' · ' + ad.count + ' ADS' : '') : sq ? 'SQUEEZE-BACK' : 'SLATE · ' + x.slate.title.toUpperCase());
+      what.append(el('small', '', x.title + (left === null ? ' · until master control takes it off' : sq ? ' · full screen again in' : ' · back to live in')));
+      row.append(what, el('div', 'cd', left !== null ? fmt(left) : '—'));
+      document.body.append(row);
+    }
+    document.body.append(el('div', 'note', 'Only viewers in the app see this: the stream and recording stay clean.'));
+  }
+  poll(); setInterval(poll, 2000); setInterval(paint, 250);
+})();
+</script>
+</body></html>

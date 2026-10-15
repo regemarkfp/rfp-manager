@@ -139,6 +139,7 @@
         link('Graphics control', 'Take, update and clear graphics.', '/graphics-control', true),
         link('Confidence monitor', 'Commentary box: score, clock, players, cards, stats and talking points.', '/confidence'),
         link('Rundown', 'Running order with the item on air, time left and what is next.', '/rundown'),
+        link('Ad break countdown', 'Master control on the website: how long the app\'s viewers are still in an ad break or on a slate, big enough for a monitor.', '/mcr'),
         link('Output', 'Program output in a browser (OBS / vMix browser source, 1920×1080).', '/output'),
         link('Preview', 'Preview channel with tally and safe areas.', '/preview'),
         link('Fill + key', 'Program output with its key signal side by side (3840×1080) for a Raspberry Pi with two HDMI outputs: left = fill, right = key. See tools/pi-output.sh.', '/fill-key'),

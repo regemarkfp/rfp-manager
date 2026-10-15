@@ -40,6 +40,23 @@
     $('stage').replaceChildren(...[poster, el('div', { class: 'msg' }, el('b', {}, title), text ? el('p', {}, text) : null, ...extra)].filter(Boolean));
     $('ctrl').replaceChildren(); $('player').classList.remove('has-bar');
   }
+  // the slate: "Technical difficulties" when the signal goes away, "This stream has ended" when it was ended
+  let slateKind = '';
+  function slateEl(kind) {
+    const ch = (info && info.channel) || {}, ended = kind === 'ended';
+    return el('div', { class: 'slate' + (ended ? ' ended' : '') },
+      ch.logo ? el('img', { class: 'slogo', src: imgUrl(ch.logo), alt: ch.name || '' }) : el('img', { class: 'slogo brand', src: '/brand/rfp-logo.png', alt: (info && info.site) || '' }),
+      el('b', {}, ended ? 'This stream has ended' : 'Technical difficulties'),
+      el('p', {}, ended ? 'Thank you for watching.' + ((info && (info.videos || []).length) ? ' The recording is below.' : '') : 'We are currently experiencing technical issues. Our technicians are working to resolve the problem – please stay with us, the stream continues here by itself.'),
+      ended ? null : el('div', { class: 'sbars' }, el('i'), el('i'), el('i')));
+  }
+  function showSlate(kind) {
+    stop();
+    slateKind = kind;
+    $('ctrl').replaceChildren(); $('player').classList.remove('has-bar');
+    $('stage').replaceChildren(slateEl(kind));
+  }
+
   // the control bar under the picture (player.js); prev / next walk the matches and recordings
   function bar(video, opts) {
     const items = [...(info.matches || []).map((m) => '?m=' + encodeURIComponent(m.fixture)), ...(info.videos || []).map((v) => '?v=' + encodeURIComponent(v.start))];
@@ -47,7 +64,7 @@
     const i = items.indexOf(here);
     const go = (q) => () => { location.search = q; };
     const live = !!opts.live;
-    const b = window.RFPPlayer.mount(video, { player: $('player'), live, since: live ? info.since : 0, tracks: opts.tracks || null, onUnmute: opts.onUnmute,
+    const b = window.RFPPlayer.mount(video, { player: $('player'), live, color: (info.channel || {}).color || '', since: live ? info.since : 0, tracks: opts.tracks || null, onUnmute: opts.onUnmute,
       prev: live ? null : i > 0 ? go(items[i - 1]) : null, next: live ? (items.length ? go(items[0]) : null) : i >= 0 && i < items.length - 1 ? go(items[i + 1]) : null,
       prevLabel: 'Previous video', nextLabel: live ? 'Recordings' : 'Next video',
       onList: (items.length || (info.matches || []).length) ? () => $('vids').scrollIntoView({ behavior: 'smooth' }) : null });
@@ -61,9 +78,11 @@
     const vod = vodStart && info.vod;
     document.title = info.title + (info.live && !vod ? ' · LIVE' : '') + (info.site ? ' · ' + info.site : '');
     if (info.site) $('site').textContent = info.site;
+    const cc = String((info.channel || {}).color || '');
+    if (/^#[0-9a-f]{6}$/i.test(cc)) document.documentElement.style.setProperty('--accent', cc);         // the channel's colour across the page
     $('title').textContent = vod && info.vod.title ? info.vod.title : info.title;
     if (vod && info.vod.title) document.title = info.vod.title + (info.site ? ' · ' + info.site : '');
-    $('badge').textContent = vod ? 'VIDEO' : info.live ? 'LIVE' : 'OFFLINE';
+    $('badge').textContent = vod ? 'VIDEO' : info.live ? 'LIVE' : info.ended ? 'ENDED' : 'OFFLINE';
     $('badge').className = 'badge' + (info.live && !vod ? ' on' : '');
     $('viewers').textContent = vod ? new Date(info.vod.start).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : info.live && info.viewers ? `${info.viewers} watching` : '';
     $('desc').textContent = info.description || '';
@@ -87,10 +106,13 @@
   }
   function playVod() {
     stop();
-    const video = el('video', { playsinline: '', autoplay: '', src: info.vod.url });
+    const video = el('video', { playsinline: '', preload: 'auto', src: info.vod.url, poster: info.poster ? '/media/' + encodeURIComponent(info.poster) : null });
+    const unmute = el('button', { class: 'unmute', onclick: (e) => { e.stopPropagation(); video.muted = false; video.play().catch(() => {}); unmute.remove(); } }, '🔊 Tap for sound');
     $('stage').replaceChildren(video);
-    bar(video, { live: false });
+    bar(video, { live: false, onUnmute: () => unmute.remove() });
     playing = true;
+    // with sound if the browser lets us; phones only start muted videos by themselves
+    video.play().catch(() => { video.muted = true; video.play().then(() => $('stage').append(unmute)).catch(() => {}); });
     beats(video, matchId ? { kind: 'match', match: matchId, title: info.vod.title || '' } : { kind: 'vod', start: info.vod.start });
   }
 
@@ -136,22 +158,29 @@
     setTimeout(() => { if (mine === pc && !video.videoWidth) { stop(); hlsOnly = true; playHLS(); } }, 7000);
   }
 
-  let hls = null, hlsOnly = false, withTracks = false;
+  let hls = null, hlsOnly = false, withTracks = false, tracksBroken = false;
   function playHLS() {
     const video = el('video', { autoplay: '', playsinline: '', muted: '' });
     video.muted = true;
-    const src = info.audio ? info.audio.hls : info.hls;
-    withTracks = !!info.audio;
+    const useTracks = !!info.audio && !tracksBroken;
+    const src = useTracks ? info.audio.hls : info.hls;
+    withTracks = useTracks;
+    if (info.poster) video.poster = '/media/' + encodeURIComponent(info.poster);
+    // the audio tracks do not play (yet): carry on with the plain stream
+    const giveUp = () => { if (!useTracks || tracksBroken) return false; tracksBroken = true; stop(); playHLS(); return true; };
+    if (useTracks) setTimeout(() => { if (withTracks && video.isConnected && !video.videoWidth) giveUp(); }, 15000);
     const tok = (u) => (info.token ? u + (u.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(info.token) : u);
     let tracks = null;
-    if (canHLS()) {                                                                              // Safari, iPhone, iPad
-      video.src = tok(src); video.onerror = () => again(4000);
+    // Safari (Mac, iPhone, iPad) plays HLS itself; everything else through hls.js (Android Chrome's own HLS is unreliable)
+    const apple = /Apple/.test(navigator.vendor || '') && canHLS();
+    if (apple || (canHLS() && !(window.Hls && window.Hls.isSupported()))) {
+      video.src = tok(src); video.onerror = () => { if (!giveUp()) again(4000); };
       if (info.audio && video.audioTracks) tracks = { list: () => [...video.audioTracks].map((t, i) => ({ name: t.label || (info.audio.tracks[i] || {}).name || 'Track ' + (i + 1) })), current: () => [...video.audioTracks].findIndex((t) => t.enabled), pick: (i) => { [...video.audioTracks].forEach((t, j) => { t.enabled = j === i; }); } };
     }
     else if (window.Hls && window.Hls.isSupported()) {
       hls = new window.Hls({ enableWorker: false, lowLatencyMode: true, liveSyncDurationCount: 3, manifestLoadingMaxRetry: 20, manifestLoadingRetryDelay: 1500,
         xhrSetup: (xhr, url) => { if (info.token && !/[?&]token=/.test(url)) xhr.open('GET', tok(url), true); } });
-      hls.on(window.Hls.Events.ERROR, (ev, d) => { if (d && d.fatal) again(4000); });
+      hls.on(window.Hls.Events.ERROR, (ev, d) => { if (d && d.fatal && !giveUp()) again(4000); });
       hls.loadSource(tok(src));
       hls.attachMedia(video);
       const h0 = hls;
@@ -172,6 +201,13 @@
     $('stage').replaceChildren(video, unmute);
     current = bar(video, { live: true, tracks, onUnmute: () => unmute.remove() });
     video.play().catch(() => {});
+    slateKind = '';
+    // the picture stops coming for a while: the slate over it, gone again as soon as it plays
+    let stallT = null, over = null;
+    const stalled = () => { clearTimeout(stallT); stallT = setTimeout(() => { if (video.isConnected && !over) { over = slateEl('difficulties'); $('stage').append(over); } }, 8000); };
+    const fine = () => { clearTimeout(stallT); if (over) { over.remove(); over = null; } };
+    for (const ev of ['waiting', 'stalled']) video.addEventListener(ev, stalled);
+    for (const ev of ['playing', 'timeupdate']) video.addEventListener(ev, () => { if (!video.paused && video.readyState >= 3) fine(); });
     beats(video, { kind: 'live' });
   }
 
@@ -194,8 +230,10 @@
     if (info.needs === 'ticket') { if (paidId) return waitForPayment(); return buy(); }
     if (vodStart) { if (info.vod) { if (!playing) playVod(); return; } return message(matchId ? 'This match video is not ready yet' : 'This recording is no longer here', '', el('p', {}, el('a', { class: 'btn', href: location.pathname }, 'Back to the stream'))); }
     if (!info.streaming) return message('Streaming is not set up on this website yet', '');
+    if (!info.live && info.ended) { showSlate('ended'); return; }
+    if (!info.live && (info.dropped || slateKind === 'difficulties')) { showSlate('difficulties'); return again(5000); }
     if (!info.live) { message('Not live yet', (info.videos || []).length ? 'Watch a recording below, or stay here: it starts playing by itself when the stream begins.' : 'This page starts playing by itself when the stream begins.'); return again(5000); }
-    if (playing) { if (!vodStart && info.audio && !withTracks) { stop(); playHLS(); } return; }   // the audio tracks became ready: switch to them
+    if (playing) { if (!vodStart && info.audio && !withTracks && !tracksBroken) { stop(); playHLS(); } return; }   // the audio tracks became ready: switch to them
     if (!webrtcFits()) return playHLS();
     try { await playWebRTC(); }
     catch (e) { stop(); playHLS(); }
@@ -290,10 +328,158 @@
       const now = await api(password === null ? 'GET' : 'POST', password === null ? null : { password });
       const was = info.live; info = { ...info, ...now }; header();
       if (!was && info.live && !playing) load();
-      else if (info.live && playing && info.audio && !withTracks) { stop(); playHLS(); }                  // audio tracks ready: switch to them
-      else if (!info.live && playing && was) { stop(); load(); }
+      else if (info.live && playing && info.audio && !withTracks && !tracksBroken) { stop(); playHLS(); }                  // audio tracks ready: switch to them
+      else if (!info.live && was) showSlate(info.ended ? 'ended' : 'difficulties');
     } catch (e) { /* next time */ }
-  }, 10000);
+  }, 5000);
+
+  // ---- master control (the production's MCR): slates, ad breaks and graphics over the live picture, in this player only.
+  // The stream itself (and its recording) stays clean. Times come from the website's clock.
+  const M = { state: null, skew: 0, layer: null, slate: null, ad: null, adKey: '', ov: null, ovKey: '', muted: null, timer: null, sq: null, sqKey: '' };
+  const srvNow = () => Date.now() + M.skew;
+  const liveVideo = () => $('stage').querySelector('video:not(.advid)');
+  function muteLive(on) {
+    const v = liveVideo();
+    if (!v) return;
+    if (on && M.muted === null) { M.muted = v.muted; v.muted = true; }
+    else if (!on && M.muted !== null) { v.muted = M.muted; M.muted = null; }
+  }
+  function mcrLayer() {
+    if (!M.layer) M.layer = el('div', { class: 'mcr' });
+    if (!M.layer.isConnected) $('stage').append(M.layer);
+    return M.layer;
+  }
+  function mcrSlate(sl) {
+    const key = sl ? [sl.kind, sl.title, sl.text, sl.mute].join('|') : '';
+    if (M.slate && M.slate.dataset.key === key) return;
+    if (M.slate) { M.slate.remove(); M.slate = null; }
+    if (!sl) return;
+    const ch = (info && info.channel) || {};
+    M.slate = el('div', { class: 'slate mslate k-' + sl.kind, 'data-key': key },
+      ch.logo ? el('img', { class: 'slogo', src: imgUrl(ch.logo), alt: ch.name || '' }) : el('img', { class: 'slogo brand', src: '/brand/rfp-logo.png', alt: (info && info.site) || '' }),
+      el('b', {}, sl.title || 'Please stand by'), sl.text ? el('p', {}, sl.text) : null,
+      el('div', { class: 'sbars' }, el('i'), el('i'), el('i')),
+      sl.until ? el('small', { class: 'suntil' }) : null);
+    M.slate.until = sl.until ? Date.parse(sl.until) : 0;
+    mcrLayer().append(M.slate);
+  }
+  function mcrAd(ad) {
+    const key = ad ? ad.startedAt + '|' + ad.items.map((i) => i.url).join(',') : '';
+    if (key === M.adKey) return;
+    M.adKey = key;
+    if (M.ad) { try { M.ad.video.pause(); } catch (e) { /* gone */ } M.ad.box.remove(); M.ad = null; }
+    if (!ad) return;
+    const video = el('video', { class: 'advid', playsinline: '', preload: 'auto' });
+    const badge = el('div', { class: 'adbadge' }), snd = el('button', { class: 'unmute adsnd', onclick: (e) => { e.stopPropagation(); video.muted = false; video.play().catch(() => {}); snd.remove(); } }, '🔊 Tap for sound');
+    const box = el('div', { class: 'adbox' }, video, badge);
+    M.ad = { box, video, badge, ad, idx: -1, snd };
+    mcrLayer().append(box);
+    // which advert, and how far into it, by the clock
+    const place = () => {
+      const t = srvNow() - Date.parse(ad.startedAt);
+      let acc = 0;
+      for (let i = 0; i < ad.items.length; i++) { const d = ad.items[i].duration * 1000; if (t < acc + d) return { i, off: Math.max(0, (t - acc) / 1000) }; acc += d; }
+      return null;
+    };
+    const playAt = () => {
+      const p = place();
+      if (!p || !M.ad || M.ad.box !== box) return;
+      if (p.i !== M.ad.idx) {
+        M.ad.idx = p.i;
+        video.src = ad.items[p.i].url;
+        const seek = () => { if (p.off > 0.5) { try { video.currentTime = p.off; } catch (e) { /* not seekable yet */ } } };
+        video.addEventListener('loadedmetadata', seek, { once: true });
+        video.muted = M.muted === null ? true : !!M.muted;
+        video.play().catch(() => { video.muted = true; video.play().catch(() => {}); if (!snd.isConnected) box.append(snd); });
+        if (video.muted && !snd.isConnected) box.append(snd);
+      }
+    };
+    video.addEventListener('ended', playAt);
+    playAt();
+  }
+  // squeeze-back: the live picture shrinks into a corner; adverts (or a sponsor board) fill the frame behind it
+  function mcrSqueeze(sq) {
+    const key = sq ? [sq.startedAt, sq.image, sq.pos, sq.size, sq.items.map((i) => i.url).join(',')].join('|') : '';
+    const stage = $('stage');
+    if (key === M.sqKey && (!M.sq || M.sq.bg.isConnected)) return;
+    M.sqKey = key;
+    if (M.sq) { try { M.sq.video && M.sq.video.pause(); } catch (e) { /* gone */ } M.sq.bg.remove(); M.sq.badge.remove(); M.sq = null; }
+    stage.classList.remove('squeeze', 'sq-tl', 'sq-tr', 'sq-bl', 'sq-br');
+    if (!sq) return;
+    stage.style.setProperty('--sq', (sq.size || 62) + '%');
+    stage.classList.add('squeeze', 'sq-' + (sq.pos || 'tr'));
+    const bg = el('div', { class: 'sqbg' }), badge = el('div', { class: 'adbadge sqbadge' });
+    if (sq.image) bg.append(el('img', { src: imgUrl(sq.image), alt: '' }));
+    let video = null;
+    if (sq.items.length) {
+      video = el('video', { class: 'advid', playsinline: '', preload: 'auto' });
+      bg.append(video);
+      let idx = -1;
+      const playAt = () => {
+        const t = srvNow() - Date.parse(sq.startedAt);
+        let acc = 0, p = null;
+        for (let i = 0; i < sq.items.length; i++) { const d = sq.items[i].duration * 1000; if (t < acc + d) { p = { i, off: Math.max(0, (t - acc) / 1000) }; break; } acc += d; }
+        if (!p || !M.sq || M.sq.bg !== bg || p.i === idx) return;
+        idx = p.i;
+        video.src = sq.items[p.i].url;
+        video.addEventListener('loadedmetadata', () => { if (p.off > 0.5) { try { video.currentTime = p.off; } catch (e) { /* not yet */ } } }, { once: true });
+        video.muted = sq.sound === 'live' || M.muted === null ? true : !!M.muted;
+        video.play().catch(() => { video.muted = true; video.play().catch(() => {}); });
+      };
+      video.addEventListener('ended', playAt);
+      M.sq = { bg, badge, video, sq };
+      stage.prepend(bg);
+      playAt();
+    } else { M.sq = { bg, badge, video: null, sq }; stage.prepend(bg); }
+    if (sq.text) bg.append(el('div', { class: 'sqtext' }, sq.text));
+    mcrLayer().append(badge);
+  }
+  function mcrOverlays(list) {
+    const key = JSON.stringify(list || []);
+    if (key === M.ovKey) return;
+    M.ovKey = key;
+    if (M.ov) M.ov.remove();
+    M.ov = el('div', { class: 'ovl' });
+    for (const o of list || []) {
+      if (o.kind === 'bug') M.ov.append(el('div', { class: 'ov bug ' + o.pos }, o.image ? el('img', { src: imgUrl(o.image), alt: '' }) : null, o.text ? el('span', {}, o.text) : null));
+      else if (o.kind === 'lower') M.ov.append(el('div', { class: 'ov lower ' + (o.pos === 'br' || o.pos === 'tr' ? 'right' : '') }, el('b', {}, o.text), o.sub ? el('span', {}, o.sub) : null));
+      else if (o.kind === 'ticker') M.ov.append(el('div', { class: 'ov ticker' }, el('div', { class: 'tk' }, el('span', {}, o.text + (o.sub ? '   •   ' + o.sub : '')))));
+      else if (o.kind === 'image' && o.image) M.ov.append(el('img', { class: 'ov image ' + o.pos, src: imgUrl(o.image), alt: o.text || '' }));
+    }
+    mcrLayer().append(M.ov);
+  }
+  // every half second: the countdowns, the end of an ad break, the sound
+  function mcrTick() {
+    const st = M.state, now = srvNow();
+    const ad = st && st.ad && Date.parse(st.ad.endsAt) > now ? st.ad : null;
+    const sl = st && st.slate && (!st.slate.until || Date.parse(st.slate.until) > now) ? st.slate : null;
+    const sq = st && st.squeeze && Date.parse(st.squeeze.endsAt) > now ? st.squeeze : null;
+    const on = !!(info && info.live && !info.needs) && !vodStart && !!liveVideo();
+    if (on && M.layer && !M.layer.isConnected) $('stage').append(M.layer);        // the picture was started again
+    mcrAd(on ? ad : null);
+    mcrSlate(on && !ad ? sl : null);
+    mcrSqueeze(on && !ad && !sl ? sq : null);
+    mcrOverlays(on && !ad && !(sq && !sl) ? (st && st.overlays) || [] : []);
+    muteLive(on && (!!ad || !!(sl && sl.mute) || !!(sq && !sl && sq.sound !== 'live' && sq.items.length)));
+    if (M.sq) M.sq.badge.textContent = 'Back to full screen in ' + dur(Math.max(0, Math.ceil((Date.parse(M.sq.sq.endsAt) - now) / 1000)));
+    if (M.ad) {
+      const left = Math.max(0, Math.ceil((Date.parse(ad.endsAt) - now) / 1000));
+      M.ad.badge.textContent = (ad.items.length > 1 ? `Ad ${Math.max(1, M.ad.idx + 1)} of ${ad.items.length} · ` : 'Ad · ') + 'back in ' + dur(left);
+    }
+    if (M.slate && M.slate.until) { const u = M.slate.querySelector('.suntil'); if (u) u.textContent = 'Back in about ' + dur(Math.max(0, Math.ceil((M.slate.until - now) / 1000))); }
+  }
+  async function mcrPoll() {
+    if (!info || info.needs || vodStart || !info.live) { M.state = null; return; }
+    try {
+      const t0 = Date.now();
+      const r = await fetch('/api/watch/' + encodeURIComponent(slug) + '/mcr', { credentials: 'same-origin', cache: 'no-store' });
+      if (!r.ok) return;
+      const x = await r.json();
+      M.skew = x.now - Math.round((t0 + Date.now()) / 2);
+      M.state = x;
+    } catch (e) { /* next time */ }
+  }
+  if (!vodStart) { setInterval(mcrPoll, 3000); setInterval(mcrTick, 500); setTimeout(mcrPoll, 800); }
 
   load();
 })();

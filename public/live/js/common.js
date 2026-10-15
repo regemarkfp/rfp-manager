@@ -377,4 +377,41 @@
   }
 
   window.CG = CG;
+
+  // ---- the stream's master control on the website: while viewers in the app see an ad break or a slate, a countdown
+  // across the top of the operator screens (scorer, graphics control, commentary / confidence monitor), never on outputs.
+  (function mcrCountdown() {
+    const page = location.pathname.split('/').pop();
+    if (!/^(control|sport|stats|commentary|sport-commentary|dash|timeline|rundown)\.html$/.test(page)) return;
+    const key = new URLSearchParams(location.search).get('key');
+    let data = { now: 0, list: [] }, skew = 0, bar = null;
+    const fmt = (s) => { s = Math.max(0, Math.ceil(s)); const m = Math.floor(s / 60); return m + ':' + String(s % 60).padStart(2, '0'); };
+    const css = document.createElement('style');
+    css.textContent = '.mcr-cd{position:fixed;left:50%;top:6px;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:4px;pointer-events:none;font:600 15px system-ui,sans-serif}' +
+      '.mcr-cd div{padding:6px 16px;border-radius:6px;color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.5);font-variant-numeric:tabular-nums;white-space:nowrap}.mcr-cd .ad{background:#b37400}.mcr-cd .slate{background:#a12a2a}.mcr-cd b{font-size:19px;margin-left:6px}';
+    document.head.appendChild(css);
+    async function poll() {
+      try {
+        const r = await fetch('/api/mcr/active' + (key ? '?key=' + encodeURIComponent(key) : ''), { credentials: 'same-origin', cache: 'no-store' });
+        if (r.ok) { data = await r.json(); skew = data.now - Date.now(); }
+      } catch (e) { /* next time */ }
+    }
+    function paint() {
+      const t = Date.now() + skew;
+      const rows = (data.list || []).filter((x) => (x.ad && Date.parse(x.ad.endsAt) > t) || (x.squeeze && Date.parse(x.squeeze.endsAt) > t) || (x.slate && (!x.slate.until || Date.parse(x.slate.until) > t)));
+      if (!rows.length) { if (bar) { bar.remove(); bar = null; } return; }
+      if (!bar) { bar = document.createElement('div'); bar.className = 'mcr-cd'; document.body.appendChild(bar); }
+      bar.innerHTML = '';
+      for (const x of rows) {
+        const d = document.createElement('div');
+        const ad = x.ad && Date.parse(x.ad.endsAt) > t ? x.ad : null, sq = !ad && x.squeeze && Date.parse(x.squeeze.endsAt) > t ? x.squeeze : null;
+        d.className = ad || sq ? 'ad' : 'slate';
+        d.textContent = ad ? 'AD BREAK IN THE APP · ' + x.title + ' · back to live in' : sq ? 'SQUEEZE-BACK IN THE APP · ' + x.title + ' · full screen in' : 'SLATE IN THE APP · ' + x.slate.title + (x.slate.until ? ' · ends in' : '');
+        const end = ad ? ad.endsAt : sq ? sq.endsAt : x.slate.until;
+        if (end) { const b = document.createElement('b'); b.textContent = fmt((Date.parse(end) - t) / 1000); d.appendChild(b); }
+        bar.appendChild(d);
+      }
+    }
+    poll(); setInterval(poll, 3000); setInterval(paint, 250);
+  })();
 })();

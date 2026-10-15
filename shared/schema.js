@@ -109,6 +109,10 @@
         fields: [{ k: 'channels', l: 'Channels', t: 'select', opts: ['1+2', '3+4', '5+6', '7+8', '9+10', '11+12', '13+14', '15+16'], w: 100 }, { k: 'name', l: 'Name', t: 'text', ph: 'ENGLISH' },
           { k: 'language', l: 'Language', t: 'select', opts: ['', 'English', 'Afrikaans', 'isiZulu', 'isiXhosa', 'Sesotho', 'Setswana', 'Sepedi', 'Xitsonga', 'siSwati', 'Tshivenda', 'isiNdebele', 'Portuguese', 'French', 'German', 'Spanish', 'Other'], w: 130 },
           { k: 'audience', l: 'Who hears it', t: 'select', opts: ['Everyone', 'Production team', 'Nobody'], def: 'Everyone', w: 175 }] },
+      { k: 'streamPerMatch', l: 'Also a stream per match (several venues at once)', t: 'bool', group: 'Live stream', help: 'Each match in this production gets its own stream key and watch page, next to the production\'s own stream, so several venues can stream at the same time. The keys are shown on the production\'s Live stream card once saved.' },
+      { k: 'streamRestream', l: 'Restream to other platforms', t: 'list', group: 'Live stream', help: 'While the stream is live the website sends a copy to each destination that is on: YouTube (rtmp://a.rtmp.youtube.com/live2), Facebook (rtmps://live-api-s.facebook.com:443/rtmp/), Twitch or any RTMP server. Leave Match empty for the production\'s own stream, or pick a match to restream that match\'s stream.',
+        fields: [{ k: 'name', l: 'Name', t: 'text', ph: 'YouTube', w: 130 }, { k: 'url', l: 'Server (RTMP / RTMPS)', t: 'text', ph: 'rtmp://a.rtmp.youtube.com/live2' }, { k: 'key', l: 'Stream key', t: 'text', ph: 'From the platform' },
+          { k: 'fixture', l: 'Match', t: 'ref', ref: 'fixture', w: 170 }, { k: 'on', l: 'On', t: 'bool', def: true, w: 50 }] },
       RUNDOWN] },
 
     graphic: { label: 'Template graphic', plural: 'Template graphics', group: 'Live', title: (d) => d.name, cols: ['name', 'template', 'kind', 'layer'], fields: [
@@ -222,7 +226,7 @@
   // Everything else is managed on the website.
   const PC_EDIT = ['graphic', 'theme', 'dashboard', 'timeline', 'variable', 'gametrigger'];
 
-  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'songuse', 'user', 'machinekey', 'purchase', 'streamclip', 'comment', 'viewstat', 'streamvideo'];
+  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'songuse', 'user', 'machinekey', 'purchase', 'streamclip', 'comment', 'viewstat', 'streamvideo', 'mcr', 'videoad'];
   const ALL_TYPES = [...Object.keys(E), ...SYSTEM_TYPES];
 
   const has = (v) => v !== undefined && v !== null && v !== '';

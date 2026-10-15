@@ -192,7 +192,7 @@ function navFor() {
     ['Assets', [['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/theme', 'Themes'], ['#/images', 'Images']]],
     ['Advertising', [['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log']]],
     ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report']].concat(local ? [['#/bibles', 'Bibles']] : [])],
-    local ? null : ['Streaming', [['#/list/channel', 'Channels'], App.can('edit') ? ['#/analytics', 'Analytics'] : null, App.can('edit') ? ['#/sales', 'Ticket sales'] : null].filter(Boolean)],
+    local ? null : ['Streaming', [['#/list/channel', 'Channels'], App.can('edit') ? ['#/streams', 'Live streams'] : null, App.can('edit') ? ['#/analytics', 'Analytics'] : null, App.can('edit') ? ['#/sales', 'Ticket sales'] : null].filter(Boolean)],
     ['Live', [App.pcs ? ['#/pcs', 'Production PCs'] : null, pc ? ['#/monitors', 'Monitors'] : null, pc ? ['#/templates', 'Templates'] : null, pc ? ['#/adverts', 'Advert playout'] : null,
       ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers']].filter(Boolean)],
     ['', [['#/settings', 'Settings']]],
@@ -406,7 +406,7 @@ function listField(f, value, onChange, ctx) {
         h('button', { type: 'button', class: 'ghost sm danger', title: 'Remove', 'aria-label': 'Remove row', onclick: () => { rows.splice(i, 1); commit(); paint(); } }, '✕'))));
     wrap.replaceChildren(
       rows.length ? h('div', { style: { overflowX: 'auto' } }, h('table', { class: 't sub' }, h('thead', {}, h('tr', {}, f.fields.map((sf) => h('th', {}, sf.l)), h('th', {}))), h('tbody', {}, body))) : h('div', { class: 'dim small', style: { marginBottom: '6px' } }, 'Nothing added yet.'),
-      h('button', { type: 'button', class: 'sm', onclick: () => { rows.push({}); commit(); paint(); const ins = wrap.querySelectorAll('tbody tr:last-child input, tbody tr:last-child select'); if (ins[0]) ins[0].focus(); } }, '+ Add row'));
+      h('button', { type: 'button', class: 'sm', onclick: () => { rows.push(Object.fromEntries(f.fields.filter((sf) => sf.def !== undefined).map((sf) => [sf.k, sf.def]))); commit(); paint(); const ins = wrap.querySelectorAll('tbody tr:last-child input, tbody tr:last-child select'); if (ins[0]) ins[0].focus(); } }, '+ Add row'));
   };
   paint();
   wrap.setRows = (next) => { rows = next.map((r) => ({ ...r })); paint(); };
