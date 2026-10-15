@@ -50,7 +50,7 @@
       return h('tr', {},
         picked ? h('td', { style: { width: '34px' } }, h('input', { type: 'checkbox', checked: n >= 0, onchange: (e) => onPick(a.id, e.target.checked) })) : null,
         picked ? h('td', { style: { width: '28px' } }, n >= 0 ? h('span', { class: 'pill' }, String(n + 1)) : null) : null,
-        h('td', {}, h('b', {}, a.title)), h('td', { class: 'nowrap dim' }, dur(a.duration)),
+        h('td', {}, h('b', {}, a.title), a.missing ? h('span', { class: 'pill warn', style: { marginLeft: '6px' }, title: 'The file is not on the streaming server (it was added on another copy of the website). Delete it and add it again here.' }, 'file missing: add it again') : null), h('td', { class: 'nowrap dim' }, dur(a.duration)),
         h('td', { class: 'nowrap', style: { textAlign: 'right' } }, h('a', { class: 'btn sm ghost', href: a.url, target: '_blank', rel: 'noopener' }, 'Preview'),
           manage ? [
             h('button', { class: 'sm ghost', onclick: async () => { const t = await promptBox('Rename', 'Name', a.title); if (!t) return; try { await api('PUT', `/api/videoads/${a.id}?team=${App.team}`, { title: t }); reload(); } catch (e) { oops(e); } } }, 'Rename'),
@@ -186,7 +186,7 @@
           h('label', { class: 'row', style: { gap: '6px', alignItems: 'center' } }, h('span', { class: 'small' }, 'For'), minutes, h('span', { class: 'small' }, 'min')),
           h('label', { class: 'row', style: { gap: '6px', alignItems: 'center' } }, h('span', { class: 'small' }, 'Music'),
             h('select', { style: { width: 'auto' }, onchange: (e) => act({ action: 'setMusic', music: e.target.value }, e.target.value ? 'Slate music set' : 'No slate music') },
-              h('option', { value: '' }, 'None (the live sound)'), ads.filter((a) => a.kind === 'music').map((a) => h('option', { value: a.id, selected: st && st.slateMusic === a.id }, a.title)))),
+              h('option', { value: '' }, 'None (the live sound)'), ads.filter((a) => a.kind === 'music' && !a.missing).map((a) => h('option', { value: a.id, selected: st && st.slateMusic === a.id }, a.title)))),
           App.canEdit('production') ? uploadBtn('music', '+ Music', () => loadAds()) : null,
           h('label', { class: 'row', style: { gap: '6px', alignItems: 'center' } }, mute, h('span', { class: 'small' }, 'No music: mute the stream sound under it')),
           st && st.slate ? h('button', { class: 'sm', onclick: () => act({ action: 'clearSlate' }, 'Slate off') }, 'Take slate off') : null));
@@ -259,6 +259,20 @@
         })(),
         h('p', { class: 'dim small', style: { marginBottom: 0 } }, 'The scorer on the production PC reports the events (the PC must be signed in to this website). A rule never starts on top of an ad break, squeeze-back or slate, and rests for the time you set. The delay lets the replay or celebration play out first. A preset (Advertising → Stream adverts) is the easiest; otherwise the videos and settings ticked above are used.'));
     }
+    // sponsor logos that take turns in the bug: the logos, how long each stays, and how they change
+    function rotation(o, changed) {
+      o.images = o.images || [];
+      const tsel = h('select', { style: { width: 'auto' }, onchange: (e) => { o.transition = e.target.value; changed(); } }, [['fade', 'Fade'], ['slide', 'Slide up'], ['flip', 'Flip'], ['zoom', 'Zoom'], ['cut', 'Cut']].map(([v, l]) => h('option', { value: v, selected: (o.transition || 'fade') === v }, l)));
+      const num = (k, def, min, max, step, w) => h('input', { type: 'number', min, max, step, value: o[k] || def, style: { width: w }, onchange: (e) => { o[k] = Number(e.target.value) || def; changed(); } });
+      return h('div', { class: 'mcr-rot', style: { flexBasis: '100%' } },
+        h('div', { class: 'dim small' }, 'Sponsor logos taking turns with the logo (add one or more):'),
+        h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap', alignItems: 'center', margin: '4px 0' } },
+          o.images.map((id, i) => h('span', { class: 'mcr-thumb' }, h('img', { src: App.img(id), alt: '' }), h('button', { class: 'sm ghost danger', title: 'Remove', onclick: () => { o.images.splice(i, 1); changed(); } }, '✕'))),
+          typeof imageField === 'function' ? h('div', { class: 'mcr-addlogo' }, imageField('', (v) => { if (v && !o.images.includes(v)) { o.images.push(v); changed(); } }, 'sponsor')) : null),
+        h('div', { class: 'row', style: { gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
+          h('span', { class: 'small' }, 'Each for'), num('every', 10, 3, 300, 1, '70px'), h('span', { class: 'small' }, 's · change with'), tsel,
+          h('span', { class: 'small' }, 'taking'), num('speed', 0.8, 0.2, 3, 0.1, '70px'), h('span', { class: 'small' }, 's')));
+    }
     function paintOverlays() {
       const cur = new Map(((st && st.overlays) || []).map((o) => [o.kind, { ...o }]));
       const rows = OVL.map(([k]) => cur.get(k) || { kind: k, on: false, text: '', sub: '', image: '', pos: k === 'bug' ? 'tr' : k === 'image' ? 'br' : 'bl' });
@@ -273,11 +287,12 @@
             h('label', { class: 'switch' }, h('input', { type: 'checkbox', checked: o.on, onchange: (e) => { o.on = e.target.checked; save(o.on ? label + ' on' : label + ' off'); } }), h('b', {}, label)),
             h('span', { class: 'dim small' }, help)),
           h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap', alignItems: 'flex-start', marginTop: '6px' } },
-            o.kind === 'bug' ? [inp(o, 'text', 'LIVE', '120px'), pos(o)] : null,
+            o.kind === 'bug' ? [inp(o, 'text', 'LIVE', '120px'), pos(o), img ? h('div', { style: { minWidth: '220px' } }, h('div', { class: 'dim small' }, 'Logo'), img) : null] : null,
+            o.kind === 'bug' ? rotation(o, () => save()) : null,
             o.kind === 'lower' ? [inp(o, 'text', 'Name or headline', '220px'), inp(o, 'sub', 'Second line', '220px'), pos(o, [['bl', 'Left'], ['br', 'Right']])] : null,
             o.kind === 'ticker' ? [inp(o, 'text', 'Next match: …', '360px'), inp(o, 'sub', 'More (optional)', '220px')] : null,
             o.kind === 'image' ? [pos(o)] : null,
-            img ? h('div', { style: { minWidth: '220px' } }, img) : null));
+            img && o.kind !== 'bug' ? h('div', { style: { minWidth: '220px' } }, img) : null));
       }));
     }
     function paintCues() {

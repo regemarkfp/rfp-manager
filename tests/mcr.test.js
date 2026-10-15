@@ -104,6 +104,10 @@ test('master control: slates (timed, cued), video adverts with a countdown, over
   assert.equal(r.data.state.overlays.length, 3);
   v = await viewer();
   assert.deepEqual(v.overlays.map((o) => o.kind), ['bug', 'ticker']);
+  // sponsor logos rotating in the bug
+  r = await mcr({ action: 'overlays', overlays: [{ kind: 'bug', on: true, image: 'img_main', images: ['img_s1', 'img_s2', 'bad id'], every: 1, transition: 'flip', speed: 9 }] });
+  assert.deepEqual(r.data.state.overlays[0].images, ['img_s1', 'img_s2']);
+  assert.equal(r.data.state.overlays[0].every, 3); assert.equal(r.data.state.overlays[0].transition, 'flip'); assert.equal(r.data.state.overlays[0].speed, 3);
 
   // ad break without adverts: refused
   assert.equal((await mcr({ action: 'ads', ads: [] })).status, 400);

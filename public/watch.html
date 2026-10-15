@@ -50,17 +50,27 @@
     .stage { --fx: 0px; --fy: 0px; --fw: 100%; --fh: 100%; }
     .mcr, .stage > .slate, .stage .sqbg { position: absolute; inset: auto; left: var(--fx); top: var(--fy); width: var(--fw); height: var(--fh); }
     .mcr { z-index: 4; pointer-events: none; container-type: size; overflow: hidden; }
-    .mcr .slate { z-index: 1; inset: 0; width: auto; height: auto; }
+    .mcr .slate { z-index: 3; inset: 0; width: auto; height: auto; }
     .mcr .slate b { font-size: 7cqh; } .mcr .slate p { font-size: 3.6cqh; max-width: 80cqw; } .mcr .slate .slogo { width: 18cqh; height: 18cqh; } .mcr .slate .slogo.brand { width: 32cqh; height: auto; }
-    .mcr .adbox { position: absolute; inset: 0; z-index: 3; background: #000; pointer-events: auto; }
+    .mcr .adbox { position: absolute; inset: 0; z-index: 4; background: #000; pointer-events: auto; }
     .mcr .advid { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; object-fit: contain; }
-    .slate .slatesnd { position: absolute; left: 12px; bottom: 12px; z-index: 5; }
+    .slate .slatesnd { position: absolute; right: 10px; bottom: 10px; z-index: 5; width: 34px; height: 34px; padding: 0; border-radius: 50%; background: rgba(0,0,0,.5); border-color: rgba(255,255,255,.25); font-size: 16px; line-height: 1; }
     .mcr .adsnd { left: 3cqw; bottom: 4cqh; pointer-events: auto; z-index: 5; position: absolute; }
-    .mcr .ovl { position: absolute; inset: 0; z-index: 2; }
+    /* layers, bottom to top: squeeze-back, live picture, lower third / ticker, logos / images, slates, adverts */
+    .mcr .ovl { position: absolute; inset: 0; }
+    .mcr .ov.lower, .mcr .ov.ticker { z-index: 1; } .mcr .ov.bug, .mcr .ov.image { z-index: 2; }
     .mcr .ov { position: absolute; }
     .mcr .tl { top: 4cqh; left: 3cqw; } .mcr .tr { top: 4cqh; right: 3cqw; } .mcr .bl { bottom: 12cqh; left: 3cqw; } .mcr .br { bottom: 12cqh; right: 3cqw; }
     .mcr .bug { display: flex; align-items: center; gap: 1cqh; font-weight: 800; font-size: 3cqh; letter-spacing: .06em; text-shadow: 0 1px 3px rgba(0,0,0,.8); opacity: .92; }
     .mcr .bug img { height: 7cqh; width: auto; }
+    /* sponsor logo rotation in a bug */
+    .mcr .rot { display: grid; height: 7cqh; perspective: 40cqh; }
+    .mcr .rot img { grid-area: 1 / 1; height: 7cqh; width: auto; justify-self: center; opacity: 0; transition: opacity var(--rs) ease, transform var(--rs) ease; }
+    .mcr .rot img.on { opacity: 1; transform: none; }
+    .mcr .rot.t-cut img { transition: none; }
+    .mcr .rot.t-slide { overflow: hidden; } .mcr .rot.t-slide img { transform: translateY(100%); } .mcr .rot.t-slide img.out { transform: translateY(-100%); }
+    .mcr .rot.t-flip img { transform: rotateY(90deg); backface-visibility: hidden; } .mcr .rot.t-flip img.out { transform: rotateY(-90deg); }
+    .mcr .rot.t-zoom img { transform: scale(.4); } .mcr .rot.t-zoom img.out { transform: scale(1.6); }
     .mcr .bug span { background: rgba(0,0,0,.45); padding: .4cqh 1.2cqh; border-radius: 3px; }
     .mcr .lower { left: 4cqw; bottom: 12cqh; max-width: 70cqw; display: grid; background: rgba(10,10,10,.82); border-left: .8cqh solid var(--accent); padding: 1cqh 2.4cqh; animation: lin .4s ease-out; }
     .mcr .lower.right { left: auto; right: 4cqw; border-left: 0; border-right: .8cqh solid var(--accent); text-align: right; }

@@ -70,7 +70,7 @@
   function withMusic(slate, kind) {
     if (!info || !info.slateMusic || kind === 'ended') return slate;
     const audio = mediaFor('audio', info.slateMusic, { loop: '', preload: 'auto', src: info.slateMusic });
-    const snd = el('button', { class: 'unmute slatesnd', onclick: (e) => { e.stopPropagation(); audio.muted = false; window.RFPPlayer.saveSound(audio); audio.play().catch(() => {}); snd.remove(); } }, '🔊 Tap for music');
+    const snd = el('button', { class: 'slatesnd', title: 'Music on', 'aria-label': 'Music on', onclick: (e) => { e.stopPropagation(); audio.muted = false; window.RFPPlayer.saveSound(audio); audio.play().catch(() => {}); snd.remove(); } }, '🔈');
     slate.append(audio);
     startAd(audio, window.RFPPlayer.sound().muted, snd, slate);
     // stops when the slate goes
@@ -133,7 +133,7 @@
     bar(video, { live: false, onUnmute: () => unmute.remove() });
     playing = true;
     // with the viewer's sound settings; muted only when the browser will not start it with sound (then: tap for sound)
-    window.RFPPlayer.playWithSound(video, () => $('stage').append(unmute));
+    window.RFPPlayer.playWithSound(video, () => blocked(video));
     beats(video, matchId ? { kind: 'match', match: matchId, title: info.vod.title || '' } : { kind: 'vod', start: info.vod.start });
   }
 
@@ -219,7 +219,7 @@
     const unmute = el('button', { class: 'unmute', onclick: (e) => { e.stopPropagation(); video.muted = false; window.RFPPlayer.saveSound(video); video.play().catch(() => {}); unmute.remove(); } }, '🔊 Tap for sound');
     $('stage').replaceChildren(video);
     current = bar(video, { live: true, tracks, onUnmute: () => unmute.remove() });
-    window.RFPPlayer.playWithSound(video, () => { if (!unmute.isConnected) $('stage').append(unmute); });
+    window.RFPPlayer.playWithSound(video, () => blocked(video));
     slateKind = '';
     // the picture stops coming for a while: the slate over it, gone again as soon as it plays
     let stallT = null, over = null;
@@ -376,11 +376,26 @@
   window.addEventListener('resize', fitFrame);
   document.addEventListener('fullscreenchange', () => setTimeout(fitFrame, 50));
   // a slate with the sound off: the live sound goes, and comes back as it was
+  // a smooth change of volume (sound coming back after a slate or an advert, music going)
+  function fade(m, to, ms, done) {
+    clearInterval(m._fade);
+    const from = m.volume, t0 = Date.now();
+    m._fade = setInterval(() => { const k = Math.min(1, (Date.now() - t0) / ms); try { m.volume = from + (to - from) * k; } catch (e) { /* read-only (iPhone) */ } if (k >= 1) { clearInterval(m._fade); if (done) done(); } }, 40);
+  }
+  // may this page play sound yet (the viewer tapped or pressed a key on it)?
+  const mayPlaySound = () => !navigator.userActivation || navigator.userActivation.hasBeenActive;
+  // the live sound back: faded in to the viewer's volume, unless they muted it (or the browser does not allow sound yet)
+  function liveSoundBack(v, muted, volume) {
+    if (muted) { v.muted = true; return; }
+    if (!mayPlaySound()) { v.muted = true; blocked(v); return; }
+    clearInterval(v._fade); v.volume = 0; v.muted = false; v.play().catch(() => {});
+    fade(v, volume, 1500);
+  }
   function muteLive(on) {
     const v = liveVideo();
     if (!v) return;
-    if (on && M.muted === null) { M.muted = v.muted; v.muted = true; }
-    else if (!on && M.muted !== null) { v.muted = M.muted; M.muted = null; }
+    if (on && M.muted === null) { M.muted = v.muted; M.mutedVol = v.volume; v.muted = true; }
+    else if (!on && M.muted !== null) { liveSoundBack(v, window.RFPPlayer.sound().muted, window.RFPPlayer.sound().volume); M.muted = null; }
   }
   // an advert plays instead of the live sound: the player's volume and mute work on the advert, and whatever the viewer
   // chose there carries back to the live sound afterwards
@@ -389,17 +404,34 @@
   function audioTo(target) {
     const v = liveVideo();
     if (target === M.aud) return;
-    if (M.aud && v) { v.muted = M.aud.muted; v.volume = M.aud.volume; }
-    if (target && v) { target.volume = v.volume; v.muted = true; }
+    if (M.aud && v) {
+      // the viewer's choice while the advert / music played carries over (muted there = muted here)
+      const userMuted = M.aud.muted && !M.aud.dataset.blocked;
+      liveSoundBack(v, userMuted || window.RFPPlayer.sound().muted, window.RFPPlayer.sound().volume);
+    }
+    if (target && v) { clearInterval(v._fade); target.volume = window.RFPPlayer.sound().volume; v.muted = true; }
     M.aud = target || null;
     if (current && current.setAudio) current.setAudio(M.aud);
   }
   function startAd(video, muted, snd, box) {
     video.volume = window.RFPPlayer.sound().volume;
     video.muted = muted;
-    video.play().catch(() => { video.muted = true; video.play().catch(() => {}); if (snd && !snd.isConnected) box.append(snd); });
-    if (video.muted && snd && !snd.isConnected) box.append(snd);
+    video.play().catch(() => { video.muted = true; blocked(video); video.play().catch(() => {}); if (snd && !snd.isConnected) box.append(snd); });
   }
+  // the browser would not start it with sound (no tap on the page yet): no button over the picture; the viewer's first
+  // tap or key anywhere on the page brings the sound (unless they muted it themselves)
+  function blocked(m) { m.dataset.blocked = '1'; }
+  function unlock() {
+    if (window.RFPPlayer.sound().muted) return;
+    for (const m of document.querySelectorAll('video[data-blocked], audio[data-blocked]')) {
+      delete m.dataset.blocked;
+      if (m === liveVideo() && M.aud) continue;                       // an advert / music has the sound now
+      m.muted = false; m.play().catch(() => {});
+    }
+    for (const b of document.querySelectorAll('.slatesnd')) b.remove();
+  }
+  document.addEventListener('pointerdown', unlock, true);
+  document.addEventListener('keydown', unlock, true);
   // plays a list of adverts on one video element, in step with the website's clock
   function sequence(video, items, startedAt, onStart) {
     let idx = -1;
@@ -448,7 +480,7 @@
   function mcrSlate(sl) {
     const key = sl ? [sl.kind, sl.title, sl.text, sl.mute, sl.music || ''].join('|') : '';
     if (M.slate && M.slate.dataset.key === key) return;
-    if (M.slate) { if (M.slate.audio) { M.slate.audio.pause(); M.slate.audio.removeAttribute('src'); } M.slate.remove(); M.slate = null; }
+    if (M.slate) { const a = M.slate.audio; if (a) fade(a, 0, 1200, () => { a.pause(); a.removeAttribute('src'); }); M.slate.remove(); M.slate = null; }
     if (!sl) return;
     const ch = (info && info.channel) || {};
     M.slate = el('div', { class: 'slate mslate k-' + sl.kind, 'data-key': key },
@@ -458,10 +490,9 @@
     // music under the slate: a loop, with the viewer's sound settings; the live sound stays off while it plays
     if (sl.music) {
       const audio = mediaFor('audio', sl.music, { loop: '', preload: 'auto', src: sl.music });
-      const snd = el('button', { class: 'unmute adsnd', onclick: (e) => { e.stopPropagation(); audio.muted = false; window.RFPPlayer.saveSound(audio); audio.play().catch(() => {}); snd.remove(); } }, '🔊 Tap for sound');
-      M.slate.audio = audio; M.slate.snd = snd;
+      M.slate.audio = audio;
       M.slate.append(audio);
-      startAd(audio, !soundOn(), snd, M.slate);
+      startAd(audio, !soundOn(), null, null);
     }
     mcrLayer().append(M.slate);
   }
@@ -473,11 +504,10 @@
     if (!ad) return;
     const video = el('video', { class: 'advid', playsinline: '', preload: 'auto' });
     const box = el('div', { class: 'adbox' }, video);
-    const snd = el('button', { class: 'unmute adsnd', onclick: (e) => { e.stopPropagation(); video.muted = false; window.RFPPlayer.saveSound(video); video.play().catch(() => {}); snd.remove(); } }, '🔊 Tap for sound');
     const muted = !soundOn();
-    M.ad = { box, video, ad, snd };
+    M.ad = { box, video, ad };
     mcrLayer().append(box);
-    sequence(video, ad.items, ad.startedAt, () => startAd(video, muted, snd, box));
+    sequence(video, ad.items, ad.startedAt, () => startAd(video, muted, null, null));
   }
   // squeeze-back: the live picture at three quarters in a corner of the frame; adverts (or a sponsor board) behind it
   function mcrSqueeze(sq) {
@@ -517,7 +547,13 @@
     if (M.ov) M.ov.remove();
     M.ov = el('div', { class: 'ovl' });
     for (const o of list || []) {
-      if (o.kind === 'bug') M.ov.append(el('div', { class: 'ov bug ' + o.pos }, o.image ? el('img', { src: imgUrl(o.image), alt: '' }) : null, o.text ? el('span', {}, o.text) : null));
+      if (o.kind === 'bug') {
+        const logos = [o.image, ...(o.images || [])].filter(Boolean);
+        // several logos: a rotation, in step for every viewer (by the website's clock)
+        const pic = logos.length > 1 ? el('div', { class: 'rot t-' + (o.transition || 'fade'), 'data-every': String(o.every || 10), style: `--rs:${o.speed || 0.8}s` }, logos.map((id) => el('img', { src: imgUrl(id), alt: '' })))
+          : logos.length ? el('img', { src: imgUrl(logos[0]), alt: '' }) : null;
+        M.ov.append(el('div', { class: 'ov bug ' + o.pos }, pic, o.text ? el('span', {}, o.text) : null));
+      }
       else if (o.kind === 'lower') M.ov.append(el('div', { class: 'ov lower ' + (o.pos === 'br' || o.pos === 'tr' ? 'right' : '') }, el('b', {}, o.text), o.sub ? el('span', {}, o.sub) : null));
       else if (o.kind === 'ticker') M.ov.append(el('div', { class: 'ov ticker' }, el('div', { class: 'tk' }, el('span', {}, o.text + (o.sub ? '   •   ' + o.sub : '')))));
       else if (o.kind === 'image' && o.image) M.ov.append(el('img', { class: 'ov image ' + o.pos, src: imgUrl(o.image), alt: o.text || '' }));
@@ -536,12 +572,21 @@
     mcrAd(on ? ad : null);
     mcrSlate(on && !ad ? sl : null);
     mcrSqueeze(on && !ad && !sl ? sq : null);
-    mcrOverlays(on && !ad && !(sq && !sl) ? (st && st.overlays) || [] : []);
+    const squeezing = !!(sq && !sl && !ad);
+    if (M.wasSq && !squeezing) M.ovHold = Date.now() + 1400 + 3000;
+    M.wasSq = squeezing;
+    mcrOverlays(on && !ad && !squeezing && Date.now() > (M.ovHold || 0) ? (st && st.overlays) || [] : []);
     const target = M.ad ? M.ad.video : M.slate && M.slate.audio ? M.slate.audio : M.sq && M.sq.video && M.sq.sq.sound !== 'live' ? M.sq.video : null;
     muteLive(on && !target && !!(sl && sl.mute));
+    for (const r of document.querySelectorAll('.mcr .rot')) {
+      const imgs = r.children, n = imgs.length, every = Number(r.dataset.every) * 1000 || 10000;
+      const i = Math.floor(srvNow() / every) % n;
+      if (r._i === i) continue;
+      for (let k = 0; k < n; k++) { imgs[k].classList.toggle('on', k === i); imgs[k].classList.toggle('out', k === r._i); }
+      r._i = i;
+    }
     audioTo(on ? target : null);
-    if (M.ad && !M.ad.video.muted && M.ad.snd.isConnected) M.ad.snd.remove();
-    if (M.slate && M.slate.audio && !M.slate.audio.muted && M.slate.snd.isConnected) M.slate.snd.remove();
+
   }
   async function mcrPoll() {
     if (!info || info.needs || vodStart || !info.live) { M.state = null; return; }

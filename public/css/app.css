@@ -283,3 +283,7 @@ table.cs-plain td { padding: 2px 26px 2px 0; }
 .mcr-banner { position: fixed; right: 14px; bottom: 14px; z-index: 40; display: grid; gap: 6px; max-width: min(460px, calc(100vw - 28px)); text-decoration: none !important; }
 .mcr-banner div { padding: 10px 14px; border-radius: 8px; color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.5); font-variant-numeric: tabular-nums; }
 .mcr-banner .ad { background: #8a5a00; } .mcr-banner .slate { background: #8a1f1f; }
+
+.mcr-thumb { display: inline-flex; align-items: center; gap: 2px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 3px; }
+.mcr-thumb img { height: 34px; width: auto; max-width: 90px; object-fit: contain; }
+.mcr-addlogo .imgbox, .mcr-addlogo img { max-height: 40px; }
