@@ -39,6 +39,12 @@
     .vids { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 10px; }
     .vids a { display: block; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--text); text-decoration: none; }
     .vids a.on { border-color: var(--accent); } .vids small { color: var(--dim); display: block; }
+    #chat { margin-top: 18px; } #chat h3 { margin: 0 0 8px; font-size: 16px; }
+    .clist { max-height: 360px; overflow-y: auto; display: grid; gap: 10px; padding: 4px 2px 8px; }
+    .cm { display: flex; gap: 10px; align-items: flex-start; } .cm .av { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex: none; background: #2b2b2b; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: var(--dim); }
+    .cm b { font-size: 13px; } .cm .t { white-space: pre-wrap; word-break: break-word; } .cm .when { color: var(--dim); font-size: 12px; margin-left: 6px; }
+    .cm .rm { background: none; border: 0; color: var(--dim); padding: 0 4px; font-size: 12px; cursor: pointer; }
+    .cform { display: flex; gap: 8px; } .cform input { margin: 0; flex: 1; }
     @media (max-width: 600px) { main { padding: 0 0 16px; } .stage { border-radius: 0; } .info { padding: 0 16px; } }
   </style>
 </head>
@@ -50,6 +56,7 @@
       <div class="head"><h1 id="title"></h1><span class="badge" id="badge">OFFLINE</span><span class="dim small" id="viewers"></span></div>
       <div class="chrow" id="chrow"></div>
       <div class="desc" id="desc"></div>
+      <div id="chat"></div>
       <div id="vids"></div>
     </div>
   </main>

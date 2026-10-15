@@ -133,6 +133,7 @@
     }
     header();
     if (!pub) loadPublic();
+    if (chatKey !== chatQuery() + ':' + !!info.needs) { chatKey = chatQuery() + ':' + !!info.needs; loadChat(); }
     if (info.needs === 'password') return askPassword();
     if (info.needs === 'signin') return message('Sign in to watch', 'This channel is for members of the production team.', el('p', {}, el('a', { class: 'btn primary', href: '/?signin=1&next=' + encodeURIComponent(location.pathname + location.search) }, 'Sign in')));
     if (info.needs === 'team') return message('This channel is for its production team', 'Ask the team to add you, or for a link you can use.');
@@ -184,6 +185,43 @@
     } catch (e) { /* try again */ }
     if (tries > 40) { paidId = ''; return message('Your payment is still being processed', 'You get an email with your ticket as soon as PayFast confirms it. You can close this page.'); }
     setTimeout(() => waitForPayment(tries + 1), 3000);
+  }
+
+  // ---- comments: a live chat while live, comments on each video. Reading is open; writing needs a sign-in.
+  let chatTimer = null, chatKey = '', chatForm = null;
+  const ago = (t) => { const s = Math.round((Date.now() - t) / 1000); return s < 60 ? 'now' : s < 3600 ? Math.floor(s / 60) + ' min' : s < 86400 ? Math.floor(s / 3600) + ' h' : new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); };
+  const chatQuery = () => (matchId ? '?m=' + encodeURIComponent(matchId) : vodStart && vodStart !== 'match' ? '?v=' + encodeURIComponent(vodStart) : '');
+  async function loadChat() {
+    if (!info || info.needs) { $('chat').replaceChildren(); chatForm = null; return; }
+    const key = chatQuery(), liveChat = !vodStart;
+    let r;
+    try { const x = await fetch('/api/watch/' + encodeURIComponent(slug) + '/comments' + key, { credentials: 'same-origin' }); r = await x.json(); if (!x.ok) throw new Error(r.error); } catch (e) { return; }
+    const list = el('div', { class: 'clist' }, r.comments.length ? r.comments.map((c) => el('div', { class: 'cm' },
+      c.image ? el('img', { class: 'av', src: c.image, alt: '', referrerpolicy: 'no-referrer' }) : el('span', { class: 'av' }, (c.name || '?').slice(0, 1).toUpperCase()),
+      el('div', {}, el('b', {}, c.name), el('span', { class: 'when' }, ago(c.at)), (c.mine || r.canModerate) ? el('button', { class: 'rm', title: 'Remove', onclick: async () => { await fetch('/api/comments/' + c.id, { method: 'DELETE', credentials: 'same-origin', headers: { 'x-rfp': '1' } }); loadChat(); } }, '✕') : null,
+        el('div', { class: 't' }, c.text)))) : el('p', { class: 'dim small' }, liveChat ? 'No messages yet. Say hello!' : 'No comments yet.'));
+    // the form is made once per thread, so typing is not disturbed while the chat refreshes
+    if (!chatForm || chatForm.key !== key + ':' + r.signedIn) {
+      const input = el('input', { type: 'text', maxlength: 500, placeholder: liveChat ? 'Say something…' : 'Add a comment…' });
+      const err = el('p', { class: 'err small' });
+      const send = async () => {
+        const text = input.value.trim(); if (!text) return;
+        const x = await fetch('/api/watch/' + encodeURIComponent(slug) + '/comments' + key, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-rfp': '1' }, body: JSON.stringify({ text }) });
+        const o = await x.json().catch(() => ({}));
+        if (!x.ok) { err.textContent = o.error || 'Could not send'; return; }
+        err.textContent = ''; input.value = ''; loadChat();
+      };
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
+      chatForm = { key: key + ':' + r.signedIn, el: [r.signedIn ? el('div', { class: 'cform' }, input, el('button', { class: 'primary', onclick: send }, 'Send')) : el('p', { class: 'dim small' }, el('a', { href: '/?signin=1&next=' + encodeURIComponent(location.pathname + location.search) }, 'Sign in'), liveChat ? ' to chat.' : ' to comment.'), err] };
+    }
+    const prev = $('chat').querySelector('.clist');
+    const atEnd = !prev || prev.scrollHeight - prev.scrollTop - prev.clientHeight < 40, top = prev ? prev.scrollTop : 0;
+    const title = liveChat ? (info.live ? 'Live chat' : 'Chat') : 'Comments' + (r.comments.length ? ' (' + r.comments.length + ')' : '');
+    if (!chatForm.shown || !prev) { chatForm.shown = true; $('chat').replaceChildren(el('h3', {}, title), list, ...chatForm.el); }
+    else { $('chat').querySelector('h3').textContent = title; prev.replaceWith(list); }      // the form stays put while typing
+    list.scrollTop = atEnd ? list.scrollHeight : top;
+    clearTimeout(chatTimer);
+    if (liveChat) chatTimer = setTimeout(loadChat, 4000);
   }
 
   function askPassword(problem) {
