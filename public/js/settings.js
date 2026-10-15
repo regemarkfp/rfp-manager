@@ -204,17 +204,41 @@
       h('div', { class: 'row' }, App.can('edit') ? h('a', { class: 'btn', href: '/api/export.xml?team=' + App.team }, 'Export save file') : null, App.can('admin') && !App.cfg.bridge ? h('button', { onclick: () => file.click() }, 'Import save file…') : null));
   }
 
+  // ---- the public website's home page (site admins): about us, services, contact, who gets booking requests
+  function websiteTab() {
+    const box = h('div', { class: 'card dim' }, 'Loading…');
+    api('GET', '/api/site/landing').then((l) => {
+      const f = { ...l, services: (l.services || []).map((x) => ({ ...x })) };
+      const text = (k, label, ph) => h('label', { class: 'f' }, h('span', {}, label), h('input', { value: f[k] || '', placeholder: ph || '', oninput: (e) => { f[k] = e.target.value; } }));
+      box.className = 'card';
+      box.replaceChildren(h('h2', {}, 'Home page'),
+        h('p', { class: 'dim', style: { marginTop: 0 } }, 'What everyone sees first on the website: about us, the Browse content and Book services buttons, and "Sign in as production team".'),
+        h('div', { class: 'form' },
+          h('label', { class: 'f', style: { gridColumn: '1 / -1' } }, h('span', {}, 'Heading'), h('input', { value: f.title || '', oninput: (e) => { f.title = e.target.value; } })),
+          h('label', { class: 'f', style: { gridColumn: '1 / -1' } }, h('span', {}, 'About us'), h('textarea', { rows: 5, oninput: (e) => { f.about = e.target.value; } }, f.about || '')),
+          h('div', { class: 'f' }, h('span', { class: 'flabel' }, 'Background picture'), fieldInput({ k: 'image', t: 'image' }, f.image, (v) => { f.image = v; })),
+          text('email', 'Contact email', 'info@…'), text('phone', 'Contact phone'),
+          h('label', { class: 'f' }, h('span', {}, 'Booking requests go to'), h('select', { onchange: (e) => { f.bookingTeam = e.target.value; } }, l.teams.map((t) => h('option', { value: t.id, selected: t.id === f.bookingTeam }, t.name))))),
+        h('h3', { style: { marginTop: '16px' } }, 'Services'),
+        fieldInput({ k: 'services', t: 'list', fields: [{ k: 'title', l: 'Service', t: 'text' }, { k: 'text', l: 'Short description', t: 'text' }] }, f.services, (v) => { f.services = v; }),
+        h('div', { class: 'row', style: { marginTop: '14px' } }, h('button', { class: 'primary', onclick: async () => { try { await api('PUT', '/api/site/landing', f); toast('Home page saved'); } catch (e) { oops(e); } } }, 'Save'),
+          h('a', { class: 'btn', href: '/', target: '_blank', rel: 'noopener' }, 'View the home page ↗')));
+    }).catch((e) => { box.textContent = e.message; });
+    return box;
+  }
+
   App.pages.settings = () => {
     const local = App.cfg.mode === 'local';
     const tabs = (App.cfg.bridge ? [] : [['team', 'Production team']]).concat([['members', 'Members'], ['account', 'My account']]);   // team settings are made on the website
     if ((local || App.machine.remote) && App.machine.admin) tabs.push(['connections', 'Connections'], ['machine', local ? 'This machine' : 'Production PC']);
     if (!App.cfg.bridge && App.teams.some((t) => t.role === 'Admin')) tabs.push(['keys', 'Machine keys']);   // keys are made on the website
+    if (!local && App.machine.siteAdmin) tabs.push(['website', 'Website']);
     if (!local) tabs.push(['server', 'Server']);
     if (App.settingsTab) { tab = App.settingsTab; App.settingsTab = null; }
     if (!App.cfg.bridge) tabs.push(['file', 'Save file']);
     if (App.cfg.bridge) tabs.sort((a, b) => ['connections', 'machine', 'members', 'account'].indexOf(a[0]) - ['connections', 'machine', 'members', 'account'].indexOf(b[0]));   // the PC: CasparCG and devices first
     if (!tabs.some(([k]) => k === tab)) tab = tabs.some(([k]) => k === 'connections') && App.cfg.bridge ? 'connections' : tabs[0][0];
-    const body = { team: teamTab, members: membersTab, account: accountTab, connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab, server: App.serverTab }[tab]();
+    const body = { team: teamTab, members: membersTab, account: accountTab, connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab, server: App.serverTab, website: websiteTab }[tab]();
     return { el: h('div', {}, pageHead('Settings'), h('div', { class: 'tabs' }, tabs.map(([k, l]) => h('button', { class: k === tab ? 'on' : '', onclick: () => { tab = k; route(); } }, l))), body) };
   };
 })();

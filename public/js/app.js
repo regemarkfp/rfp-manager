@@ -47,8 +47,11 @@ const App = {
   personByEmail(email) { const m = this.list('member').find((x) => x.data.email === email); return m ? m.data : null; },
   limited() { return !!Schema.ROLE_SEES[this.role]; },          // a coach or an official
   onlineUrl(hash) { return (this.cfg && this.cfg.cloudUrl ? this.cfg.cloudUrl.replace(/\/+$/, '') : '') + '/app' + (hash || ''); },
-  canScore() { return this.cfg && this.cfg.mode === 'local' && this.can('score'); },
-  scorerUrl(id, f) { const s = Scoring.sportFor(f.sport); return `/live/${s && s.id === 'cricket' ? 'stats' : 'sport'}.html?fixture=${encodeURIComponent(id)}`; },
+  // the Android app (TWA): it opens the website with ?android=<build>; remembered for this app session
+  isApp() { try { if (/[?&]android=\d+/.test(location.search)) sessionStorage.setItem('rfp-app', 'android'); return sessionStorage.getItem('rfp-app') === 'android'; } catch (e) { return false; } },
+  // scoring: on the production PC (and its network), and in the Android app – not in a web browser on the website
+  canScore() { return !!this.cfg && this.can('score') && (this.cfg.mode === 'local' || this.isApp()); },
+  scorerUrl(id, f) { const s = Scoring.sportFor(f.sport); return `/live/${s && s.id === 'cricket' ? 'stats' : 'sport'}.html?fixture=${encodeURIComponent(id)}${this.cfg && this.cfg.mode === 'cloud' && this.isApp() ? '&app=android' : ''}`; },
   commsUrl(id, f) { const s = Scoring.sportFor(f.sport); return `/live/${s && s.id === 'cricket' ? 'commentary' : 'sport-commentary'}.html?fixture=${encodeURIComponent(id)}`; },
   img(id) { return id && this.docs.has(id) ? '/media/' + id : ''; },
   fixtureName(f) { return f.name || f.autoName || 'Match'; },
@@ -185,7 +188,7 @@ function navFor() {
   return [
     ['', [['#/', 'Dashboard']]],
     ['Matches', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions']]],
-    ['Productions', [['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], ['#/list/expense', App.can('edit') ? 'Expenses' : 'My expenses'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment']]],
+    ['Productions', [['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], App.can('edit') && !local ? ['#/list/booking', 'Booking requests' + (App.waitingBookings && App.waitingBookings().length ? ` (${App.waitingBookings().length})` : '')] : null, ['#/list/expense', App.can('edit') ? 'Expenses' : 'My expenses'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment']].filter(Boolean)],
     ['Assets', [['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/theme', 'Themes'], ['#/images', 'Images']]],
     ['Advertising', [['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log']]],
     ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report']].concat(local ? [['#/bibles', 'Bibles']] : [])],
@@ -376,6 +379,13 @@ function fieldInput(f, value, onChange, ctx = {}) {
         if (value) sel.value = value;
       }).catch(() => {});
       return sel;
+    }
+    case 'member': {       // a person in this production team (by email), e.g. the Producer of a booking
+      const ms = App.list('member').filter((m) => !f.roles || f.roles.includes(m.data.role)).sort((a, b) => String(a.data.name || a.data.email).localeCompare(String(b.data.name || b.data.email)));
+      const known = ms.some((m) => m.data.email === value);
+      return h('select', { disabled: f.readonly || null, onchange: (e) => onChange(e.target.value) }, h('option', { value: '' }, '—'),
+        !known && value ? h('option', { value, selected: true }, value) : null,
+        ms.map((m) => h('option', { value: m.data.email, selected: m.data.email === value }, (m.data.name || m.data.email) + ' (' + m.data.role + ')')));
     }
     case 'image': return imageField(value, onChange, f.k);
     case 'list': return listField(f, value, onChange, ctx);

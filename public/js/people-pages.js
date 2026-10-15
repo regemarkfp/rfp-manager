@@ -179,4 +179,64 @@
     box.repaint = () => { if (base && base.repaint) base.repaint(); if (exp) exp.repaint(); };
     return box;
   };
+
+  // ---- bookings nobody has responded to yet: Admins see all of them (to allocate / reallocate), Producers theirs
+  const WAITING = ['New', 'Assigned', 'Declined by producer', '', undefined];
+  App.waitingBookings = () => {
+    if (App.cfg.mode !== 'cloud' || !App.can('edit')) return [];
+    const me = String(App.me.email || '').toLowerCase();
+    return App.list('booking').filter((b) => WAITING.includes(b.data.status) && (App.can('admin') || (String(b.data.producer || '').toLowerCase() === me && b.data.status === 'Assigned')))
+      .sort((a, b) => String(a.data.received || '').localeCompare(String(b.data.received || '')));
+  };
+  async function respondTo(id, accept) {
+    const note = accept ? '' : await promptBox('Decline this booking', 'Why (the Admins see this)', '');
+    if (!accept && note === null) return;
+    try {
+      const r = await api('POST', `/api/bookings/${encodeURIComponent(id)}/respond?team=${App.team}`, { accept, note: note || '' });
+      App.docs.set(r.doc.id, r.doc);
+      if (accept && r.production) { toast('Accepted – set up the production and its crew'); location.hash = '#/edit/production/' + r.production; } else { toast('Declined'); route(); }
+    } catch (e) { oops(e); }
+  }
+  function waitingCard() {
+    const list = App.waitingBookings();
+    if (!list.length) return null;
+    const admin = App.can('admin'), me = String(App.me.email || '').toLowerCase();
+    const producers = App.list('member').filter((m) => ['Producer', 'Admin'].includes(m.data.role));
+    const allocate = async (b, email) => {
+      try { const r = await api('PUT', `/api/docs/booking/${encodeURIComponent(b.id)}?team=${App.team}`, { data: { ...b.data, producer: email } }); App.docs.set(r.doc.id, r.doc); toast(email ? 'Allocated – they get an email' : 'Allocation removed'); route(); } catch (e) { oops(e); }
+    };
+    return h('div', { class: 'card', style: { marginBottom: '16px', borderColor: 'var(--accent)' } },
+      h('div', { class: 'spread' }, h('h2', { style: { margin: 0 } }, `Bookings waiting for a response (${list.length})`), h('a', { class: 'btn sm', href: '#/list/booking' }, 'All booking requests')),
+      h('table', { class: 't', style: { marginTop: '10px' } }, h('tr', {}, h('th', {}, 'Received'), h('th', {}, 'Who'), h('th', {}, 'Service'), h('th', {}, 'Date'), h('th', {}, 'Producer'), h('th', {}, 'Status'), h('th', {}, '')),
+        list.map((b) => {
+          const d = b.data, mine = String(d.producer || '').toLowerCase() === me;
+          return h('tr', {}, h('td', { class: 'nowrap dim' }, d.received || ''), h('td', {}, h('a', { href: '#/edit/booking/' + b.id }, d.name || '—'), d.organisation ? h('div', { class: 'dim small' }, d.organisation) : null),
+            h('td', {}, d.service || ''), h('td', { class: 'nowrap' }, d.date ? UI.fmtDate(d.date) : ''),
+            h('td', {}, admin ? h('select', { onchange: (e) => allocate(b, e.target.value) }, h('option', { value: '' }, 'Choose a Producer…'),
+              producers.map((m) => h('option', { value: m.data.email, selected: m.data.email === d.producer }, m.data.name || m.data.email))) : (d.producer || '')),
+            h('td', {}, h('span', { class: 'pill' + (d.status === 'Declined by producer' ? ' warn' : '') }, d.status || 'New'), d.status === 'Declined by producer' && d.response ? h('div', { class: 'dim small' }, '"' + d.response + '"') : null),
+            h('td', { class: 'nowrap' }, mine && d.status === 'Assigned' ? [h('button', { class: 'sm primary', onclick: () => respondTo(b.id, true) }, 'Accept'), ' ', h('button', { class: 'sm danger', onclick: () => respondTo(b.id, false) }, 'Decline')] : h('a', { class: 'btn sm', href: '#/edit/booking/' + b.id }, 'Open')));
+        })));
+  }
+  // dashboard, under the team's name: the verse of the day (small), then bookings waiting for a response
+  App.dashBelowHero = () => { const v = App.verseCard(true); v.style.marginBottom = '16px'; return [v, waitingCard()]; };
+
+  // ---- a booking request: the allocated Producer accepts (a production is made) or declines it
+  App.panels.booking = (doc) => {
+    const d = (App.docs.get(doc.id) || doc).data;
+    const me = String(App.me.email || '').toLowerCase();
+    const mine = String(d.producer || '').toLowerCase() === me;
+    const admin = App.can('admin');
+    const who = (email) => { const m = App.list('member').find((x) => x.data.email === email); return m ? m.data.name || m.data.email : email; };
+    const respond = (accept) => respondTo(doc.id, accept);
+    const prod = d.production && App.docs.get(d.production);
+    return h('div', { class: 'card' }, h('div', { class: 'spread' },
+      h('div', {}, h('h2', { style: { margin: 0 } }, 'Booking request ', h('span', { class: 'pill' + (d.status === 'Accepted' || d.status === 'Booked' ? ' ok' : d.status === 'Declined by producer' ? ' warn' : '') }, d.status || 'New')),
+        h('div', { class: 'dim small' }, d.producer ? 'Producer: ' + who(d.producer) : admin ? 'Not allocated yet: choose a Producer below and save. They get an email.' : '',
+          d.response ? ' · "' + d.response + '"' : '')),
+      h('div', { class: 'row' },
+        (mine || (admin && d.producer)) && !['Accepted', 'Booked', 'Not going ahead'].includes(d.status) ? [h('button', { class: 'primary', onclick: () => respond(true) }, 'Accept'), h('button', { class: 'danger', onclick: () => respond(false) }, 'Decline')] : null,
+        prod ? h('a', { class: 'btn primary', href: '#/edit/production/' + prod.id }, 'Open the production – crew & setup ›') : null)),
+      d.status === 'Accepted' && !prod && d.production ? h('p', { class: 'dim small' }, 'Production made: ' + d.production) : null);
+  };
 })();

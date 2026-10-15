@@ -14,6 +14,7 @@
     Official: ['org', 'member', 'club', 'squad', 'player', 'competition', 'venue', 'fixture', 'image', 'theme'],
   };
   const EXPENSE_CATS = ['Travel', 'Fuel', 'Accommodation', 'Meals', 'Equipment hire', 'Consumables', 'Parking & tolls', 'Crew', 'Other'];
+  const BOOKING_STATUS = ['New', 'Assigned', 'Accepted', 'Declined by producer', 'Quoted', 'Booked', 'Not going ahead'];
   const EXPENSE_STATUS = ['Submitted', 'Approved', 'Rejected', 'Paid back'];
   const PRODUCTION_TYPES = ['Sport', 'Corporate', 'Religion', 'Concert', 'Conference', 'Wedding', 'Awards', 'Esports', 'Other'];
   const STATUSES = ['Upcoming', 'Live', 'Completed', 'Postponed', 'Cancelled'];
@@ -82,7 +83,8 @@
       { k: 'date', l: 'Date', t: 'date' }, { k: 'days', l: 'Days', t: 'number', ph: '1' }, { k: 'venue', l: 'Venue', t: 'ref', ref: 'venue' },
       { k: 'event', l: 'Event', t: 'text', ph: 'From the competition unless you type one', help: 'Shown on the call sheet and rundown.' },
       { k: 'txTime', l: 'TX / kick-off time', t: 'time', help: 'Default TX time for the crew and the start line of the rundown.' },
-      { k: 'client', l: 'Client', t: 'text' }, { k: 'description', l: 'Description', t: 'textarea' },
+      { k: 'client', l: 'Client', t: 'text' }, { k: 'producer', l: 'Producer', t: 'member', roles: ['Producer', 'Admin'] }, { k: 'description', l: 'Description', t: 'textarea' },
+      { k: 'booking', l: 'Booking request', t: 'ref', ref: 'booking', hidden: true },
       { k: 'remoteStudio', l: 'Remote studio / gallery', t: 'text', ph: 'OB van, studio name…' }, { k: 'remoteStudioAddress', l: 'Remote studio address', t: 'text' },
       { k: 'contacts', l: 'Key contacts', t: 'list', help: 'Stadium manager, production coordinator, technical manager… Pick a crew member or type a name and number.', fields: [
         { k: 'title', l: 'Title', t: 'combo', opts: ['Stadium Manager', 'Production Coordinator', 'Technical Manager', 'Producer', 'Client Contact', 'Safety Officer'] },
@@ -187,6 +189,13 @@
       { k: 'viewerPassword', l: 'Viewer password', t: 'text', help: 'Only used when "Who can watch" is Password.' },
       { k: 'teamOnly', l: 'Only this production team', t: 'bool', help: 'Off: any production team can stream its productions on this channel. On: only this team\'s productions.' },
       { k: 'disabled', l: 'Switched off', t: 'bool', help: 'Hidden, and nobody can stream to it or watch it.' }] },
+    booking: { label: 'Booking request', plural: 'Booking requests', group: 'Productions', title: (d) => [d.name, d.service].filter(Boolean).join(' · '), cols: ['received', 'name', 'service', 'date', 'producer', 'status'], fields: [
+      { k: 'status', l: 'Status', t: 'select', opts: BOOKING_STATUS, def: 'New' },
+      { k: 'producer', l: 'Producer', t: 'member', roles: ['Producer', 'Admin'], help: 'The Producer who looks after this booking. Only they (and Admins) see it; they accept or decline it.' },
+      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'email', l: 'Email', t: 'text' }, { k: 'phone', l: 'Phone', t: 'text' }, { k: 'organisation', l: 'Organisation', t: 'text' },
+      { k: 'service', l: 'Service', t: 'text' }, { k: 'date', l: 'Date of the event', t: 'date' }, { k: 'venue', l: 'Where', t: 'text' },
+      { k: 'details', l: 'What they asked', t: 'textarea' }, { k: 'notes', l: 'Our notes', t: 'textarea' }, { k: 'received', l: 'Received', t: 'text', help: 'When the request came in from the website.' },
+      { k: 'production', l: 'Production', t: 'ref', ref: 'production', help: 'The production made for this booking.' }] },
     expense: { label: 'Expense', plural: 'Expenses', group: 'Productions', title: (d) => [d.description, d.amount ? Number(d.amount).toFixed(2) : ''].filter(Boolean).join(' · '), cols: ['date', 'production', 'description', 'category', 'amount', 'status'], fields: [
       { k: 'production', l: 'Production', t: 'ref', ref: 'production', req: true }, { k: 'date', l: 'Date', t: 'date' },
       { k: 'description', l: 'What for', t: 'text', req: true, ph: 'Fuel to the venue' }, { k: 'category', l: 'Category', t: 'combo', opts: EXPENSE_CATS },
@@ -305,6 +314,6 @@
     read: (role) => ROLES.includes(role),
   };
 
-  return { ENTITIES: E, LINE_COLORS, ROLES, STATUSES, PRODUCTION_TYPES, SOURCES, EQUIP_CATS, SYSTEM_TYPES, ALL_TYPES, PC_EDIT, ROLE_SEES, EXPENSE_CATS, EXPENSE_STATUS, officiates, sees, resolveSquad, snapshotTeam, fieldsFor, age,
+  return { ENTITIES: E, LINE_COLORS, ROLES, STATUSES, PRODUCTION_TYPES, SOURCES, EQUIP_CATS, SYSTEM_TYPES, ALL_TYPES, PC_EDIT, ROLE_SEES, EXPENSE_CATS, EXPENSE_STATUS, BOOKING_STATUS, officiates, sees, resolveSquad, snapshotTeam, fieldsFor, age,
     parseDuration, fmtDuration, rundownTimes, costing, CAN };
 });

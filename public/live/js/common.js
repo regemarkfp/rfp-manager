@@ -43,7 +43,10 @@
     // RFP Manager: the match comes from the page address (?fixture=<id>). Without one, the screen follows the match
     // that is on air. Screens opened with ?key=<output key> are view-only and need no sign-in.
     pcQuery: (() => { const p = new URLSearchParams(location.search).get('pc'); return p ? '?pc=' + encodeURIComponent(p) : ''; })(),
-    query: (() => { const q = new URLSearchParams(location.search), o = new URLSearchParams(); ['fixture', 'key', 'team', 'pc'].forEach(k => { if (q.get(k)) o.set(k, q.get(k)); }); const s = o.toString(); return s ? '?' + s : ''; })(),
+    query: (() => { const q = new URLSearchParams(location.search), o = new URLSearchParams(); ['fixture', 'key', 'team', 'pc'].forEach(k => { if (q.get(k)) o.set(k, q.get(k)); });
+      let appTab = q.get('app') === 'android'; try { if (appTab) sessionStorage.setItem('rfp-app', 'android'); appTab = appTab || sessionStorage.getItem('rfp-app') === 'android'; } catch (e) { /* ignore */ }
+      if (appTab) o.set('app', 'android');      // the Android app: scoring allowed
+      const s = o.toString(); return s ? '?' + s : ''; })(),
     rfp: { canScore: false, user: '', fixtureId: '' },
     async connect(r) {
       role = r;

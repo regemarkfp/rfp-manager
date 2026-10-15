@@ -155,6 +155,52 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       el('div', { class: 'tabs' }, tabLink('home', 'Home'), tabLink('upcoming', 'Upcoming' + (up.length ? ` (${up.length})` : '')), tabLink('videos', 'Videos'), tabLink('about', 'About')), body];
   }
 
+  // ---- the landing page: about us, Browse content, Book services, sign in as a production team
+  let L = null;
+  async function landingData() { if (!L) L = await get('/api/public/landing'); return L; }
+  async function landingPage() {
+    let l;
+    try { l = await landingData(); } catch (e) { return el('div', { class: 'empty' }, e.message); }
+    document.title = l.site || 'RegemarkFP';
+    const live = (D.live || [])[0];
+    const team = () => { if (D.me && D.me.teams) location.href = '/app'; else signIn('Production team members: sign in to open your Studio.'); };
+    return [
+      el('section', { class: 'land-hero', style: l.image ? { backgroundImage: `linear-gradient(90deg, rgba(10,10,10,.92) 35%, rgba(10,10,10,.55)), url("${img(l.image)}")` } : {} },
+        el('img', { class: 'land-logo', src: '/brand/rfp-logo.png', alt: l.site || '' }),
+        el('h1', {}, l.title), el('p', { class: 'land-about' }, l.about),
+        el('div', { class: 'land-buttons' }, el('a', { class: 'btn-big primary', href: '/browse', 'data-nav': '' }, 'Browse content'), el('a', { class: 'btn-big', href: '/book', 'data-nav': '' }, 'Book services')),
+        el('a', { class: 'land-team', href: '#', onclick: (e) => { e.preventDefault(); team(); } }, D.me && D.me.teams ? 'Open your Studio (production team) ›' : 'Sign in as production team')),
+      live ? el('a', { class: 'land-live', href: '/watch/' + live.slug }, el('span', { class: 'badge live', style: { position: 'static' } }, '● LIVE'), el('b', {}, live.title), el('span', { class: 'sub' }, live.channel.name + ' · watch now ›')) : null,
+      (l.services || []).length ? [el('h2', { class: 'sec' }, 'What we do'), el('div', { class: 'land-services' }, l.services.map((x) => el('a', { class: 'svc', href: '/book?service=' + encodeURIComponent(x.title), 'data-nav': '' }, el('b', {}, x.title), el('p', {}, x.text || ''), el('span', { class: 'more' }, 'Book ›'))))] : null,
+      l.email || l.phone ? el('p', { class: 'land-contact' }, 'Contact us: ', l.email ? el('a', { href: 'mailto:' + l.email }, l.email) : null, l.email && l.phone ? ' · ' : '', l.phone ? el('a', { href: 'tel:' + l.phone.replace(/\s+/g, '') }, l.phone) : null) : null];
+  }
+  async function bookPage(service) {
+    let l;
+    try { l = await landingData(); } catch (e) { return el('div', { class: 'empty' }, e.message); }
+    document.title = 'Book services · ' + (l.site || 'RegemarkFP');
+    const f = { name: D.me ? D.me.name : '', email: D.me ? D.me.email : '', phone: '', organisation: '', service, date: '', venue: '', details: '', website: '' };
+    const input = (k, label, attrs = {}) => el('label', { class: 'fld' }, el('span', {}, label), el(attrs.rows ? 'textarea' : 'input', { ...attrs, value: f[k] || '', oninput: (e) => { f[k] = e.target.value; } }));
+    const opts = (l.services || []).map((x) => x.title);
+    const sel = el('select', { onchange: (e) => { f.service = e.target.value; } }, el('option', { value: '' }, 'Choose…'), opts.map((o) => el('option', { value: o, selected: o === service ? '' : null }, o)), el('option', { value: 'Something else' }, 'Something else'));
+    const err = el('p', { class: 'err' });
+    const box = el('div', { class: 'book' });
+    const btn = el('button', { class: 'primary', type: 'submit' }, 'Send request');
+    const form = el('form', { class: 'book-form', onsubmit: async (e) => {
+      e.preventDefault(); btn.disabled = true; err.textContent = '';
+      try { if (form.querySelector('textarea')) f.details = form.querySelector('textarea').value; await post('/api/public/booking', f);
+        box.replaceChildren(el('h1', {}, 'Thank you'), el('p', { class: 'sub' }, 'We have your request and will be in touch soon.' + (f.email ? ' A copy is on its way to ' + f.email + '.' : '')), el('a', { class: 'btn-big', href: '/', 'data-nav': '' }, 'Back to the home page'));
+      } catch (x) { err.textContent = x.message; btn.disabled = false; }
+    } },
+      input('name', 'Your name *', { required: '', autocomplete: 'name' }), input('organisation', 'Organisation / club / church', { autocomplete: 'organization' }),
+      input('email', 'Email', { type: 'email', autocomplete: 'email' }), input('phone', 'Phone', { type: 'tel', autocomplete: 'tel' }),
+      el('label', { class: 'fld' }, el('span', {}, 'Service'), sel), input('date', 'Date of the event', { type: 'date' }), input('venue', 'Where', {}),
+      el('label', { class: 'fld wide' }, el('span', {}, 'Tell us about it'), el('textarea', { rows: 5, placeholder: 'What is the event, how many cameras or what you would like streamed, graphics, anything else…' })),
+      el('input', { class: 'hp', name: 'website', tabindex: '-1', autocomplete: 'off', oninput: (e) => { f.website = e.target.value; } }),
+      err, el('div', { class: 'wide' }, btn));
+    box.append(el('h1', {}, 'Book services'), el('p', { class: 'sub' }, 'Tell us about your event and we will get back to you with a quote.'), form);
+    return box;
+  }
+
   // ---- signing in and subscribing
   // Everyone signs in here with Google and stays on the website (subscriptions, tickets). Members of a production
   // team are taken to the Studio (/app); nobody is asked to make a production team.
@@ -206,7 +252,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const p = location.pathname;
     const link = (href, label, icon) => el('a', { href, 'data-nav': '', class: p === href ? 'on' : '' }, el('span', {}, icon), label);
     const subs = D && D.me ? D.channels.filter((c) => (D.me.subscriptions || []).includes(c.id)) : [];
-    $('side').replaceChildren(link('/', 'Home', '⌂'), link('/matches', 'Matches', '◎'), link('/videos', 'Videos', '▶'), link('/subscriptions', 'Subscriptions', '★'), link('/channels', 'Channels', '◉'),
+    $('side').replaceChildren(link('/', 'Home', '⌂'), link('/browse', 'Browse', '▦'), link('/book', 'Book services', '✉'), link('/matches', 'Matches', '◎'), link('/videos', 'Videos', '▶'), link('/subscriptions', 'Subscriptions', '★'), link('/channels', 'Channels', '◉'),
       subs.length ? [el('hr'), el('h4', {}, 'Subscriptions'), subs.map((c) => el('a', { href: '/c/' + c.slug, 'data-nav': '', class: p === '/c/' + c.slug ? 'on' : '' }, c.logo ? el('img', { class: 'chip-logo', src: img(c.logo), alt: '' }) : el('span', { class: 'chip-logo' }), c.name))] : null,
       D && D.me && D.me.teams ? [el('hr'), el('a', { href: '/app', class: 'studio-link' }, el('span', {}, '⚙'), 'Studio (your production team)')] : null,
       D && !D.me ? [el('hr'), el('a', { href: '#', class: 'studio-link', onclick: (e) => { e.preventDefault(); signIn('Production team members: sign in to open your Studio.'); } }, el('span', {}, '⚙'), 'Production teams: sign in')] : null);
@@ -224,6 +270,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   async function render() {
     side(); meBox();
     const p = location.pathname, params = new URLSearchParams(location.search);
+    document.body.classList.toggle('landing', p === '/' || p === '');
     document.title = D.site || 'RegemarkFP';
     let view;
     if (p.startsWith('/c/')) view = await channelPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')), params.get('tab'));
@@ -231,6 +278,8 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     else if (p === '/matches') view = matchesPage();
     else if (p === '/channels') view = channelsPage();
     else if (p === '/subscriptions') view = subscriptionsPage();
+    else if (p === '/book') view = await bookPage(params.get('service') || '');
+    else if (p === '/' || p === '') view = await landingPage();
     else view = home();
     $('main').replaceChildren(...[view].flat(Infinity).filter(Boolean));
     document.body.classList.remove('side-open');
@@ -242,7 +291,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   });
   window.addEventListener('popstate', render);
   $('menu').addEventListener('click', () => document.body.classList.toggle('side-open'));
-  $('search').addEventListener('submit', (e) => { e.preventDefault(); query = e.target.querySelector('input').value.trim().toLowerCase(); if (!['/', '/videos', '/matches', '/channels'].includes(location.pathname)) history.pushState(null, '', '/'); render(); });
+  $('search').addEventListener('submit', (e) => { e.preventDefault(); query = e.target.querySelector('input').value.trim().toLowerCase(); if (!['/browse', '/videos', '/matches', '/channels'].includes(location.pathname)) history.pushState(null, '', '/browse'); render(); });
   $('search').querySelector('input').addEventListener('input', (e) => { if (!e.target.value) { query = ''; render(); } });
 
   async function load() {
@@ -256,5 +305,5 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     render();
   }
   load();
-  setInterval(async () => { try { D = await get('/api/public/home'); if (!location.pathname.startsWith('/c/')) render(); } catch (e) { /* next time */ } }, 30000);   // live now / viewers
+  setInterval(async () => { try { D = await get('/api/public/home'); if (!location.pathname.startsWith('/c/') && !['/', '/book'].includes(location.pathname)) render(); } catch (e) { /* next time */ } }, 30000);   // live now / viewers
 })();

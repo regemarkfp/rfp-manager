@@ -41,6 +41,7 @@
           (App.gfx || App.machine.outputKey) && App.can('score') ? h('div', { class: 'row', style: { marginLeft: 'auto' } },
             h('a', { class: 'btn', href: '/live/worship.html', title: 'Songs, scripture and slides for services' }, 'Worship control ↗'),
             h('a', { class: 'btn primary', href: '/live/control.html', title: 'Take graphics for the match on air' }, 'Graphics control ↗')) : null),
+        App.dashBelowHero ? App.dashBelowHero() : null,
         h('div', { class: 'cards', style: { marginBottom: '16px' } },
           h('div', { class: 'tile' }, h('b', {}, live.length), h('span', {}, 'Live now')),
           h('div', { class: 'tile' }, h('b', {}, todays.length + live.length), h('span', {}, 'Matches today')),
@@ -75,6 +76,7 @@
       case 'image': return App.img(v) ? h('img', { class: 'thumb', src: App.img(v), alt: '', loading: 'lazy' }) : '';
       case 'color': return h('span', { class: 'nowrap' }, h('span', { class: 'swatch', style: { background: v } }), v);
       case 'ref': return App.title(f.ref, v);
+      case 'member': { const m = App.list('member').find((x) => x.data.email === v); return m ? (m.data.name || m.data.email) : v || ''; }
       case 'multi': return (v || []).join(', ');
       case 'money': return UI.money(v, cur());
       case 'date': return UI.fmtDate(v);

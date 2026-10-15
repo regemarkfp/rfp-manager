@@ -14,6 +14,9 @@
   // the Android app's build: from the address it opened (?android=12), kept for later pages
   const q = new URLSearchParams(location.search).get('android');
   if (q && /^\d+$/.test(q)) store.set(ANDROID_KEY, q);
+  // this tab is the Android app (scoring is allowed in the app, not in a browser)
+  const fromApp0 = /^android-app:\/\/com\.regemarkfp\.rfpmanager/.test(document.referrer || '');
+  if ((q && /^\d+$/.test(q)) || fromApp0) { try { sessionStorage.setItem('rfp-app', 'android'); } catch (e) { /* ignore */ } }
   const fromApp = /^android-app:\/\/com\.regemarkfp\.rfpmanager/.test(document.referrer || '');
   if (fromApp && !store.get(ANDROID_KEY)) store.set(ANDROID_KEY, '0');         // an early app that did not say its build
 

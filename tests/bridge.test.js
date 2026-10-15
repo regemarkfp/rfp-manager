@@ -33,7 +33,14 @@ test('bridge PC: website manages records, PC scores and plays out, works offline
   const webScorer = await liveClient(cloud, { cookie: web.cookie(), fixture: 'fixture_one', role: 'sport' });
   t.after(() => webScorer.close());
   await until(() => webScorer.state && webScorer.state.sport && webScorer.state.sport.setup, 3000, 'website scorer state');
-  await assert.rejects(webScorer.send('sport', 'apply', { version: webScorer.state.sport.version, setup: webScorer.state.sport.setup, events: [] }), /production PC/);
+  await assert.rejects(webScorer.send('sport', 'apply', { version: webScorer.state.sport.version, setup: webScorer.state.sport.setup, events: [] }), /not in a web browser/);
+  assert.equal(webScorer.got.find((m) => m.type === 'rfp').canScore, false);
+  // the Android app scores on the website
+  const appScorer = await liveClient(cloud, { cookie: web.cookie(), fixture: 'fixture_one', role: 'sport', extra: { app: 'android' } });
+  t.after(() => appScorer.close());
+  await until(() => appScorer.state && appScorer.state.sport && appScorer.state.sport.setup, 3000, 'app scorer state');
+  assert.equal(appScorer.got.find((m) => m.type === 'rfp').canScore, true);
+  await appScorer.send('sport', 'apply', { version: appScorer.state.sport.version, setup: appScorer.state.sport.setup, events: [] });
 
   // a bridge PC: cannot be used on its own, links with Google
   const pc = await boot({ standalone: false, defaultCloudUrl: cloud.url, google: { clientId: '', certsUrl }, syncSeconds: 1, machineName: 'OB truck' });

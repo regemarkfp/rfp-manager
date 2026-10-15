@@ -57,8 +57,8 @@ async function until(fn, ms = 5000, label = 'condition') {
 
 
 // A live screen (scorer, control, output…) talking the same protocol as the pages under /live/.
-async function liveClient(app, { cookie, key, fixture, role = 'stats' } = {}) {
-  const q = new URLSearchParams();
+async function liveClient(app, { cookie, key, fixture, role = 'stats', extra = {} } = {}) {
+  const q = new URLSearchParams(extra);
   if (fixture) q.set('fixture', fixture);
   if (key) q.set('key', key);
   const ws = new WebSocket(app.url.replace('http', 'ws') + '/live/ws' + (q.toString() ? '?' + q : ''), cookie ? { headers: { cookie } } : undefined);

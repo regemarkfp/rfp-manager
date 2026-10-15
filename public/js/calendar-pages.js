@@ -9,21 +9,18 @@
 
   // ---- verse of the day
   let verse = null;
-  App.verseCard = () => {
-    const box = h('div', { class: 'card verse', style: { borderLeft: '4px solid var(--accent)' } });
-    const paint = (v) => box.replaceChildren(h('div', { class: 'dim small', style: { textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '6px' } }, 'Verse of the day'),
-      v.text ? h('div', { style: { fontSize: '17px', lineHeight: 1.5, fontStyle: 'italic' } }, '“' + v.text + '”') : null,
-      h('div', { style: { marginTop: '6px', fontWeight: 600 } }, v.ref, v.translation ? h('span', { class: 'dim small', style: { fontWeight: 400 } }, ' · ' + v.translation) : null));
+  App.verseCard = (small) => {
+    const box = h('div', { class: 'card verse', style: { borderLeft: '4px solid var(--accent)', ...(small ? { padding: '10px 16px' } : {}) } });
+    const paint = (v) => box.replaceChildren(h('div', { class: 'dim small', style: { textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: small ? '3px' : '6px', fontSize: small ? '11px' : null } }, 'Verse of the day'),
+      v.text ? h('div', { style: { fontSize: small ? '14px' : '17px', lineHeight: 1.5, fontStyle: 'italic' } }, '“' + v.text + '”') : null,
+      h('div', { style: { marginTop: small ? '3px' : '6px', fontWeight: 600, fontSize: small ? '13px' : null } }, v.ref, v.translation ? h('span', { class: 'dim small', style: { fontWeight: 400 } }, ' · ' + v.translation) : null));
     if (verse) paint(verse); else api('GET', '/api/verse').then((v) => { verse = v; paint(v); }).catch(() => box.remove());
     return box;
   };
   const home0 = App.pages.dashboard;
   App.pages.dashboard = () => {
     if (isCrew()) return crewHome();
-    const page = home0();
-    if (!page || !page.el) return page;
-    const v = App.verseCard(); v.style.marginBottom = '16px';
-    return { ...page, el: h('div', {}, v, page.el) };
+    return home0();
   };
 
   // ---- the events on the calendar

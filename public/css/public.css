@@ -96,6 +96,33 @@ h2.sec .count { color: var(--dim); font-weight: 400; font-size: 14px; }
 .signin-box { text-align: center; padding: 50px 20px; color: var(--dim); }
 .signin-box button { margin-top: 12px; }
 
+/* landing page */
+body.landing .side { display: none; } body.landing .layout { grid-template-columns: minmax(0, 1fr); } body.landing .search { visibility: hidden; }
+body.landing main { max-width: 1100px; margin: 0 auto; width: 100%; }
+.land-hero { border-radius: 20px; padding: 56px 48px; margin-top: 12px; background: radial-gradient(circle at 85% 20%, #00ff8233, transparent 55%), linear-gradient(135deg, #171717, #0f0f0f); background-size: cover; background-position: center; border: 1px solid var(--line); }
+.land-logo { height: 70px; margin-bottom: 18px; }
+.land-hero h1 { font-size: 40px; line-height: 1.15; margin: 0 0 14px; max-width: 720px; }
+.land-about { font-size: 17px; line-height: 1.6; color: #d6d6d6; max-width: 680px; margin: 0 0 26px; white-space: pre-wrap; }
+.land-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn-big { display: inline-block; padding: 13px 26px; border-radius: 26px; font-weight: 700; font-size: 16px; background: var(--panel2); border: 1px solid var(--line); }
+.btn-big.primary { background: var(--accent); color: #0b0b0b; border-color: var(--accent); }
+.btn-big:hover { filter: brightness(1.1); }
+.land-team { display: inline-block; margin-top: 18px; font-size: 13px; color: var(--dim); text-decoration: underline; text-underline-offset: 3px; }
+.land-team:hover { color: var(--text); }
+.land-live { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 12px 16px; border-radius: var(--radius); background: var(--panel); flex-wrap: wrap; }
+.land-live .sub { color: var(--dim); }
+.land-services { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.svc { background: var(--panel); border-radius: var(--radius); padding: 18px; display: grid; gap: 6px; border: 1px solid transparent; }
+.svc:hover { border-color: var(--accent); }
+.svc p { margin: 0; color: var(--dim); line-height: 1.5; } .svc .more { color: var(--accent); font-weight: 600; font-size: 13px; }
+.land-contact { color: var(--dim); margin: 28px 0 10px; } .land-contact a { color: var(--text); }
+/* booking form */
+.book { max-width: 760px; } .book h1 { margin: 18px 0 6px; } .book .sub { color: var(--dim); }
+.book-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
+.fld { display: grid; gap: 6px; } .fld span { font-size: 13px; color: var(--dim); } .wide { grid-column: 1 / -1; }
+.fld input, .fld select, .fld textarea { font: inherit; color: var(--text); background: #121212; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; box-sizing: border-box; }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+@media (max-width: 700px) { .land-hero { padding: 32px 22px; } .land-hero h1 { font-size: 28px; } .book-form { grid-template-columns: minmax(0, 1fr); } }
 /* sign-in window, account menu */
 .modal { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.6); display: grid; place-items: center; padding: 16px; }
 .modal-box { position: relative; width: 100%; max-width: 380px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 26px 22px 18px; text-align: center; display: grid; gap: 10px; justify-items: center; }
