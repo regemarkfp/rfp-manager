@@ -271,7 +271,8 @@ table.cs-plain td { padding: 2px 26px 2px 0; }
 .mcr-btns { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .mcr-btns button { padding: 14px 10px; font-weight: 600; white-space: normal; border-left: 4px solid var(--line); }
 .mcr-btns .k-technical, .mcr-btns .k-connection { border-left-color: var(--danger); } .mcr-btns .k-weather { border-left-color: #4da3ff; }
-.mcr-btns .k-break, .mcr-btns .k-starting { border-left-color: var(--warn); } .mcr-btns .k-custom { border-left-color: var(--accent); }
+.mcr-btns .k-break, .mcr-btns .k-starting { border-left-color: var(--warn); } .mcr-btns .k-custom, .mcr-btns .k-countdown { border-left-color: var(--accent); }
+.mcr-preset { border-left: 4px solid var(--accent); font-weight: 600; }
 .mcr-btns button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .mcr-custom { display: grid; gap: 6px; margin-top: 8px; }
 .mcr-ov { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; } .mcr-ov.on { border-color: var(--accent); }

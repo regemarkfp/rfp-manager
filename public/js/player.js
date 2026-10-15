@@ -113,9 +113,13 @@
       seek.addEventListener('pointermove', (e) => { if (dragging) seekTo(e.clientX); });
       seek.addEventListener('pointerup', () => { dragging = false; });
     }
-    const volBtn = btn('vol', 'Mute', () => { video.muted = !video.muted; if (!video.muted && video.volume === 0) video.volume = 0.8; paint(); if (opts.onUnmute && !video.muted) opts.onUnmute(); });
+    // the sound the bar controls: the video, or what plays instead of it for a while (an advert in master control)
+    let aud = null;
+    const A = () => aud || video;
+    const keep = () => saveSound(A());
+    const volBtn = btn('vol', 'Mute', () => { const a = A(); a.muted = !a.muted; if (!a.muted && a.volume === 0) a.volume = 0.8; if (!a.muted && a.paused && a !== video) a.play().catch(() => {}); keep(); paint(); if (opts.onUnmute && !a.muted) opts.onUnmute(); });
     const vol = el('div', 'pb-vol', el('div', 'lvl'));
-    const setVol = (x) => { const r = vol.getBoundingClientRect(); video.volume = Math.min(1, Math.max(0, (x - r.left) / r.width)); video.muted = video.volume === 0; if (!video.muted && opts.onUnmute) opts.onUnmute(); paint(); };
+    const setVol = (x) => { const r = vol.getBoundingClientRect(), a = A(); a.volume = Math.min(1, Math.max(0, (x - r.left) / r.width)); a.muted = a.volume === 0; if (!a.muted && opts.onUnmute) opts.onUnmute(); keep(); paint(); };
     let volDrag = false;
     vol.addEventListener('pointerdown', (e) => { volDrag = true; vol.setPointerCapture(e.pointerId); setVol(e.clientX); });
     vol.addEventListener('pointermove', (e) => { if (volDrag) setVol(e.clientX); });
@@ -145,8 +149,9 @@
     function paint() {
       play.replaceChildren(icon(video.paused ? 'play' : 'pause'));
       play.title = video.paused ? 'Play' : 'Pause';
-      volBtn.replaceChildren(icon(video.muted || video.volume === 0 ? 'mute' : 'vol'));
-      vol.firstChild.style.width = video.volume * 100 + '%'; vol.classList.toggle('muted', video.muted);
+      const a = A();
+      volBtn.replaceChildren(icon(a.muted || a.volume === 0 ? 'mute' : 'vol'));
+      vol.firstChild.style.width = a.volume * 100 + '%'; vol.classList.toggle('muted', a.muted);
       fullBtn.replaceChildren(icon(document.fullscreenElement ? 'exitfull' : 'full'));
       trackBtn.style.display = tracks && tracks.list().length > 1 ? '' : 'none';
       if (opts.live) {
@@ -176,13 +181,30 @@
       if (/INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || '')) return;
       if (e.key === ' ' || e.key === 'k') { e.preventDefault(); if (video.paused) video.play().catch(() => {}); else video.pause(); }
       else if (e.key === 'f') toggleFull();
-      else if (e.key === 'm') { video.muted = !video.muted; if (!video.muted && opts.onUnmute) opts.onUnmute(); }
+      else if (e.key === 'm') { const a = A(); a.muted = !a.muted; if (!a.muted && opts.onUnmute) opts.onUnmute(); keep(); paint(); }
       else if (e.key === 'ArrowLeft') video.currentTime = Math.max(0, video.currentTime - 10);
       else if (e.key === 'ArrowRight' && !opts.live) video.currentTime = Math.min(video.duration || 0, video.currentTime + 10);
     };
     document.addEventListener('keydown', onKey);
     paint();
-    return { el: bar, setTracks: (t) => { tracks = t; paint(); }, paint };
+    const setAudio = (el2) => { if (aud) aud.removeEventListener('volumechange', paint); aud = el2 || null; if (aud) aud.addEventListener('volumechange', paint); paint(); };
+    return { el: bar, setTracks: (t) => { tracks = t; paint(); }, paint, setAudio };
   }
-  window.RFPPlayer = { mount };
+  // the viewer's own sound settings (mute, volume), kept in this browser: every video starts with them
+  const SOUND = 'rfp.sound';
+  function sound() {
+    try { const x = JSON.parse(localStorage.getItem(SOUND) || '{}'); return { muted: x.muted === true, volume: Number.isFinite(x.volume) ? Math.min(1, Math.max(0, x.volume)) : 1 }; } catch (e) { return { muted: false, volume: 1 }; }
+  }
+  function saveSound(v) { try { localStorage.setItem(SOUND, JSON.stringify({ muted: !!v.muted, volume: v.volume })); } catch (e) { /* private window */ } }
+  // plays with the viewer's settings; only when the browser refuses sound without a tap does it start muted (onBlocked
+  // shows "Tap for sound"): that is not the viewer's choice, so it is not kept
+  function playWithSound(video, onBlocked) {
+    const p = sound();
+    video.volume = p.volume; video.muted = p.muted;
+    return video.play().catch((e) => {
+      if (e && e.name === 'NotAllowedError' && !video.muted) { video.muted = true; if (onBlocked) onBlocked(); return video.play().catch(() => {}); }
+      return undefined;
+    });
+  }
+  window.RFPPlayer = { mount, sound, saveSound, playWithSound };
 })();

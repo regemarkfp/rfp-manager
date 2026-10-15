@@ -37,40 +37,48 @@
     .slate p { margin: 0; color: #cfcfcf; max-width: 520px; font-size: clamp(13px, 2vw, 16px); }
     .slate .slogo { width: clamp(72px, 14vw, 140px); height: clamp(72px, 14vw, 140px); object-fit: contain; border-radius: 50%; background: rgba(0,0,0,.35); margin-bottom: 10px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 70%, transparent), 0 10px 30px rgba(0,0,0,.5); }
     .slate .slogo.brand { width: clamp(120px, 22vw, 220px); height: auto; border-radius: 0; background: none; box-shadow: none; }
+    .slate .scount { font-size: clamp(34px, 9vw, 96px); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .03em; line-height: 1.05; margin: 4px 0 6px; color: #fff; text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 45%, transparent); }
+    .slate .scount.zero { font-size: clamp(20px, 4vw, 34px); color: var(--accent); }
+    .mcr .slate .scount { font-size: 17cqh; } .mcr .slate .scount.zero { font-size: 6cqh; }
+    .slate p.small { font-size: 12px; color: #9a9a9a; }
     .slate .sbars { display: flex; gap: 6px; margin-top: 14px; }
     .slate .sbars i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: sb 1.2s infinite ease-in-out; }
     .slate .sbars i:nth-child(2) { animation-delay: .15s; } .slate .sbars i:nth-child(3) { animation-delay: .3s; }
     @keyframes sb { 0%, 80%, 100% { opacity: .25; transform: scale(.8); } 40% { opacity: 1; transform: scale(1.15); } }
     /* master control: slates, ad breaks and graphics over the live picture (this player only) */
-    .mcr { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
-    .mcr .slate { z-index: 1; } .mcr .slate .suntil { color: #bdbdbd; margin-top: 6px; font-size: 13px; }
+    /* master control: everything sits in the picture's frame (--fx/--fy/--fw/--fh, the incoming video's shape, set by watch.js) */
+    .stage { --fx: 0px; --fy: 0px; --fw: 100%; --fh: 100%; }
+    .mcr, .stage > .slate, .stage .sqbg { position: absolute; inset: auto; left: var(--fx); top: var(--fy); width: var(--fw); height: var(--fh); }
+    .mcr { z-index: 4; pointer-events: none; container-type: size; overflow: hidden; }
+    .mcr .slate { z-index: 1; inset: 0; width: auto; height: auto; }
+    .mcr .slate b { font-size: 7cqh; } .mcr .slate p { font-size: 3.6cqh; max-width: 80cqw; } .mcr .slate .slogo { width: 18cqh; height: 18cqh; } .mcr .slate .slogo.brand { width: 32cqh; height: auto; }
     .mcr .adbox { position: absolute; inset: 0; z-index: 3; background: #000; pointer-events: auto; }
-    .mcr .advid { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; }
-    .mcr .adbadge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,.72); color: #fff; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 4px; border-left: 3px solid var(--accent); font-variant-numeric: tabular-nums; }
+    .mcr .advid { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; object-fit: contain; }
+    .mcr .adsnd { left: 3cqw; bottom: 4cqh; pointer-events: auto; z-index: 5; position: absolute; }
     .mcr .ovl { position: absolute; inset: 0; z-index: 2; }
     .mcr .ov { position: absolute; }
-    .mcr .tl { top: 4%; left: 3%; } .mcr .tr { top: 4%; right: 3%; } .mcr .bl { bottom: 14%; left: 3%; } .mcr .br { bottom: 14%; right: 3%; }
-    .mcr .bug { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: clamp(11px, 1.6vw, 16px); letter-spacing: .06em; text-shadow: 0 1px 3px rgba(0,0,0,.8); opacity: .92; }
-    .mcr .bug img { height: clamp(24px, 5vw, 56px); width: auto; }
-    .mcr .bug span { background: rgba(0,0,0,.45); padding: 2px 8px; border-radius: 3px; }
-    .mcr .lower { left: 4%; bottom: 13%; max-width: 70%; display: grid; background: rgba(10,10,10,.82); border-left: 5px solid var(--accent); padding: 6px 14px; animation: lin .4s ease-out; }
-    .mcr .lower.right { left: auto; right: 4%; border-left: 0; border-right: 5px solid var(--accent); text-align: right; }
-    .mcr .lower b { font-size: clamp(14px, 2.4vw, 26px); } .mcr .lower span { color: #cfcfcf; font-size: clamp(11px, 1.6vw, 17px); }
+    .mcr .tl { top: 4cqh; left: 3cqw; } .mcr .tr { top: 4cqh; right: 3cqw; } .mcr .bl { bottom: 12cqh; left: 3cqw; } .mcr .br { bottom: 12cqh; right: 3cqw; }
+    .mcr .bug { display: flex; align-items: center; gap: 1cqh; font-weight: 800; font-size: 3cqh; letter-spacing: .06em; text-shadow: 0 1px 3px rgba(0,0,0,.8); opacity: .92; }
+    .mcr .bug img { height: 7cqh; width: auto; }
+    .mcr .bug span { background: rgba(0,0,0,.45); padding: .4cqh 1.2cqh; border-radius: 3px; }
+    .mcr .lower { left: 4cqw; bottom: 12cqh; max-width: 70cqw; display: grid; background: rgba(10,10,10,.82); border-left: .8cqh solid var(--accent); padding: 1cqh 2.4cqh; animation: lin .4s ease-out; }
+    .mcr .lower.right { left: auto; right: 4cqw; border-left: 0; border-right: .8cqh solid var(--accent); text-align: right; }
+    .mcr .lower b { font-size: 4.6cqh; } .mcr .lower span { color: #cfcfcf; font-size: 3.2cqh; }
     @keyframes lin { from { opacity: 0; transform: translateY(12px); } }
-    .mcr .ticker { left: 0; right: 0; bottom: 0; height: clamp(22px, 3.6vw, 36px); background: rgba(8,8,8,.85); border-top: 2px solid var(--accent); overflow: hidden; display: flex; align-items: center; }
-    .mcr .ticker .tk { white-space: nowrap; padding-left: 100%; animation: tick 22s linear infinite; font-weight: 600; font-size: clamp(11px, 1.7vw, 17px); }
+    .mcr .ticker { left: 0; right: 0; bottom: 0; height: 6.5cqh; background: rgba(8,8,8,.85); border-top: .3cqh solid var(--accent); overflow: hidden; display: flex; align-items: center; }
+    .mcr .ticker .tk { white-space: nowrap; padding-left: 100%; animation: tick 22s linear infinite; font-weight: 600; font-size: 3.4cqh; }
     @keyframes tick { to { transform: translateX(-100%); } }
-    .mcr .image { max-width: 30%; max-height: 30%; object-fit: contain; }
-    .player.has-bar .mcr .ticker { bottom: 0; }
-    /* squeeze-back: the live picture in a corner, the advert or sponsor board behind it */
-    .stage .sqbg { position: absolute; inset: 0; z-index: 0; background: #000; }
+    .mcr .image { max-width: 25cqw; max-height: 25cqh; object-fit: contain; }
+    /* squeeze-back: the live picture at three quarters, flush in its corner of the frame; the advert or board behind it */
+    .stage .sqbg { z-index: 0; background: #000; container-type: size; overflow: hidden; animation: sqin 1.2s ease both; }
+    @keyframes sqin { from { opacity: 0; } }
     .stage .sqbg img, .stage .sqbg video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-    .stage .sqbg .sqtext { position: absolute; left: 3%; bottom: 18%; max-width: 30%; font-weight: 800; font-size: clamp(14px, 2.6vw, 30px); text-shadow: 0 2px 8px rgba(0,0,0,.8); }
-    .stage > video:not(.advid) { transition: all .6s cubic-bezier(.2,.8,.2,1); }
-    .stage.squeeze > video:not(.advid) { z-index: 1; inset: auto; width: var(--sq, 62%); height: var(--sq, 62%); box-shadow: 0 0 0 3px var(--accent), 0 10px 30px rgba(0,0,0,.6); border-radius: 6px; }
-    .stage.sq-tr > video:not(.advid) { top: 4%; right: 3%; } .stage.sq-tl > video:not(.advid) { top: 4%; left: 3%; }
-    .stage.sq-br > video:not(.advid) { bottom: 4%; right: 3%; } .stage.sq-bl > video:not(.advid) { bottom: 4%; left: 3%; }
-    .mcr .sqbadge { top: auto; bottom: 10px; right: auto; left: 10px; }
+    .stage .sqbg .sqtext { position: absolute; left: 3cqw; bottom: 6cqh; max-width: 22cqw; font-weight: 800; font-size: 4.6cqh; line-height: 1.15; text-shadow: 0 2px 8px rgba(0,0,0,.8); }
+    .stage > video:not(.advid) { inset: auto; left: var(--fx); top: var(--fy); width: var(--fw); height: var(--fh); }
+    .stage.sqanim > video:not(.advid) { transition: left 1.4s cubic-bezier(.45,0,.2,1), top 1.4s cubic-bezier(.45,0,.2,1), width 1.4s cubic-bezier(.45,0,.2,1), height 1.4s cubic-bezier(.45,0,.2,1); will-change: left, top, width, height; }
+    .stage.squeeze > video:not(.advid) { z-index: 1; width: calc(var(--fw) * .75); height: calc(var(--fh) * .75); }
+    .stage.sq-tr > video:not(.advid) { left: calc(var(--fx) + var(--fw) * .25); } .stage.sq-br > video:not(.advid) { left: calc(var(--fx) + var(--fw) * .25); top: calc(var(--fy) + var(--fh) * .25); }
+    .stage.sq-bl > video:not(.advid) { top: calc(var(--fy) + var(--fh) * .25); }
     .unmute { position: absolute; left: 12px; bottom: 12px; z-index: 2; background: rgba(0,0,0,.7); }
     .err { color: #ff8a8a; }
     .msg a { color: var(--accent); }

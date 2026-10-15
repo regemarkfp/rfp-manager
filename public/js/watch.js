@@ -44,6 +44,15 @@
   let slateKind = '';
   function slateEl(kind) {
     const ch = (info && info.channel) || {}, ended = kind === 'ended';
+    if (kind === 'countdown') {                                   // before the stream starts: a countdown to its start time
+      const when = new Date(info.startsAt);
+      return el('div', { class: 'slate countdown' },
+        ch.logo ? el('img', { class: 'slogo', src: imgUrl(ch.logo), alt: ch.name || '' }) : el('img', { class: 'slogo brand', src: '/brand/rfp-logo.png', alt: (info && info.site) || '' }),
+        el('b', {}, info.title || 'Starting soon'),
+        el('div', { class: 'scount', 'data-count-to': info.startsAt }),
+        el('p', {}, when.toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })),
+        el('p', { class: 'small' }, 'This page starts playing by itself when the stream begins.'));
+    }
     return el('div', { class: 'slate' + (ended ? ' ended' : '') },
       ch.logo ? el('img', { class: 'slogo', src: imgUrl(ch.logo), alt: ch.name || '' }) : el('img', { class: 'slogo brand', src: '/brand/rfp-logo.png', alt: (info && info.site) || '' }),
       el('b', {}, ended ? 'This stream has ended' : 'Technical difficulties'),
@@ -107,12 +116,12 @@
   function playVod() {
     stop();
     const video = el('video', { playsinline: '', preload: 'auto', src: info.vod.url, poster: info.poster ? '/media/' + encodeURIComponent(info.poster) : null });
-    const unmute = el('button', { class: 'unmute', onclick: (e) => { e.stopPropagation(); video.muted = false; video.play().catch(() => {}); unmute.remove(); } }, '🔊 Tap for sound');
+    const unmute = el('button', { class: 'unmute', onclick: (e) => { e.stopPropagation(); video.muted = false; window.RFPPlayer.saveSound(video); video.play().catch(() => {}); unmute.remove(); } }, '🔊 Tap for sound');
     $('stage').replaceChildren(video);
     bar(video, { live: false, onUnmute: () => unmute.remove() });
     playing = true;
-    // with sound if the browser lets us; phones only start muted videos by themselves
-    video.play().catch(() => { video.muted = true; video.play().then(() => $('stage').append(unmute)).catch(() => {}); });
+    // with the viewer's sound settings; muted only when the browser will not start it with sound (then: tap for sound)
+    window.RFPPlayer.playWithSound(video, () => $('stage').append(unmute));
     beats(video, matchId ? { kind: 'match', match: matchId, title: info.vod.title || '' } : { kind: 'vod', start: info.vod.start });
   }
 
@@ -133,8 +142,7 @@
   function stop() { if (pc) { try { pc.close(); } catch (e) { /* closed */ } } pc = null; if (hls) { try { hls.destroy(); } catch (e) { /* gone */ } hls = null; } playing = false; }
 
   async function playWebRTC() {
-    const video = el('video', { autoplay: '', playsinline: '', muted: '' });
-    video.muted = true;
+    const video = el('video', { autoplay: '', playsinline: '' });
     pc = new RTCPeerConnection({ bundlePolicy: 'max-bundle' });
     pc.addTransceiver('video', { direction: 'recvonly' });
     pc.addTransceiver('audio', { direction: 'recvonly' });
@@ -160,8 +168,7 @@
 
   let hls = null, hlsOnly = false, withTracks = false, tracksBroken = false;
   function playHLS() {
-    const video = el('video', { autoplay: '', playsinline: '', muted: '' });
-    video.muted = true;
+    const video = el('video', { autoplay: '', playsinline: '' });
     const useTracks = !!info.audio && !tracksBroken;
     const src = useTracks ? info.audio.hls : info.hls;
     withTracks = useTracks;
@@ -197,10 +204,10 @@
   let current = null;
   function show(video, tracks) {
     playing = true;
-    const unmute = el('button', { class: 'unmute', onclick: (e) => { e.stopPropagation(); video.muted = false; video.play().catch(() => {}); unmute.remove(); } }, '🔊 Tap for sound');
-    $('stage').replaceChildren(video, unmute);
+    const unmute = el('button', { class: 'unmute', onclick: (e) => { e.stopPropagation(); video.muted = false; window.RFPPlayer.saveSound(video); video.play().catch(() => {}); unmute.remove(); } }, '🔊 Tap for sound');
+    $('stage').replaceChildren(video);
     current = bar(video, { live: true, tracks, onUnmute: () => unmute.remove() });
-    video.play().catch(() => {});
+    window.RFPPlayer.playWithSound(video, () => { if (!unmute.isConnected) $('stage').append(unmute); });
     slateKind = '';
     // the picture stops coming for a while: the slate over it, gone again as soon as it plays
     let stallT = null, over = null;
@@ -232,6 +239,10 @@
     if (!info.streaming) return message('Streaming is not set up on this website yet', '');
     if (!info.live && info.ended) { showSlate('ended'); return; }
     if (!info.live && (info.dropped || slateKind === 'difficulties')) { showSlate('difficulties'); return again(5000); }
+    if (!info.live && info.startsAt && Date.parse(info.startsAt) > Date.now() - 30 * 60e3) {
+      if (slateKind !== 'countdown' || !$('stage').querySelector('.slate.countdown')) showSlate('countdown');
+      return again(5000);
+    }
     if (!info.live) { message('Not live yet', (info.videos || []).length ? 'Watch a recording below, or stay here: it starts playing by itself when the stream begins.' : 'This page starts playing by itself when the stream begins.'); return again(5000); }
     if (playing) { if (!vodStart && info.audio && !withTracks && !tracksBroken) { stop(); playHLS(); } return; }   // the audio tracks became ready: switch to them
     if (!webrtcFits()) return playHLS();
@@ -335,14 +346,66 @@
 
   // ---- master control (the production's MCR): slates, ad breaks and graphics over the live picture, in this player only.
   // The stream itself (and its recording) stays clean. Times come from the website's clock.
-  const M = { state: null, skew: 0, layer: null, slate: null, ad: null, adKey: '', ov: null, ovKey: '', muted: null, timer: null, sq: null, sqKey: '' };
+  const M = { state: null, skew: 0, layer: null, slate: null, ad: null, adKey: '', ov: null, ovKey: '', muted: null, aud: null, sq: null, sqKey: '' };
   const srvNow = () => Date.now() + M.skew;
   const liveVideo = () => $('stage').querySelector('video:not(.advid)');
+  // the picture's frame inside the player: the incoming video's shape, as big as fits (letterboxed in a portrait
+  // full screen). Slates, adverts, graphics and squeeze-backs all sit inside it.
+  function fitFrame() {
+    const stage = $('stage'), v = liveVideo();
+    const W = stage.clientWidth, H = stage.clientHeight;
+    if (!W || !H) return;
+    const ar = v && v.videoWidth && v.videoHeight ? v.videoWidth / v.videoHeight : 16 / 9;
+    let w = W, h = W / ar;
+    if (h > H) { h = H; w = H * ar; }
+    const x = (W - w) / 2, y = (H - h) / 2, set = (k, n) => stage.style.setProperty(k, Math.round(n) + 'px');
+    set('--fx', x); set('--fy', y); set('--fw', w); set('--fh', h);
+  }
+  window.addEventListener('resize', fitFrame);
+  document.addEventListener('fullscreenchange', () => setTimeout(fitFrame, 50));
+  // a slate with the sound off: the live sound goes, and comes back as it was
   function muteLive(on) {
     const v = liveVideo();
     if (!v) return;
     if (on && M.muted === null) { M.muted = v.muted; v.muted = true; }
     else if (!on && M.muted !== null) { v.muted = M.muted; M.muted = null; }
+  }
+  // an advert plays instead of the live sound: the player's volume and mute work on the advert, and whatever the viewer
+  // chose there carries back to the live sound afterwards
+  // what the viewer hears now (their own choice; a browser that blocked sound counts as no sound yet)
+  const soundOn = () => { const v = liveVideo(); return M.aud ? !M.aud.muted : M.muted !== null ? !M.muted : v ? !v.muted : !window.RFPPlayer.sound().muted; };
+  function audioTo(target) {
+    const v = liveVideo();
+    if (target === M.aud) return;
+    if (M.aud && v) { v.muted = M.aud.muted; v.volume = M.aud.volume; }
+    if (target && v) { target.volume = v.volume; v.muted = true; }
+    M.aud = target || null;
+    if (current && current.setAudio) current.setAudio(M.aud);
+  }
+  function startAd(video, muted, snd, box) {
+    video.volume = window.RFPPlayer.sound().volume;
+    video.muted = muted;
+    video.play().catch(() => { video.muted = true; video.play().catch(() => {}); if (snd && !snd.isConnected) box.append(snd); });
+    if (video.muted && snd && !snd.isConnected) box.append(snd);
+  }
+  // plays a list of adverts on one video element, in step with the website's clock
+  function sequence(video, items, startedAt, onStart) {
+    let idx = -1;
+    const playAt = () => {
+      const t = srvNow() - Date.parse(startedAt);
+      let acc = 0, p = null;
+      for (let i = 0; i < items.length; i++) { const d = items[i].duration * 1000; if (t < acc + d) { p = { i, off: Math.max(0, (t - acc) / 1000) }; break; } acc += d; }
+      if (!p || p.i === idx || !video.isConnected && idx >= 0) return;
+      const first = idx < 0;
+      idx = p.i;
+      video.src = items[p.i].url;
+      video.addEventListener('loadedmetadata', () => { if (p.off > 0.5) { try { video.currentTime = p.off; } catch (e) { /* not yet */ } } }, { once: true });
+      if (first) onStart(); else video.play().catch(() => {});
+    };
+    video.addEventListener('ended', playAt);
+    // a stuck advert (slow connection): try again from where the clock is
+    video.addEventListener('error', () => { idx = -2; setTimeout(playAt, 1500); });
+    playAt();
   }
   function mcrLayer() {
     if (!M.layer) M.layer = el('div', { class: 'mcr' });
@@ -350,17 +413,23 @@
     return M.layer;
   }
   function mcrSlate(sl) {
-    const key = sl ? [sl.kind, sl.title, sl.text, sl.mute].join('|') : '';
+    const key = sl ? [sl.kind, sl.title, sl.text, sl.mute, sl.music || ''].join('|') : '';
     if (M.slate && M.slate.dataset.key === key) return;
-    if (M.slate) { M.slate.remove(); M.slate = null; }
+    if (M.slate) { if (M.slate.audio) { M.slate.audio.pause(); M.slate.audio.removeAttribute('src'); } M.slate.remove(); M.slate = null; }
     if (!sl) return;
     const ch = (info && info.channel) || {};
     M.slate = el('div', { class: 'slate mslate k-' + sl.kind, 'data-key': key },
       ch.logo ? el('img', { class: 'slogo', src: imgUrl(ch.logo), alt: ch.name || '' }) : el('img', { class: 'slogo brand', src: '/brand/rfp-logo.png', alt: (info && info.site) || '' }),
       el('b', {}, sl.title || 'Please stand by'), sl.text ? el('p', {}, sl.text) : null,
-      el('div', { class: 'sbars' }, el('i'), el('i'), el('i')),
-      sl.until ? el('small', { class: 'suntil' }) : null);
-    M.slate.until = sl.until ? Date.parse(sl.until) : 0;
+      sl.countTo ? el('div', { class: 'scount', 'data-count-to': sl.countTo }) : el('div', { class: 'sbars' }, el('i'), el('i'), el('i')));
+    // music under the slate: a loop, with the viewer's sound settings; the live sound stays off while it plays
+    if (sl.music) {
+      const audio = el('audio', { loop: '', preload: 'auto', src: sl.music });
+      const snd = el('button', { class: 'unmute adsnd', onclick: (e) => { e.stopPropagation(); audio.muted = false; window.RFPPlayer.saveSound(audio); audio.play().catch(() => {}); snd.remove(); } }, '🔊 Tap for sound');
+      M.slate.audio = audio; M.slate.snd = snd;
+      M.slate.append(audio);
+      startAd(audio, !soundOn(), snd, M.slate);
+    }
     mcrLayer().append(M.slate);
   }
   function mcrAd(ad) {
@@ -370,69 +439,43 @@
     if (M.ad) { try { M.ad.video.pause(); } catch (e) { /* gone */ } M.ad.box.remove(); M.ad = null; }
     if (!ad) return;
     const video = el('video', { class: 'advid', playsinline: '', preload: 'auto' });
-    const badge = el('div', { class: 'adbadge' }), snd = el('button', { class: 'unmute adsnd', onclick: (e) => { e.stopPropagation(); video.muted = false; video.play().catch(() => {}); snd.remove(); } }, '🔊 Tap for sound');
-    const box = el('div', { class: 'adbox' }, video, badge);
-    M.ad = { box, video, badge, ad, idx: -1, snd };
+    const box = el('div', { class: 'adbox' }, video);
+    const snd = el('button', { class: 'unmute adsnd', onclick: (e) => { e.stopPropagation(); video.muted = false; window.RFPPlayer.saveSound(video); video.play().catch(() => {}); snd.remove(); } }, '🔊 Tap for sound');
+    const muted = !soundOn();
+    M.ad = { box, video, ad, snd };
     mcrLayer().append(box);
-    // which advert, and how far into it, by the clock
-    const place = () => {
-      const t = srvNow() - Date.parse(ad.startedAt);
-      let acc = 0;
-      for (let i = 0; i < ad.items.length; i++) { const d = ad.items[i].duration * 1000; if (t < acc + d) return { i, off: Math.max(0, (t - acc) / 1000) }; acc += d; }
-      return null;
-    };
-    const playAt = () => {
-      const p = place();
-      if (!p || !M.ad || M.ad.box !== box) return;
-      if (p.i !== M.ad.idx) {
-        M.ad.idx = p.i;
-        video.src = ad.items[p.i].url;
-        const seek = () => { if (p.off > 0.5) { try { video.currentTime = p.off; } catch (e) { /* not seekable yet */ } } };
-        video.addEventListener('loadedmetadata', seek, { once: true });
-        video.muted = M.muted === null ? true : !!M.muted;
-        video.play().catch(() => { video.muted = true; video.play().catch(() => {}); if (!snd.isConnected) box.append(snd); });
-        if (video.muted && !snd.isConnected) box.append(snd);
-      }
-    };
-    video.addEventListener('ended', playAt);
-    playAt();
+    sequence(video, ad.items, ad.startedAt, () => startAd(video, muted, snd, box));
   }
-  // squeeze-back: the live picture shrinks into a corner; adverts (or a sponsor board) fill the frame behind it
+  // squeeze-back: the live picture at three quarters in a corner of the frame; adverts (or a sponsor board) behind it
   function mcrSqueeze(sq) {
-    const key = sq ? [sq.startedAt, sq.image, sq.pos, sq.size, sq.items.map((i) => i.url).join(',')].join('|') : '';
+    const key = sq ? [sq.startedAt, sq.image, sq.pos, sq.items.map((i) => i.url).join(',')].join('|') : '';
     const stage = $('stage');
     if (key === M.sqKey && (!M.sq || M.sq.bg.isConnected)) return;
     M.sqKey = key;
-    if (M.sq) { try { M.sq.video && M.sq.video.pause(); } catch (e) { /* gone */ } M.sq.bg.remove(); M.sq.badge.remove(); M.sq = null; }
+    // the move in and out is animated (slowly); resizing the window is not
+    const anim = () => { stage.classList.add('sqanim'); clearTimeout(M.sqAnimT); M.sqAnimT = setTimeout(() => stage.classList.remove('sqanim'), 1600); };
+    if (M.sq) {
+      const old = M.sq; M.sq = null; anim();
+      // the board stays behind while the picture grows back, then fades
+      try { if (old.video) { old.video.muted = true; old.video.pause(); } } catch (e) { /* gone */ }
+      setTimeout(() => old.bg.remove(), sq ? 0 : 1400);
+    }
     stage.classList.remove('squeeze', 'sq-tl', 'sq-tr', 'sq-bl', 'sq-br');
     if (!sq) return;
-    stage.style.setProperty('--sq', (sq.size || 62) + '%');
+    anim();
     stage.classList.add('squeeze', 'sq-' + (sq.pos || 'tr'));
-    const bg = el('div', { class: 'sqbg' }), badge = el('div', { class: 'adbadge sqbadge' });
+    const bg = el('div', { class: 'sqbg' });
     if (sq.image) bg.append(el('img', { src: imgUrl(sq.image), alt: '' }));
     let video = null;
     if (sq.items.length) {
       video = el('video', { class: 'advid', playsinline: '', preload: 'auto' });
       bg.append(video);
-      let idx = -1;
-      const playAt = () => {
-        const t = srvNow() - Date.parse(sq.startedAt);
-        let acc = 0, p = null;
-        for (let i = 0; i < sq.items.length; i++) { const d = sq.items[i].duration * 1000; if (t < acc + d) { p = { i, off: Math.max(0, (t - acc) / 1000) }; break; } acc += d; }
-        if (!p || !M.sq || M.sq.bg !== bg || p.i === idx) return;
-        idx = p.i;
-        video.src = sq.items[p.i].url;
-        video.addEventListener('loadedmetadata', () => { if (p.off > 0.5) { try { video.currentTime = p.off; } catch (e) { /* not yet */ } } }, { once: true });
-        video.muted = sq.sound === 'live' || M.muted === null ? true : !!M.muted;
-        video.play().catch(() => { video.muted = true; video.play().catch(() => {}); });
-      };
-      video.addEventListener('ended', playAt);
-      M.sq = { bg, badge, video, sq };
-      stage.prepend(bg);
-      playAt();
-    } else { M.sq = { bg, badge, video: null, sq }; stage.prepend(bg); }
+      const muted = sq.sound === 'live' ? true : !soundOn();
+      sequence(video, sq.items, sq.startedAt, () => startAd(video, muted, null, null));
+    }
     if (sq.text) bg.append(el('div', { class: 'sqtext' }, sq.text));
-    mcrLayer().append(badge);
+    M.sq = { bg, video, sq };
+    stage.prepend(bg);
   }
   function mcrOverlays(list) {
     const key = JSON.stringify(list || []);
@@ -448,8 +491,9 @@
     }
     mcrLayer().append(M.ov);
   }
-  // every half second: the countdowns, the end of an ad break, the sound
+  // every half second: what is on, the frame, the sound. (No countdowns for viewers: those are for the production.)
   function mcrTick() {
+    fitFrame();
     const st = M.state, now = srvNow();
     const ad = st && st.ad && Date.parse(st.ad.endsAt) > now ? st.ad : null;
     const sl = st && st.slate && (!st.slate.until || Date.parse(st.slate.until) > now) ? st.slate : null;
@@ -460,13 +504,11 @@
     mcrSlate(on && !ad ? sl : null);
     mcrSqueeze(on && !ad && !sl ? sq : null);
     mcrOverlays(on && !ad && !(sq && !sl) ? (st && st.overlays) || [] : []);
-    muteLive(on && (!!ad || !!(sl && sl.mute) || !!(sq && !sl && sq.sound !== 'live' && sq.items.length)));
-    if (M.sq) M.sq.badge.textContent = 'Back to full screen in ' + dur(Math.max(0, Math.ceil((Date.parse(M.sq.sq.endsAt) - now) / 1000)));
-    if (M.ad) {
-      const left = Math.max(0, Math.ceil((Date.parse(ad.endsAt) - now) / 1000));
-      M.ad.badge.textContent = (ad.items.length > 1 ? `Ad ${Math.max(1, M.ad.idx + 1)} of ${ad.items.length} · ` : 'Ad · ') + 'back in ' + dur(left);
-    }
-    if (M.slate && M.slate.until) { const u = M.slate.querySelector('.suntil'); if (u) u.textContent = 'Back in about ' + dur(Math.max(0, Math.ceil((M.slate.until - now) / 1000))); }
+    const target = M.ad ? M.ad.video : M.slate && M.slate.audio ? M.slate.audio : M.sq && M.sq.video && M.sq.sq.sound !== 'live' ? M.sq.video : null;
+    muteLive(on && !target && !!(sl && sl.mute));
+    audioTo(on ? target : null);
+    if (M.ad && !M.ad.video.muted && M.ad.snd.isConnected) M.ad.snd.remove();
+    if (M.slate && M.slate.audio && !M.slate.audio.muted && M.slate.snd.isConnected) M.slate.snd.remove();
   }
   async function mcrPoll() {
     if (!info || info.needs || vodStart || !info.live) { M.state = null; return; }
@@ -479,6 +521,16 @@
       M.state = x;
     } catch (e) { /* next time */ }
   }
+  // countdown slates tick: days, hours, minutes, seconds to their time (by the website's clock when known)
+  setInterval(() => {
+    for (const c of document.querySelectorAll('[data-count-to]')) {
+      const left = Math.ceil((Date.parse(c.dataset.countTo) - (Date.now() + M.skew)) / 1000);
+      if (left <= 0) { c.textContent = 'Starting any moment…'; c.classList.add('zero'); continue; }
+      const d = Math.floor(left / 86400), hh = Math.floor((left % 86400) / 3600), mm = Math.floor((left % 3600) / 60), ss = left % 60, p2 = (n) => String(n).padStart(2, '0');
+      c.textContent = (d ? d + (d === 1 ? ' day ' : ' days ') : '') + (d || hh ? p2(hh) + ':' : '') + p2(mm) + ':' + p2(ss);
+      c.classList.remove('zero');
+    }
+  }, 250);
   if (!vodStart) { setInterval(mcrPoll, 3000); setInterval(mcrTick, 500); setTimeout(mcrPoll, 800); }
 
   load();

@@ -46,7 +46,7 @@ const haveFfmpeg = (() => { try { execFileSync('ffmpeg', ['-version'], { stdio: 
 test('master control: slates (timed, cued), video adverts with a countdown, overlays only in the app', async (t) => {
   const { cloud, web, team, mtx, put } = await site(t);
   await put('channel', 'channel_tv', { name: 'Schools TV' });
-  assert.equal((await put('production', 'prod_show', { name: 'Derby day', date: '2026-10-17', streamChannel: 'channel_tv' })).status, 200);
+  assert.equal((await put('production', 'prod_show', { name: 'Derby day', date: '2026-10-17', txTime: '15:00', streamChannel: 'channel_tv' })).status, 200);
   const slug = (await cloud.store.get('prod_show')).data.streamSlug;
   mtx.state.items = [{ name: 'live/' + slug, ready: true, readyTime: new Date().toISOString(), tracks: ['H264'], readers: [] }];
   await cloud.streaming.poll();
@@ -61,7 +61,7 @@ test('master control: slates (timed, cued), video adverts with a countdown, over
   let r = await mcr({ action: 'slate', kind: 'weather', minutes: 20 });
   assert.equal(r.status, 200, JSON.stringify(r.data));
   assert.equal(r.data.state.slate.title, 'Weather delay');
-  assert.equal(r.data.state.slate.mute, true);
+  assert.equal(r.data.state.slate.mute, false, 'the sound stays on unless asked');
   v = await viewer();
   assert.equal(v.slate.kind, 'weather');
   assert.ok(Date.parse(v.slate.until) - Date.now() > 19 * 60e3);
@@ -69,10 +69,21 @@ test('master control: slates (timed, cued), video adverts with a countdown, over
   let streams = (await web.get(`/api/streams?team=${team}`)).data.list;
   assert.equal(streams[0].mcr.slate.kind, 'weather');
   // a custom slate with its own words; then cleared
-  r = await mcr({ action: 'slate', kind: 'custom', title: 'Lightning in the area', text: 'Players are off the field.', mute: false });
-  assert.equal(r.data.state.slate.title, 'Lightning in the area'); assert.equal(r.data.state.slate.mute, false);
+  r = await mcr({ action: 'slate', kind: 'custom', title: 'Lightning in the area', text: 'Players are off the field.', mute: true });
+  assert.equal(r.data.state.slate.title, 'Lightning in the area'); assert.equal(r.data.state.slate.mute, true);
   await mcr({ action: 'clearSlate' });
   assert.equal((await viewer()).slate, null);
+  // a countdown slate: to a time (or for some minutes); it goes off by itself at zero
+  const to = new Date(Date.now() + 90e3).toISOString();
+  r = await mcr({ action: 'slate', kind: 'countdown', title: 'Kick-off in', countTo: to });
+  assert.equal(r.data.state.slate.countTo, to); assert.equal(r.data.state.slate.until, to); assert.equal(r.data.state.slate.title, 'Kick-off in');
+  r = await mcr({ action: 'slate', kind: 'countdown', minutes: 10 });
+  assert.ok(Math.abs(Date.parse(r.data.state.slate.countTo) - Date.now() - 600e3) < 3000);
+  assert.equal(r.data.state.slate.title, 'Starting soon');
+  await mcr({ action: 'clearSlate' });
+  // before the stream: the watch page counts down to the production's TX time (South African time unless set)
+  const w = (await client(cloud.url).get('/api/watch/' + slug)).data;
+  assert.equal(w.startsAt, '2026-10-17T13:00:00.000Z');
   assert.equal((await mcr({ action: 'nonsense' })).status, 400);
 
   // a cue: a connection slate in a moment; the clock (tick) puts it on
@@ -147,6 +158,48 @@ test('master control: slates (timed, cued), video adverts with a countdown, over
   // deleting an advert deletes its file
   assert.equal((await web.del(`/api/videoads/${a2.data.ad.id}?team=${team}`)).status, 200);
   assert.equal((await fetch(cloud.url + a2.data.ad.url)).status, 404);
+
+  // squeeze-back videos are a list of their own; presets play an ad break or a squeeze-back in one go
+  const up2 = (buf, name, kind, type = 'video/mp4') => fetch(cloud.url + `/api/videoads?team=${team}&kind=${kind}&name=${encodeURIComponent(name)}`, { method: 'POST', headers: { 'x-rfp': '1', cookie: web.cookie(), 'content-type': type }, body: buf }).then(async (x) => ({ status: x.status, data: await x.json() }));
+  const sq1 = await up2(make(3, 'c.mp4'), 'Sponsor loop.mp4', 'squeeze');
+  assert.equal(sq1.data.ad.kind, 'squeeze');
+  assert.equal(sq1.data.ad.faststart, true, 'ready to play at once on phones');
+  const lib = (await web.get(`/api/videoads?team=${team}`)).data.list;
+  assert.deepEqual(lib.map((x) => [x.title, x.kind]).sort(), [['Sponsor loop', 'squeeze'], ['Sponsor one', 'ad']]);
+  assert.equal((await web.put(`/api/adpresets/new?team=${team}`, { kind: 'ads', name: 'Empty' })).status, 400);
+  const pa = (await web.put(`/api/adpresets/new?team=${team}`, { kind: 'ads', name: 'Half time', ads: [a1.data.ad.id, 'vad_nothere'] })).data.preset;
+  assert.deepEqual(pa.ads, [a1.data.ad.id]);
+  const ps = (await web.put(`/api/adpresets/new?team=${team}`, { kind: 'squeeze', name: 'Sponsor squeeze', ads: [sq1.data.ad.id], pos: 'bl', sound: 'live' })).data.preset;
+  assert.equal((await web.get(`/api/adpresets?team=${team}`)).data.list.length, 2);
+  r = await mcr({ action: 'preset', preset: ps.id });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  v = await viewer();
+  assert.equal(v.squeeze.pos, 'bl'); assert.equal(v.squeeze.sound, 'live'); assert.equal(v.squeeze.size, 75); assert.equal(v.squeeze.items[0].title, 'Sponsor loop');
+  r = await mcr({ action: 'preset', preset: pa.id });
+  v = await viewer();
+  assert.equal(v.ad.items[0].title, 'Sponsor one'); assert.equal(v.squeeze, null, 'an ad break takes over from a squeeze-back');
+  await mcr({ action: 'stopAds' });
+  // a preset on a cue and on an automatic rule
+  r = await mcr({ action: 'addCue', at: new Date(Date.now() + 60e3).toISOString(), do: 'preset', preset: ps.id });
+  assert.equal(r.data.state.cues.at(-1).preset, ps.id);
+  r = await mcr({ action: 'setAuto', rules: [{ when: 'try', do: 'preset', preset: ps.id }] });
+  assert.equal(r.data.state.auto[0].preset, ps.id);
+  assert.equal((await web.del(`/api/adpresets/${pa.id}?team=${team}`)).status, 200);
+
+  // music under a slate: any sound file, made AAC; the stream's slate music plays under every slate
+  const wav = path.join(dir, 'm.wav'); execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3', '-y', wav]);
+  const mu = await up2(fs.readFileSync(wav), 'Hold music.wav', 'music', 'audio/wav');
+  assert.equal(mu.status, 200, JSON.stringify(mu.data));
+  assert.equal(mu.data.ad.kind, 'music'); assert.equal(mu.data.ad.mime, 'audio/mp4');
+  assert.equal((await up2(Buffer.from('x'), 'x.png', 'music', 'image/png')).status, 415);
+  assert.equal((await fetch(cloud.url + mu.data.ad.url)).headers.get('content-type'), 'audio/mp4');
+  await mcr({ action: 'setMusic', music: mu.data.ad.id });
+  await mcr({ action: 'slate', kind: 'weather' });
+  v = await viewer();
+  assert.equal(v.slate.music, mu.data.ad.url);
+  await mcr({ action: 'slate', kind: 'break', music: '' });
+  assert.equal((await viewer()).slate.music, '', 'one slate without music');
+  assert.equal((await mcr({ action: 'setMusic', music: 'vad_nothere' })).status, 400);
 });
 
 test('several venues at once: a stream per match, each with its own key, page, ending and restreams', async (t) => {
