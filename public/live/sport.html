@@ -63,6 +63,7 @@
       <button class="tab" data-page="timeline">Timeline</button>
       <button class="tab" data-page="entry">Stats entry</button>
       <button class="tab" data-page="stats">Stats</button>
+      <button class="tab" data-page="timing" id="tab-timing" hidden>Timing</button>
     </nav>
     <div class="matchline" id="matchline"></div>
     <div class="pills">
@@ -80,11 +81,14 @@
     <section class="page" id="page-setup"><div id="setup-root"></div></section>
     <section class="page" id="page-timeline"><div class="panel"><h4>Timeline <span class="sp"></span><button class="btn sm" id="btn-note">+ Note</button></h4><table class="t" id="tl"></table></div></section>
     <section class="page" id="page-entry"><div id="entry-root"></div></section>
+    <section class="page" id="page-timing"><div id="timing-root"></div></section>
     <section class="page" id="page-stats"><div class="grid cols-2"><div class="panel"><h4>Team stats <span class="sp"></span><button class="btn sm" id="stats-export">Export CSV</button></h4><table class="t" id="tstats"></table></div><div class="panel" style="overflow:auto"><h4>Players</h4><table class="t" id="pstats"></table></div></div></section>
   </main>
 </div>
 <script src="js/common.js"></script>
 <script src="/shared/sports.js"></script>
+<script src="/shared/athletics.js"></script>
+<script src="js/timing-ui.js"></script>
 <script src="js/sportscorer.js"></script>
 <script src="js/actions.js"></script>
 <script src="js/padkit.js"></script>

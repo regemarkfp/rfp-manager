@@ -369,6 +369,24 @@ scorer link; both work on the same match at the same time.
 - The **Stats** tab shows the full team and player tables and exports them as CSV.
 - Graphics: **Team Stats (FS)** shows the first nine lines; **page 2** and **page 3** show the rest.
 
+### Athletics: events and timing systems
+
+**Events** are built from dropdowns on the scorer's Setup tab: gender, age group, discipline (sprints to combined events), round and heat. The name follows ("80m Hurdles Girls U16 · Heat 2"), the type (track or field) and the wind box come with the discipline. "+ Several events" makes one event for every gender and age group ticked (and every heat); "Copy as next heat" adds Heat 2, 3 …. Lanes, bibs, names and teams are picked from lists (names and teams you have used before; a known athlete brings their bib and team).
+
+**Timing systems** connect on the scorer's **Timing** tab (athletics only, on the production PC). Add one from the list:
+
+| Preset | In the timing system | Brings |
+|---|---|---|
+| FinishLynx – files | Options → Database: Input directory = a folder this PC can see, tick "Write LIF" | Start lists (lynx.evt / lynx.ppl from the meet software) and official results (.lif) |
+| FinishLynx – running time | Scoreboard → New: a running-time script, Network (UDP), this PC's IP and the port | The race clock |
+| FinishLynx – live results | Scoreboard → New: a results script, Network (Connect), this PC's IP and the port | Places, lanes, names, times, reaction times, wind as the race finishes |
+| ALGE timer | RS-232 output (USB adapter is fine) | Starts (C0) start the race clock; net times (RT) and finishes (C1) become results by bib |
+| Another system | Network (UDP / TCP), serial, or a folder of CSV / text files | Whatever your rules read |
+
+"What comes in" shows every line received and how it was read. A line that isn't understood can be read with your own rules (What it sends → My own layout): which lines, what they are (result, start-list entry, running time, event name, wind, gun), how they split (control codes, comma, semicolon, tab, spaces) and which column is which, chosen from dropdowns while an example line shows its columns. "Try it" previews pasted lines or sends them into the meet by hand.
+
+Events that aren't set up yet are made from the names the system sends (gender, age group and discipline are read from "Men's 100 Meter", "Girls U16 80m Hurdles"…), the race being timed becomes the current event (graphics follow), and the race clock runs from the system. Results from .lif files are official: lines from a scoreboard never overwrite them. Serial ports on Windows are read through PowerShell (no drivers or extra software). New template fields: `ath_gender`, `ath_age`, `ath_discipline`, `rsN_reaction`.
+
 ### Statistics graphics
 
 Graphics control → **Scores & Stats** has a group "Statistics with team badges" (template `sport_stat`):

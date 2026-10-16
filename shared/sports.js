@@ -1182,7 +1182,7 @@
     apply(st, ev) {
       const key = `${ev.eventId}|${ev.entry}`;
       if (ev.type === 'result') {
-        st.results[key] = ev.value; if (ev.note !== undefined) st.notes[key] = ev.note;
+        st.results[key] = ev.value; if (ev.note !== undefined) st.notes[key] = ev.note; if (ev.reaction !== undefined) st.reaction[key] = ev.reaction;
         const e = (st.ath.events || []).find(x => x.id === ev.eventId);
         const en = e && e.entries.find(x => x.id === ev.entry);
         if (en && ev.value) { const text = `${U.up(en.name)} – ${ev.value}${ev.note ? ' ' + U.up(ev.note) : ''}`; st.timeline.push({ id: ev.id, team: '', kind: 'result', text, icon: 'result', ct: e.name }); st.last = { type: 'result', team: '', player: en.id, text, wipe: '' }; }
@@ -1206,7 +1206,7 @@
           if (best.length) result = Math.max(...best).toFixed(2);
         }
         return { id: en.id, lane: en.lane || '', bib: en.bib || '', name: en.name || '', tvName: en.tvName || U.up(en.name || ''), team: en.team || '', pb: en.pb || '', sb: en.sb || '',
-          result, note: st.notes[key] || '', attempts: att, mark: parseMark(result, kind) };
+          result, note: st.notes[key] || '', reaction: st.reaction[key] || '', attempts: att, mark: parseMark(result, kind) };
       });
       const ranked = rows.filter(r => r.mark != null).sort((a, b) => (kind === 'field' ? b.mark - a.mark : a.mark - b.mark));
       let rank = 0, prev = null;
@@ -1214,7 +1214,7 @@
       const unranked = rows.filter(r => r.mark == null && r.result);
       const results = ranked.concat(unranked.map(r => Object.assign(r, { rank: '' })));
       const startlist = rows.slice().sort((a, b) => (+a.lane || +a.bib || 999) - (+b.lane || +b.bib || 999));
-      return { id: e.id, name: e.name || '', round: e.round || '', wind: e.wind || '', kind, rows, startlist, results, hasResults: results.length > 0 };
+      return { id: e.id, name: e.name || '', round: e.round || '', wind: e.wind || '', kind, gender: e.gender || '', age: e.age || '', discipline: e.discipline || '', rows, startlist, results, hasResults: results.length > 0 };
     },
     view(st, setup) {
       const v = baseView(this, setup);
@@ -1330,12 +1330,12 @@
     if (v.kind === 'athletics') {
       const c = x.current;
       set('ath_event', c ? U.up(c.name) : ''); set('ath_round', c ? U.up(c.round) : ''); set('ath_wind', c ? c.wind : ''); set('ath_kind', c ? c.kind : '');
-      set('ath_status', v.status);
+      set('ath_status', v.status); set('ath_gender', c ? U.up(c.gender) : ''); set('ath_age', c && c.age && c.age !== 'Open' ? U.up(c.age) : ''); set('ath_discipline', c ? U.up(c.discipline || c.name) : '');
       if (c) {
         set('sl_count', c.startlist.length);
         c.startlist.slice(0, 16).forEach((r, i) => { const p = `sl${i + 1}_`; set(p + 'lane', r.lane); set(p + 'bib', r.bib); set(p + 'name', r.tvName); set(p + 'team', U.up(r.team)); set(p + 'pb', r.pb); set(p + 'sb', r.sb); });
         set('rs_count', c.results.length);
-        c.results.slice(0, 16).forEach((r, i) => { const p = `rs${i + 1}_`; set(p + 'rank', r.rank); set(p + 'lane', r.lane); set(p + 'name', r.tvName); set(p + 'team', U.up(r.team)); set(p + 'result', r.result); set(p + 'note', U.up(r.note)); set(p + 'attempts', r.attempts.join(' ')); });
+        c.results.slice(0, 16).forEach((r, i) => { const p = `rs${i + 1}_`; set(p + 'rank', r.rank); set(p + 'lane', r.lane); set(p + 'name', r.tvName); set(p + 'team', U.up(r.team)); set(p + 'result', r.result); set(p + 'note', U.up(r.note)); set(p + 'reaction', r.reaction); set(p + 'attempts', r.attempts.join(' ')); });
         const w = c.results[0];
         set('ath_winner_name', w ? w.tvName : ''); set('ath_winner_team', w ? U.up(w.team) : ''); set('ath_winner_result', w ? w.result : ''); set('ath_winner_note', w ? U.up(w.note) : '');
       }

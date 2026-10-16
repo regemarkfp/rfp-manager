@@ -131,6 +131,11 @@
     if (page === 'timeline') renderTimeline(v);
     if (page === 'stats') renderStats(v);
     if (page === 'entry') renderEntry(v);
+    // athletics: photo-finish systems and timers (Timing tab)
+    const ath = !!(v && v.kind === 'athletics');
+    $('#tab-timing').hidden = !ath;
+    if (page === 'timing' && !ath && v) { page = 'score'; CG.store.set('sportPage', page); render(); return; }
+    if (page === 'timing' && window.RFPTimingUI) window.RFPTimingUI.show($('#timing-root')); else if (window.RFPTimingUI) window.RFPTimingUI.hide();
   }
 
   $('#btn-mode').onclick = () => {
@@ -439,7 +444,7 @@
     const field = c.kind === 'field';
     const rows = c.startlist.map(r => `<tr data-entry="${esc(r.id)}"><td class="n">${esc(r.lane)}</td><td class="muted">${esc(r.bib)}</td><td><b>${esc(r.tvName)}</b></td><td class="muted">${esc(r.team)}</td><td class="muted small">${esc(r.pb)}${r.sb ? ' / ' + esc(r.sb) : ''}</td>
       ${field ? `<td class="mono">${esc(r.attempts.join('  '))}</td><td><input type="text" data-att style="width:80px" placeholder="7.85 / X"></td>` : ''}
-      <td><input type="text" data-res style="width:100px" value="${esc(r.result && !field ? r.result : (st(r) ? st(r) : ''))}" placeholder="${field ? 'best (auto)' : '10.23'}"></td>
+      <td><input type="text" data-res style="width:100px" value="${esc(r.result && !field ? r.result : (st(r) ? st(r) : ''))}" placeholder="${field ? 'best (auto)' : '10.23'}">${r.reaction ? ` <span class="small muted" title="Reaction time">RT ${esc(r.reaction)}</span>` : ''}</td>
       <td><select data-note>${NOTES.map(n => `<option ${n === r.note ? 'selected' : ''}>${n}</option>`).join('')}</select></td><td class="n"><b>${esc(r.rank || '')}</b></td></tr>`).join('');
     function st(r) { return field ? '' : r.result; }
     return `<div class="panel"><h4>Event <span class="sp"></span>${esc(v.status)}</h4><div class="row">${evBtns}</div>${clockRow}</div>
@@ -511,7 +516,7 @@
         <div><div class="panel"><h4>Commentators and officials</h4><div class="form-grid">
             <label class="f" style="grid-column:1/-1"><span>Commentators (one per line)</span><textarea id="s-comms" rows="3" placeholder="One per line">${esc((d.commentators || []).join('\n'))}</textarea></label>
             <div class="f" style="grid-column:1/-1"><span>Match officials</span>
-              <div id="s-offs">${Sports.officialsOf(d).concat([{ role: '', name: '' }]).map(o => `<div class="row" style="flex-wrap:nowrap;margin-bottom:4px"><input type="text" data-orole value="${esc(o.role)}" placeholder="Role (e.g. Referee)" style="max-width:240px"><input type="text" data-oname value="${esc(o.name)}" placeholder="Name"></div>`).join('')}</div></div>
+              <div id="s-offs">${Sports.officialsOf(d).concat([{ role: '', name: '' }]).map(o => `<div class="row" style="flex-wrap:nowrap;margin-bottom:4px"><select data-orole style="max-width:240px">${roleOptions(d.sport, o.role)}</select><input type="text" data-oname value="${esc(o.name)}" placeholder="Name"></div>`).join('')}</div></div>
           </div><p class="small muted" style="margin:8px 0 0">Saved with "Save setup". They also come from the match in RFP Manager (Fixtures).</p></div>
         <div class="panel"><h4>Tips</h4><p class="small muted" style="margin:0">${tipsFor(d.sport)}</p></div></div>
       </div>
@@ -552,23 +557,82 @@
     <td><input type="text" data-p="name" value="${esc(p.name || '')}"></td><td><input type="text" data-p="tvName" value="${esc(p.tvName || '')}" placeholder="auto"></td>
     <td><input type="text" data-p="position" value="${esc(p.position || '')}"></td><td><button class="btn sm ghost" data-delp>✕</button></td></tr>`;
 
+  // ---- athletics setup: events are built from dropdowns (gender, age group, discipline, round, heat)
+  const A = window.Athletics;
+  const sel = (attr, list, cur, blank) => `<select ${attr}>${blank !== undefined ? `<option value="">${esc(blank)}</option>` : ''}${list.map(x => { const v = typeof x === 'string' ? x : x.value, l = typeof x === 'string' ? x : x.label; return `<option value="${esc(v)}" ${String(v) === String(cur == null ? '' : cur) ? 'selected' : ''}>${esc(l)}</option>`; }).join('')}${cur && !list.some(x => String(typeof x === 'string' ? x : x.value) === String(cur)) ? `<option selected>${esc(cur)}</option>` : ''}</select>`;
+  const discSelect = (attr, cur) => `<select ${attr}><option value="">Choose…</option>${A.groups().map(g => `<optgroup label="${esc(g.group)}">${g.list.map(x => `<option ${x.name === cur ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</optgroup>`).join('')}</select>`;
+  function roleOptions(sport, cur) {
+    const list = [...new Set([...Sports.officialRoles(sport), ...(sport === 'athletics' ? A.ROLES : ['Referee', 'Assistant referee', 'Umpire', 'Judge', 'Timekeeper', 'Scorer', 'Commissioner', 'Match commissioner', 'Technical official'])])];
+    return `<option value="">Role…</option>` + list.concat(cur && !list.includes(cur) ? [cur] : []).map(r => `<option ${r === cur ? 'selected' : ''}>${esc(r)}</option>`).join('');
+  }
+  // an event's name and type follow from its dropdowns
+  function athFix(e) {
+    if (e.discipline) {
+      const dd = A.byName(e.discipline);
+      e.name = A.eventName(e);
+      if (dd) e.kind = dd.kind;
+      if (dd && !dd.wind) e.wind = '';
+    }
+    if (e.roundType !== undefined) e.round = A.roundLabel(e.roundType, e.heat);
+    return e;
+  }
+  // events from older setups or a timing system: fill the dropdowns from the name
+  function athUpgrade(e) {
+    if (e.discipline !== undefined) return e;
+    const p = A.parseEvent(`${e.name || ''} ${e.round || ''}`);
+    Object.assign(e, { discipline: p.discipline, gender: p.gender, age: p.age || 'Open', roundType: p.round || (e.round ? '' : ''), heat: p.heat || '' });
+    if (!p.discipline) { e.discipline = ''; }
+    if (!p.round && e.round) { delete e.roundType; }
+    return athFix(e);
+  }
+  function athKnown(d) {
+    const people = new Map(), teams = new Set(), bibs = new Set();
+    for (const e of d.ath.events) for (const en of e.entries || []) {
+      if (en.name && !people.has(en.name)) people.set(en.name, en);
+      if (en.team) teams.add(en.team);
+      if (en.bib) bibs.add(en.bib);
+    }
+    ['A', 'B'].forEach(k => { const t = d.teams && d.teams[k]; if (t && t.name && !/^(HOME|AWAY)$/.test(t.name)) teams.add(t.name); });
+    return { people, teams: [...teams].sort(), bibs: [...bibs] };
+  }
   function athSetupHtml(d) {
+    d.ath.events.forEach(athUpgrade);
     const evs = d.ath.events;
     if (!athEdit || !evs.find(e => e.id === athEdit)) athEdit = evs.length ? evs[0].id : null;
     const e = evs.find(x => x.id === athEdit);
-    return `<div class="grid cols-2" style="margin-top:12px">
-      <div class="panel"><h4>Events <span class="sp"></span><button class="btn sm" id="a-add">+ Event</button></h4>
-        <table class="t">${evs.map(x => `<tr class="click ${x.id === athEdit ? 'sel' : ''}" data-aev="${esc(x.id)}"><td><b>${esc(x.name)}</b></td><td class="muted">${esc(x.round || '')}</td><td class="muted">${esc(x.kind)}</td><td>${x.entries.length} entries</td><td class="n">${d.ath.current === x.id ? '<span class="badge live">CURRENT</span>' : ''}</td></tr>`).join('') || '<tr><td class="muted">No events yet</td></tr>'}</table></div>
-      <div class="panel">${e ? `<h4>Edit event<span class="sp"></span><button class="btn sm" id="a-cur">Make current</button><button class="btn sm ghost" id="a-del">Delete event</button></h4>
+    const known = athKnown(d);
+    const dd = e && A.byName(e.discipline);
+    const field = e && e.kind === 'field';
+    const numbered = e && A.NUMBERED.includes(e.roundType);
+    return `<datalist id="a-people">${[...known.people.keys()].map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+      <datalist id="a-teams">${known.teams.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+      <datalist id="a-bibs">${known.bibs.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+      <div class="grid cols-2" style="margin-top:12px">
+      <div class="panel" data-nofold><h4>Events <span class="sp"></span><button class="btn sm" id="a-many">+ Several events</button><button class="btn sm" id="a-add">+ Event</button></h4>
+        <table class="t"><tr><th>Event</th><th>Round</th><th>Type</th><th>Entries</th><th></th></tr>${evs.map(x => `<tr class="click ${x.id === athEdit ? 'sel' : ''}" data-aev="${esc(x.id)}"><td><b>${esc(x.name)}</b></td><td class="muted">${esc(x.round || '')}</td><td class="muted">${x.kind === 'field' ? 'Field' : 'Track'}</td><td>${x.entries.length}</td><td class="n">${d.ath.current === x.id ? '<span class="badge live">CURRENT</span>' : ''}${x.timing ? ' <span class="badge" title="From the timing system">⏱</span>' : ''}</td></tr>`).join('') || '<tr><td class="muted" colspan="5">No events yet. Add them here, or let the timing system bring its start lists (Timing tab).</td></tr>'}</table></div>
+      <div class="panel" data-nofold>${e ? `<h4>Edit event<span class="sp"></span><button class="btn sm" id="a-dup">Copy as next heat</button><button class="btn sm" id="a-cur">Make current</button><button class="btn sm ghost" id="a-del">Delete event</button></h4>
         <div class="form-grid">
-          <label class="f"><span>Name</span><input type="text" data-ae="name" value="${esc(e.name)}"></label>
-          <label class="f"><span>Round</span><input type="text" data-ae="round" value="${esc(e.round || '')}" placeholder="Heat 1 / Final"></label>
-          <label class="f"><span>Type</span><select data-ae="kind"><option value="track" ${e.kind !== 'field' ? 'selected' : ''}>Track (time)</option><option value="field" ${e.kind === 'field' ? 'selected' : ''}>Field (distance / height)</option></select></label>
-          <label class="f"><span>Wind</span><input type="text" data-ae="wind" value="${esc(e.wind || '')}" placeholder="+0.4"></label>
-        </div><hr>
-        <table class="t" id="a-entries"><tr><th>Lane</th><th>Bib</th><th>Name</th><th>Team</th><th>PB</th><th>SB</th><th></th></tr>
-          ${e.entries.map(en => `<tr data-eid="${esc(en.id)}">${['lane', 'bib', 'name', 'team', 'pb', 'sb'].map(k => `<td><input type="text" data-en="${k}" value="${esc(en[k] == null ? '' : en[k])}" style="${k === 'name' ? '' : 'width:70px'}"></td>`).join('')}<td><button class="btn sm ghost" data-dele>✕</button></td></tr>`).join('')}</table>
-        <div class="row" style="margin-top:8px"><button class="btn sm" id="a-adde">+ Entry</button><button class="btn sm" id="a-bulk">Bulk paste…</button></div>` : '<p class="muted">Add an event to start.</p>'}</div></div>`;
+          <label class="f"><span>Gender</span>${sel('data-ae="gender"', A.GENDERS, e.gender, 'Choose…')}</label>
+          <label class="f"><span>Age group</span>${sel('data-ae="age"', A.AGES, e.age || 'Open')}</label>
+          <label class="f"><span>Discipline</span>${discSelect('data-ae="discipline"', e.discipline)}</label>
+          <label class="f"><span>Round</span>${sel('data-ae="roundType"', A.ROUNDS, e.roundType !== undefined ? e.roundType : e.round, 'None')}</label>
+          ${numbered ? `<label class="f"><span>${e.roundType === 'Qualification' ? 'Group' : e.roundType === 'Race' ? 'Race' : 'Number'}</span>${sel('data-ae="heat"', A.HEATS.map(n => ({ value: n, label: e.roundType === 'Qualification' ? String.fromCharCode(64 + Number(n)) : n })), e.heat, '–')}</label>` : ''}
+          ${!e.discipline ? `<label class="f"><span>Name (no discipline chosen)</span><input type="text" data-ae="name" value="${esc(e.name || '')}"></label><label class="f"><span>Type</span>${sel('data-ae="kind"', [{ value: 'track', label: 'Track (time)' }, { value: 'field', label: 'Field (distance / height)' }], e.kind || 'track')}</label>` : ''}
+          ${!e.discipline || (dd && dd.wind) ? `<label class="f"><span>Wind (m/s)</span>${sel('data-ae="wind"', windList(), e.wind, '–')}</label>` : ''}
+        </div>
+        <p class="small muted" style="margin:6px 0 0">Shows as <b>${esc(e.name || '…')}</b>${e.round ? ' · ' + esc(e.round) : ''}${dd ? ` · ${dd.kind === 'field' ? 'field event, best mark counts' : 'track event, fastest time first'}` : ''}</p><hr>
+        <table class="t" id="a-entries"><tr><th>${field ? 'Order' : 'Lane'}</th><th>Bib</th><th>Name</th><th>Team</th><th>PB</th><th>SB</th><th></th></tr>
+          ${e.entries.map(en => `<tr data-eid="${esc(en.id)}"><td>${sel('data-en="lane"', field ? A.HEATS : A.LANES, en.lane, '–')}</td>
+            <td><input type="text" data-en="bib" list="a-bibs" value="${esc(en.bib == null ? '' : en.bib)}" style="width:70px"></td>
+            <td><input type="text" data-en="name" list="a-people" value="${esc(en.name || '')}" placeholder="Pick or type a name"></td>
+            <td><input type="text" data-en="team" list="a-teams" value="${esc(en.team || '')}" style="width:120px" placeholder="Pick or type"></td>
+            <td><input type="text" data-en="pb" value="${esc(en.pb || '')}" style="width:70px"></td><td><input type="text" data-en="sb" value="${esc(en.sb || '')}" style="width:70px"></td>
+            <td><button class="btn sm ghost" data-dele>✕</button></td></tr>`).join('')}</table>
+        <div class="row" style="margin-top:8px"><button class="btn sm" id="a-adde">+ Entry</button><button class="btn sm" id="a-fill">Fill lanes</button><button class="btn sm" id="a-bulk">Bulk paste…</button></div>` : '<p class="muted">Add an event to start.</p>'}</div></div>`;
+  }
+  function windList() { const l = []; for (let w = -50; w <= 50; w++) { const v = w / 10; l.push((v > 0 ? '+' : v === 0 ? '±' : '') + v.toFixed(1)); } return l.concat(['NWI']); }
+  function newAthEvent(o) {
+    return athFix(Object.assign({ id: U.id(), name: '', gender: '', age: 'Open', discipline: '', roundType: 'Final', heat: '', round: '', kind: 'track', wind: '', entries: [] }, o || {}));
   }
 
   function collectDraft(root) {
@@ -593,6 +657,8 @@
       const e = draft.ath.events.find(x => x.id === athEdit);
       if (e) {
         $$('[data-ae]', root).forEach(i => { e[i.dataset.ae] = i.value; });
+        if (!A.NUMBERED.includes(e.roundType)) e.heat = '';
+        athFix(e);
         e.entries = $$('tr[data-eid]', root).map(tr => {
           const en = { id: tr.dataset.eid || U.id() };
           $$('[data-en]', tr).forEach(i => { en[i.dataset.en] = i.value.trim(); });
@@ -655,11 +721,67 @@
     wireRows();
     // athletics
     const aAdd = $('#a-add');
-    if (aAdd) aAdd.onclick = () => { collectDraft(root); const e = { id: U.id(), name: 'New event', round: '', kind: 'track', wind: '', entries: [] }; draft.ath.events.push(e); athEdit = e.id; if (!draft.ath.current) draft.ath.current = e.id; dirty(); buildSetup(root); };
+    const cur0 = () => draft.ath.events.find(x => x.id === athEdit);
+    if (aAdd) aAdd.onclick = () => { collectDraft(root); const p = cur0(); const e = newAthEvent(p ? { gender: p.gender, age: p.age } : {}); draft.ath.events.push(e); athEdit = e.id; if (!draft.ath.current) draft.ath.current = e.id; dirty(); buildSetup(root); };
+    // a field that changes the event (discipline, round, …): rebuild so the name, the heat and the wind follow
+    $$('[data-ae]', root).forEach(i => { i.onchange = () => { collectDraft(root); dirty(); buildSetup(root); }; });
+    // a known athlete: bib and team come with the name
+    $$('tr[data-eid] [data-en="name"]', root).forEach(i => i.onchange = () => {
+      const p = athKnown(draft).people.get(i.value.trim()), tr = i.closest('tr');
+      if (!p) return;
+      ['bib', 'team', 'pb', 'sb'].forEach(k => { const f = $(`[data-en="${k}"]`, tr); if (f && !f.value && p[k]) f.value = p[k]; });
+      dirty();
+    });
+    const aDup = $('#a-dup'); if (aDup) aDup.onclick = () => {
+      collectDraft(root);
+      const p = cur0(); if (!p) return;
+      const roundType = A.NUMBERED.includes(p.roundType) ? p.roundType : 'Heat';
+      const heat = String((Number(p.heat) || (A.NUMBERED.includes(p.roundType) ? 1 : 0)) + 1);
+      if (!A.NUMBERED.includes(p.roundType)) { p.roundType = 'Heat'; p.heat = '1'; athFix(p); }
+      const e = newAthEvent({ gender: p.gender, age: p.age, discipline: p.discipline, kind: p.kind, roundType, heat });
+      draft.ath.events.splice(draft.ath.events.indexOf(p) + 1, 0, e); athEdit = e.id; dirty(); buildSetup(root);
+    };
+    const aMany = $('#a-many'); if (aMany) aMany.onclick = async () => {
+      collectDraft(root);
+      let form = null;
+      const chk = (name, list, on) => `<div class="row" style="flex-wrap:wrap;gap:4px 14px">${list.map(x => `<label class="row" style="gap:4px"><input type="checkbox" name="${name}" value="${esc(x)}" ${on.includes(x) ? 'checked' : ''}> ${esc(x)}</label>`).join('')}</div>`;
+      const r = await CG.modal('Add several events', `<div class="form-grid">
+          <label class="f"><span>Discipline</span>${discSelect('name="discipline"', '')}</label>
+          <label class="f"><span>Round</span>${sel('name="roundType"', A.ROUNDS, 'Final')}</label>
+          <label class="f"><span>How many (heats, groups, races)</span>${sel('name="count"', A.HEATS, '1')}</label></div>
+        <p class="small muted" style="margin:10px 0 4px">Gender</p>${chk('gender', A.GENDERS, ['Men', 'Women'])}
+        <p class="small muted" style="margin:10px 0 4px">Age groups</p>${chk('age', A.AGES, ['Open'])}
+        <p class="small muted" style="margin:10px 0 0">One event is made for every gender and age group ticked (and every heat).</p>`, { ok: 'Add events', onOpen: f => { form = f; } });
+      if (!r || !r.discipline) return;
+      const pick = n => $$(`input[name="${n}"]`, form).filter(c => c.checked).map(c => c.value);
+      const genders = pick('gender').length ? pick('gender') : [''], ages = pick('age').length ? pick('age') : ['Open'];
+      const n = A.NUMBERED.includes(r.roundType) ? Number(r.count) || 1 : 1;
+      let first = null;
+      for (const g of genders) for (const a of ages) for (let i = 1; i <= n; i++) {
+        const e = newAthEvent({ gender: g, age: a, discipline: r.discipline, roundType: r.roundType, heat: A.NUMBERED.includes(r.roundType) && n > 1 ? String(i) : '' });
+        draft.ath.events.push(e); if (!first) first = e;
+      }
+      if (first) { athEdit = first.id; if (!draft.ath.current) draft.ath.current = first.id; }
+      dirty(); buildSetup(root);
+    };
+    const aFill = $('#a-fill'); if (aFill) aFill.onclick = () => {
+      collectDraft(root);
+      const e = cur0(); if (!e) return;
+      const free = (e.kind === 'field' ? A.HEATS : A.LANES).filter(l => !e.entries.some(x => x.lane === l));
+      e.entries.forEach(x => { if (!x.lane && free.length) x.lane = free.shift(); });
+      dirty(); buildSetup(root);
+    };
     $$('[data-aev]', root).forEach(tr => tr.onclick = () => { collectDraft(root); athEdit = tr.dataset.aev; buildSetup(root); });
     const aCur = $('#a-cur'); if (aCur) aCur.onclick = () => { collectDraft(root); draft.ath.current = athEdit; dirty(); buildSetup(root); };
     const aDel = $('#a-del'); if (aDel) aDel.onclick = () => { draft.ath.events = draft.ath.events.filter(e => e.id !== athEdit); if (draft.ath.current === athEdit) draft.ath.current = draft.ath.events[0] ? draft.ath.events[0].id : ''; athEdit = null; dirty(); buildSetup(root); };
-    const aAddE = $('#a-adde'); if (aAddE) aAddE.onclick = () => { collectDraft(root); draft.ath.events.find(e => e.id === athEdit).entries.push({ id: U.id(), lane: '', bib: '', name: 'New athlete', team: '', pb: '', sb: '' }); dirty(); buildSetup(root); };
+    const aAddE = $('#a-adde'); if (aAddE) aAddE.onclick = () => {
+      collectDraft(root);
+      const e = draft.ath.events.find(x => x.id === athEdit);
+      const free = (e.kind === 'field' ? A.HEATS : A.LANES).find(l => !e.entries.some(x => x.lane === l)) || '';
+      e.entries.push({ id: U.id(), lane: free, bib: '', name: '', team: '', pb: '', sb: '', _new: true });
+      dirty(); buildSetup(root);
+      const last = $$('tr[data-eid] [data-en="name"]', root).pop(); if (last) last.focus();
+    };
     $$('[data-dele]', root).forEach(b => b.onclick = () => { b.closest('tr').remove(); dirty(); });
     const aBulk = $('#a-bulk'); if (aBulk) aBulk.onclick = async () => {
       const r = await CG.modal('Bulk paste entries', `<p class="small muted">One per line: <span class="mono">lane | Name | Team | PB | SB | bib</span>. Replaces the entries of this event.</p><textarea name="text" rows="12"></textarea>`, { ok: 'Use list' });
