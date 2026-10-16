@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bar">#262626</color>
+    <color name="bar">#1d1d1d</color>
+    <color name="bg">#262626</color>
+    <color name="accent">#00ff82</color>
 </resources>

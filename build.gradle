@@ -1,3 +1,64 @@
 plugins {
-    id 'com.android.application' version '8.5.2' apply false
+    id 'com.android.application'
+}
+
+// ---- the website the app opens (the Studio; viewers are sent on to the public website from there).
+// ---- Change this one line if the website moves.
+def site = 'https://admin.regemarkfp.com'
+
+def siteHost = new URI(site).host
+def keys = new Properties()
+file('../keystore.properties').withInputStream { keys.load(it) }
+def build = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'com.regemarkfp.rfpmanager'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.regemarkfp.rfpmanager'
+        minSdk 23
+        targetSdk 34
+        versionCode 100 + build
+        versionName "2.0.${build}"
+        manifestPlaceholders = [hostName: siteHost]
+        buildConfigField 'String', 'SITE', '"' + site + '"'
+        buildConfigField 'int', 'BUILD', String.valueOf(build)
+    }
+
+    buildFeatures { buildConfig true }
+
+    // a warning from Android's checks never stops the build on GitHub
+    lint { checkReleaseBuilds false; abortOnError false }
+
+    signingConfigs {
+        release {
+            storeFile file('../' + keys['storeFile'])
+            storePassword keys['storePassword']
+            keyAlias keys['keyAlias']
+            keyPassword keys['keyPassword']
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.webkit:webkit:1.11.0'
+    implementation 'androidx.browser:browser:1.8.0'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    implementation platform('com.google.firebase:firebase-bom:33.5.1')
+    implementation 'com.google.firebase:firebase-messaging'
 }
