@@ -239,6 +239,11 @@ test('several venues at once: a stream per match, each with its own key, page, e
   assert.equal(await pub(ms.fixture_b2.slug, ms.fixture_b2.key), 200);
   assert.equal(await pub(ms.fixture_a1.slug, ms.fixture_b2.key), 401);
   assert.equal(await pub(prod.data.streamSlug, prod.data.streamKey), 200);
+  // the restream copies with graphics: only this site makes and reads them
+  assert.equal(await pub(prod.data.streamSlug + '--logos', 'hook-secret'), 200);
+  assert.equal(await pub(prod.data.streamSlug + '--logos', prod.data.streamKey), 401);
+  assert.equal(await hook({ action: 'read', path: 'live/' + prod.data.streamSlug + '--logos', query: '', ip: '10.0.0.9' }), 401);
+  assert.equal(await pub('nothere--logos', 'hook-secret'), 401);
 
   // the Live streams page: the production and both matches, with their ingest and restreams
   let list = (await web.get(`/api/streams?team=${team}`)).data.list;
@@ -359,4 +364,21 @@ test('the production PC: ad break countdown for its screens (screen key), and th
   const go = await fetch(`${pc.url}/mcr`, { redirect: 'manual' });
   assert.equal(go.status, 302); assert.ok(go.headers.get('location').startsWith('/live/mcr.html?key='));
   assert.equal((await fetch(pc.url + '/live/mcr.html')).status, 200);
+});
+
+test('restreams with master control burnt in: what each choice shows when', () => {
+  const { layerOf, variantOf, VARIANTS } = require('../lib/compositor');
+  assert.equal(variantOf('Logos only'), 'logos'); assert.equal(variantOf('Ads + slates'), 'ads-slates'); assert.equal(variantOf('Clean (as it comes in)'), ''); assert.equal(variantOf(''), ''); assert.equal(variantOf('nonsense'), '');
+  const now = Date.parse('2026-10-17T13:00:00Z'), iso = (ms) => new Date(ms).toISOString();
+  const bug = { kind: 'bug', on: true, image: 'img_a', pos: 'tr' }, lower = { kind: 'lower', on: true, text: 'Name' };
+  const st = { overlays: [bug, lower], slate: { kind: 'weather', title: 'Weather delay', since: iso(now - 1000), until: '' },
+    ad: { items: [{ id: 'vad_1', duration: 30 }, { id: 'vad_2', duration: 15 }], startedAt: iso(now - 40000), endsAt: iso(now + 5000) } };
+  assert.equal(layerOf(st, VARIANTS.logos, now).kind, 'graphics');
+  assert.deepEqual(layerOf(st, VARIANTS.logos, now).overlays.map((o) => o.kind), ['bug'], 'logos only: no lower third');
+  assert.equal(layerOf(st, VARIANTS.slates, now).kind, 'slate');
+  const ad = layerOf(st, VARIANTS['ads-slates'], now);
+  assert.equal(ad.kind, 'ad'); assert.equal(ad.id, 'vad_2'); assert.ok(Math.abs(ad.off - 10) < 0.01, 'ten seconds into the second advert');
+  assert.equal(layerOf(st, VARIANTS['ads-slates'], now + 6000).kind, 'slate', 'after the break: the slate');
+  assert.equal(layerOf({ overlays: [bug] }, VARIANTS.ads, now).kind, 'none', 'ads only: no logos');
+  assert.equal(layerOf({ overlays: [bug], squeeze: { endsAt: iso(now + 9000) } }, VARIANTS.logos, now).kind, 'none', 'no logos during a squeeze-back');
 });

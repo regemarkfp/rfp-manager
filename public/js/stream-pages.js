@@ -66,12 +66,12 @@
     return box;
   }
   // restreams: where a copy of the stream goes (YouTube, Facebook …) and how it is doing
-  const RS = { live: 'sending', retrying: 'trying again', starting: 'starting', waiting: 'starts when live', off: 'off' };
+  const RS = { live: 'sending', retrying: 'trying again', starting: 'starting', waiting: 'starts when live', off: 'off', preparing: 'adding the graphics' };
   function restreamList(s) {
     if (!(s.restream || []).length) return null;
     return h('div', { style: { margin: '10px 0 0' } }, h('div', { class: 'dim small' }, 'Restreaming to'),
       h('div', { class: 'row', style: { gap: '6px', flexWrap: 'wrap', marginTop: '4px' } }, s.restream.map((x) => h('span', { class: 'pill', title: (x.error ? x.error + ' · ' : '') + x.server,
-        style: x.state === 'live' ? { background: '#1f6f3a', color: '#fff' } : x.state === 'retrying' ? { background: '#7a2020', color: '#fff' } : {} }, `${x.name}: ${RS[x.state] || x.state}`))));
+        style: x.state === 'live' ? { background: '#1f6f3a', color: '#fff' } : x.state === 'retrying' ? { background: '#7a2020', color: '#fff' } : {} }, `${x.name}${x.with && !/^Clean/.test(x.with) ? ' (' + x.with.toLowerCase() + ')' : ''}: ${RS[x.state] || x.state}`))));
   }
   // one stream per match: each match's own key and watch page (several venues at once)
   const keysOpen = new Set();
@@ -245,7 +245,7 @@
             s.live ? h('div', { class: 'small', style: { position: 'absolute', right: '8px', bottom: '8px', background: 'rgba(0,0,0,.7)', padding: '3px 8px', borderRadius: '6px' } }, `${ago(s.since)} · ${s.viewers || 0} watching`) : null),
           h('div', {}, h('b', {}, name), h('div', { class: 'dim small' }, [s.parent ? (d.streamTitle || d.name) : '', ch ? ch.data.name : '', UI.fmtDate(d.date)].filter(Boolean).join(' · '))),
           ms ? h('div', { class: 'mcr-pill ' + ms.cls }, ms.text) : null,
-          (s.restream || []).length ? h('div', { class: 'small' }, s.restream.map((x) => h('span', { class: 'pill', title: x.error || x.server, style: { marginRight: '4px', ...(x.state === 'live' ? { background: '#1f6f3a', color: '#fff' } : x.state === 'retrying' ? { background: '#7a2020', color: '#fff' } : {}) } }, `${x.name}: ${{ live: 'sending', retrying: 'trying again', starting: 'starting', waiting: 'when live', off: 'off' }[x.state] || x.state}`))) : null,
+          (s.restream || []).length ? h('div', { class: 'small' }, s.restream.map((x) => h('span', { class: 'pill', title: x.error || x.server, style: { marginRight: '4px', ...(x.state === 'live' ? { background: '#1f6f3a', color: '#fff' } : x.state === 'retrying' ? { background: '#7a2020', color: '#fff' } : {}) } }, `${x.name}${x.with && !/^Clean/.test(x.with) ? ' · ' + x.with.toLowerCase() : ''}: ${{ live: 'sending', retrying: 'trying again', starting: 'starting', waiting: 'when live', off: 'off', preparing: 'adding graphics' }[x.state] || x.state}`))) : null,
           s.live ? h('div', { class: 'dim small' }, [s.source && 'In: ' + s.source, s.kbps ? (s.kbps / 1000).toFixed(1) + ' Mb/s' : '', (s.tracks || []).join(', '), s.audioTracks ? s.audioTracks + ' audio tracks' : ''].filter(Boolean).join(' · ')) : s.closed && s.endedAt ? h('div', { class: 'dim small' }, 'Ended ' + new Date(s.endedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })) : null,
           h('div', { class: 'row', style: { gap: '6px', flexWrap: 'wrap', marginTop: 'auto' } },
             h('a', { class: 'btn sm', href: watch, target: '_blank', rel: 'noopener' }, 'Watch ↗'),
