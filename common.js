@@ -207,6 +207,15 @@
       if (c.direction < 0) v = Math.max(0, v); else if (c.stopAtLimit && c.limitMs > 0) v = Math.min(v, c.limitMs);
       return Math.max(0, v);
     },
+    // race clock: 9.87 / 1:02.34 / 1:02:03.4 (digits 0–3), cut not rounded
+    raceClock(ms, digits) {
+      const f = Math.pow(10, digits), whole = Math.floor(ms / 1000), part = Math.floor((ms % 1000) / (1000 / f));
+      const h = Math.floor(whole / 3600), m = Math.floor((whole % 3600) / 60), s = whole % 60;
+      const dec = digits ? '.' + String(part).padStart(digits, '0') : '';
+      if (h) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}${dec}`;
+      if (m) return `${m}:${String(s).padStart(2, '0')}${dec}`;
+      return `${s}${dec}`;
+    },
     fmtClock(ms, tenthsUnder) {
       if (tenthsUnder && ms < tenthsUnder * 1000) return (Math.floor(ms / 100) / 10).toFixed(1);
       const t = Math.floor(ms / 1000);

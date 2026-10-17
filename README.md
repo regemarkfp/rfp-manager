@@ -373,6 +373,12 @@ scorer link; both work on the same match at the same time.
 
 **Events** are built from dropdowns on the scorer's Setup tab: gender, age group, discipline (sprints to combined events), round and heat. The name follows ("80m Hurdles Girls U16 · Heat 2"), the type (track or field) and the wind box come with the discipline. "+ Several events" makes one event for every gender and age group ticked (and every heat); "Copy as next heat" adds Heat 2, 3 …. Lanes, bibs, names and teams are picked from lists (names and teams you have used before; a known athlete brings their bib and team).
 
+**On the day.** Graphics control → Athletics has the events as buttons (with ◀ Prev / Next ▶) and **Change events: automatically when the results are in** (straight away or after 5 s – 5 min): the next event becomes current and the graphics follow. Each lane (field events: each athlete) has a button: click for that athlete's lower third (lane, team, then PB / SB, attempts or the result), click again to take it off.
+
+**Event numbers and the race clock.** Every event has a number (Setup: "Event no."; new events are numbered in order, FinishLynx brings its own) shown on the event buttons and as `ath_event_num`; the events list shows each event's gender and age group. The race clock shows 9.87 (hundredths) by default; choose 9 / 9.8 / 9.87 / 9.876 next to the clock on the scorer or in graphics control → Athletics (templates: `clock_digits`, or `data-digits` on a `data-clock` element).
+
+**Field events** on the scorer: the athlete who is up is shown large; type the mark and press Enter (or X / – for a foul or a pass) and the next athlete comes up by themselves (fewest attempts first, in competition order). Rounds (3–6) and "top 8 after round 3" are set there. High jump and pole vault: choose the bar, then O / X / – per try; three failures in a row and the athlete is out, the bar goes up with +3 / +5 / +10 cm, and ties are broken on failures. "Up" makes anyone up now, ↶ removes their last attempt, "Skip ▶" moves on. Graphics: "Field: Athlete Up" and the fields `ath_up_name`, `ath_up_attempts`, `ath_up_best`, `ath_bar`, `ath_attempt_round`.
+
 **Timing systems** connect on the scorer's **Timing** tab (athletics only, on the production PC). Add one from the list:
 
 | Preset | In the timing system | Brings |
@@ -386,6 +392,10 @@ scorer link; both work on the same match at the same time.
 "What comes in" shows every line received and how it was read. A line that isn't understood can be read with your own rules (What it sends → My own layout): which lines, what they are (result, start-list entry, running time, event name, wind, gun), how they split (control codes, comma, semicolon, tab, spaces) and which column is which, chosen from dropdowns while an example line shows its columns. "Try it" previews pasted lines or sends them into the meet by hand.
 
 Events that aren't set up yet are made from the names the system sends (gender, age group and discipline are read from "Men's 100 Meter", "Girls U16 80m Hurdles"…), the race being timed becomes the current event (graphics follow), and the race clock runs from the system. Results from .lif files are official: lines from a scoreboard never overwrite them. Serial ports on Windows are read through PowerShell (no drivers or extra software). New template fields: `ath_gender`, `ath_age`, `ath_discipline`, `rsN_reaction`.
+
+### Variables (Live → Variables)
+
+Every value RFP Manager can put in a template, listed sport by sport: **Every sport** (the same names in cricket and the others), **All sports except cricket** (clocks, cards, statistics …), each sport's own names, **Production and devices** (date, team, timeline, vMix / ATEM, your own variables) and **Graphic fields** (what each built-in graphic sends: line1, player_name …). Each row has the name, what it is, an example from a sample match (green: the value now, with a match on air) and **Copy**; numbered series (sl1_name … sl16_name) are one row with a number to choose. Copy as `{key}` (text fields and actions), `key`, or `data-f="key"` (your own HTML). Search covers every sport at once; "Copy all" copies a whole group.
 
 ### Statistics graphics
 
