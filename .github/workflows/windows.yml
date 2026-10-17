@@ -1,6 +1,6 @@
 # Builds RFP Manager for Windows whenever main changes (or by hand: Actions → Windows app → Run workflow):
 # RFP Manager.exe (tray app with its own windows, WebView2), a portable Node.js in node\, and the whole program,
-# zipped as RFPManager-Windows.zip. It is published as the release "windows-latest" (Releases on the repo page) and
+# zipped as RFPManager-Windows.zip, and an installer, RFPManager-Setup.exe (Inno Setup, tools/installer). It is published as the release "windows-latest" (Releases on the repo page) and
 # kept as a download on the workflow run. config.json and data\ are not in it, so it can be unzipped over an
 # existing RFP Manager folder. After that, RFP Manager updates itself from the website when it starts.
 name: Windows app
@@ -21,6 +21,7 @@ concurrency:
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -31,6 +32,7 @@ jobs:
       - name: Test
         run: npm test
         continue-on-error: true
+        timeout-minutes: 20
 
       - name: Build RFP Manager.exe
         shell: pwsh
@@ -70,6 +72,20 @@ jobs:
           "version=$ver" >> $env:GITHUB_OUTPUT
           "zip=$zip" >> $env:GITHUB_OUTPUT
 
+      - name: Build the installer (RFPManager-Setup.exe)
+        id: setup
+        timeout-minutes: 15
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { choco install innosetup -y --no-progress | Out-Null; $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          $stage = Join-Path $env:RUNNER_TEMP 'RFP Manager'
+          Remove-Item (Join-Path $stage 'START HERE.txt') -ErrorAction SilentlyContinue
+          & $iscc "/DStage=$stage" "/DVersion=${{ steps.pkg.outputs.version }}" tools\installer\rfp-manager.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed ($LASTEXITCODE)" }
+          "exe=$((Resolve-Path dist\RFPManager-Setup.exe).Path)" >> $env:GITHUB_OUTPUT
+
       - name: Publish the release "windows-latest"
         shell: pwsh
         env:
@@ -78,11 +94,13 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $false
           gh release delete windows-latest --yes --cleanup-tag 2>$null
           $global:LASTEXITCODE = 0
-          gh release create windows-latest "${{ steps.pkg.outputs.zip }}" --target $env:GITHUB_SHA --latest `
+          gh release create windows-latest "${{ steps.setup.outputs.exe }}" "${{ steps.pkg.outputs.zip }}" --target $env:GITHUB_SHA --latest `
             --title "RFP Manager ${{ steps.pkg.outputs.version }} for Windows" `
-            --notes "Download RFPManager-Windows.zip, unzip it and start RFP Manager.exe (Node.js is included). Over an existing install: quit RFP Manager first, unzip over its folder and replace the files; settings and data are kept. Built from $env:GITHUB_SHA."
+            --notes "New PC: download RFPManager-Setup.exe and run it (no administrator needed; Start menu shortcut, optional start with Windows, notifications from the website). Or the portable RFPManager-Windows.zip: unzip it and start RFP Manager.exe (Node.js is included). Over an existing install: quit RFP Manager first, unzip over its folder and replace the files; settings and data are kept. Built from $env:GITHUB_SHA."
 
       - uses: actions/upload-artifact@v4
         with:
           name: RFPManager-Windows-${{ steps.pkg.outputs.version }}
-          path: ${{ steps.pkg.outputs.zip }}
+          path: |
+            ${{ steps.pkg.outputs.zip }}
+            ${{ steps.setup.outputs.exe }}
