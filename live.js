@@ -30,15 +30,6 @@ const Clock = {
   start(c, now) { if (!c.running) { c.startedAt = now; c.running = true; } },
   stop(c, now) { if (c.running) { c.baseMs = Clock.value(c, now); c.running = false; } },
   set(c, ms, now) { c.baseMs = Math.max(0, ms); c.startedAt = now; },
-  // race clock: 9.87 / 1:02.34 / 1:02:03.4 (digits 0–3), cut not rounded
-  race(ms, digits) {
-    const f = Math.pow(10, digits), whole = Math.floor(ms / 1000), part = Math.floor((ms % 1000) / (1000 / f));
-    const h = Math.floor(whole / 3600), m = Math.floor((whole % 3600) / 60), s = whole % 60;
-    const dec = digits ? '.' + String(part).padStart(digits, '0') : '';
-    if (h) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}${dec}`;
-    if (m) return `${m}:${String(s).padStart(2, '0')}${dec}`;
-    return `${s}${dec}`;
-  },
   format(ms, tenths) {
     if (ms < 0) ms = 0;
     if (tenths && ms < 60000) return (Math.floor(ms / 100) / 10).toFixed(1);
@@ -46,8 +37,6 @@ const Clock = {
     return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
   },
 };
-// decimals on the athletics race clock (setup.ath.clockDigits, 0–3; hundredths unless chosen)
-const raceDigits = (sp) => { const n = sp.setup && sp.setup.ath && sp.setup.ath.clockDigits; return n === undefined || n === null || n === '' ? 2 : Math.max(0, Math.min(3, Number(n) || 0)); };
 const newClocks = () => ({ game: Clock.make({ direction: 1 }), shot: Clock.make({ direction: -1, stopAtLimit: true, baseMs: 24000, limitMs: 24000 }) });
 const blankSport = () => ({ sport: '', version: 0, setup: null, events: [], derived: null, flat: {}, clocks: newClocks() });
 // Counted statistics of one player as [label, value] pairs, most important first (for the player stats graphic).
@@ -78,9 +67,7 @@ function liveKeys(sp, now) {
   for (const [name, c] of Object.entries(sp.clocks || {})) {
     const p = name === 'game' ? 'clock' : name, v = Clock.value(c, now);
     d[`${p}_ms`] = String(Math.round(v));
-    const digits = sp.sport === 'athletics' && name === 'game' ? raceDigits(sp) : null;
-    d[`${p}_text`] = digits !== null ? Clock.race(v, digits) : Clock.format(v, name === 'shot' || (c.direction < 0 && sp.sport === 'basketball'));
-    if (digits !== null) d[`${p}_digits`] = String(digits);
+    d[`${p}_text`] = Clock.format(v, name === 'shot' || (c.direction < 0 && sp.sport === 'basketball'));
     d[`${p}_running`] = Clock.ticking(c, now) ? '1' : '';
     d[`${p}_dir`] = c.direction < 0 ? '-1' : '1';
     d[`${p}_limit_ms`] = String(c.limitMs);
@@ -381,43 +368,6 @@ function makeLive(app) {
     return sportKeyCache;
   }
 
-  // A full sample match for every sport (teams, players, a score, a card, athletics events), for the Variables screen:
-  // every value a template can use is listed with an example.
-  let sampleCache = null;
-  function sportSamples() {
-    if (sampleCache) return sampleCache;
-    const out = [];
-    for (const id of Object.keys(Sports.SPORTS)) {
-      try {
-        const sp = blankSport(), su = Sports.newSetup(id), def = Sports.SPORTS[id];
-        Object.assign(su, { title: 'Sample match', competition: 'Sample Cup', venue: 'Sample Park', commentators: ['First Voice', 'Second Voice'] });
-        su.officials = (su.officials || []).map((o, i) => ({ role: o.role, name: ['Ref Erry', 'Line Judge', 'Third Umpire', 'Fourth Off'][i] || '' }));
-        const pl = (k, names) => names.map((n, i) => ({ id: `${k}${i + 1}`, number: String(i + 7), name: n, tvName: n.split(' ').pop().toUpperCase(), position: '' }));
-        Object.assign(su.teams.A, { name: 'Home Lions', short: 'HOM', players: pl('a', ['Sam Home', 'Jo Home', 'Kai Home']) });
-        Object.assign(su.teams.B, { name: 'Away Eagles', short: 'AWY', players: pl('b', ['Lee Away', 'Max Away', 'Ray Away']) });
-        const events = [];
-        if (id === 'athletics') {
-          const en = (p) => ['Ann Lee', 'Bea Ray', 'Cat Moss'].map((n, i) => ({ id: `${p}${i}`, name: n, lane: String(i + 3), bib: String(100 + i), team: ['Lions AC', 'Eagles AC', 'Hawks AC'][i], pb: '11.2' + i, sb: '11.3' + i }));
-          su.ath = { events: [{ id: 'e1', num: '1', name: '100m Women', discipline: '100m', gender: 'Women', age: 'Open', round: 'Final', kind: 'track', wind: '+0.8', entries: en('t') },
-            { id: 'e2', num: '2', name: 'Long Jump Women', discipline: 'Long Jump', gender: 'Women', age: 'Open', round: 'Final', kind: 'field', rounds: 6, entries: en('f') }], current: 'e1' };
-          events.push({ id: 's1', type: 'result', eventId: 'e1', entry: 't0', value: '11.05', note: 'PB', reaction: '0.141' }, { id: 's2', type: 'result', eventId: 'e1', entry: 't1', value: '11.21' });
-        } else if (def.kind === 'timed') {
-          const a = Sports.actions(id, su.variant, su.options).find((x) => x.points) || Sports.actions(id, su.variant, su.options)[0];
-          if (a) events.push({ id: 's1', type: 'score', key: a.key, team: 'A', player: 'a1', gt: 60000 });
-          const card = Sports.cards(id)[0];
-          if (card) events.push({ id: 's2', type: 'card', key: card.key, team: 'B', player: 'b1', gt: 120000 });
-        } else if (def.kind === 'sets') {
-          for (let i = 0; i < 3; i++) events.push({ id: 's' + i, type: 'point', team: i % 2 ? 'B' : 'A', how: '' });
-        }
-        sp.setup = su; sp.events = events;
-        resetClocks(sp, computeSport(sp));
-        out.push({ id, name: def.name || id, kind: def.kind, sp });
-      } catch (e) { log('No sample values for', id, '-', e.message); }
-    }
-    sampleCache = out;
-    return out;
-  }
-
   // ---------------------------------------------------------------- scorer buttons and macros, kept per theme
   // With a theme in use they live on the theme (so a broadcaster's look brings its own button mapping); without one, on the team.
   const padSport = (s) => (s.kind === 'cricket' ? 'cricket' : (s.sport.setup && s.sport.setup.sport) || '');
@@ -676,7 +626,7 @@ function makeLive(app) {
         }
         break;
       }
-      case 'athCurrent': case 'athAuto': case 'athUp': case 'athClock': {   // athletics from graphics control: the current event, automatic changes, who is up
+      case 'athCurrent': case 'athAuto': case 'athUp': {   // athletics from graphics control: the current event, automatic changes, who is up
         if (s.kind !== 'sport' || !sp.setup || sp.setup.sport !== 'athletics') throw new Cricket.ScoringError('This is not an athletics meet');
         const r = await athMutate(s, ({ setup }) => {
           const a = setup.ath = setup.ath || { events: [], current: '' };
@@ -687,7 +637,6 @@ function makeLive(app) {
             a.current = id; return { data: true };
           }
           if (action === 'athAuto') { a.auto = { mode: d.mode === 'results' ? 'results' : 'off', delay: Math.max(0, Math.min(600, Number(d.delay) || 0)) }; return { data: true }; }
-          if (action === 'athClock') { a.clockDigits = Math.max(0, Math.min(3, Number(d.digits) || 0)); return { data: true }; }
           const e = a.events.find((x) => x.id === String(d.eventId || a.current));
           if (!e) return {};
           e.up = String(d.entry || ''); return { data: true };
@@ -1104,7 +1053,6 @@ function makeLive(app) {
       return true;
     }
     if (name === 'variables') { if (!gfx) fail(400, 'Live values come from the production PC'); httpSend(res, 200, gfx.variables(q.get('graphic') || '', sportKeys())); return true; }
-    if (name === 'varref') { if (!gfx) fail(400, 'The variables come from the production PC'); httpSend(res, 200, gfx.reference(sportSamples().map((x) => ({ id: x.id, name: x.name, kind: x.kind, sport: x.sp, liveKeys: () => liveKeys(x.sp, Date.now()) })))); return true; }
     const s = await session(q.get('fixture') || (gfx ? gfx.fixtureId || '' : ''));
     const role = user && s.team ? await app.auth.roleIn(user, s.team) : null;
     if (user && s.team && !role) fail(403, 'You are not in this production team');

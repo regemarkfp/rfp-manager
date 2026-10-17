@@ -438,7 +438,7 @@ function createCatalog(prod) {
     G('ath_athlete_lt', 'Athlete Lower Third', 'Athletics', 'lt', 'lowerthird', 30, (c) => SB.athlete(c), { mode: 'sport', live: true, param: 'player' }),
     G('ath_up_lt', 'Field: Athlete Up', 'Athletics', 'lt', 'lowerthird', 30, (c) => { const d = SB.athlete(c, F(c, 'ath_up_id')); d.set('line2', joinDot(F(c, 'ath_bar') ? 'BAR ' + F(c, 'ath_bar') : 'ROUND ' + F(c, 'ath_attempt_round'), 'ATTEMPT ' + F(c, 'ath_up_try'), F(c, 'ath_up_attempts'), F(c, 'ath_up_best') ? 'BEST ' + F(c, 'ath_up_best') : '')); return d; }, { mode: 'sport', live: true, description: 'The field athlete who is up now, with their attempts and best mark.' }),
     G('ath_winner_lt', 'Winner', 'Athletics', 'lt', 'lowerthird', 30, (c) => lower(c, 'text', F(c, 'ath_winner_name'), joinDot(F(c, 'ath_winner_team'), F(c, 'ath_winner_result'), F(c, 'ath_winner_note'), F(c, 'ath_event'))), SL),
-    G('ath_event_lt', 'Event Title', 'Athletics', 'lt', 'lowerthird', 30, (c) => lower(c, 'text', F(c, 'ath_event'), joinDot(F(c, 'ath_event_num') ? 'EVENT ' + F(c, 'ath_event_num') : '', F(c, 'ath_round'), F(c, 'competition'))), S),
+    G('ath_event_lt', 'Event Title', 'Athletics', 'lt', 'lowerthird', 30, (c) => lower(c, 'text', F(c, 'ath_event'), joinDot(F(c, 'ath_round'), F(c, 'competition'))), S),
     G('ath_clock', 'Race Clock', 'Athletics', 'bug', 'sport_bug', 21, (c) => sdata(c, 'clock').set('clock_label', F(c, 'ath_event')), SL),
     G('sport_wipe', 'Wipe (last event)', 'Sport Wipes', 'wipe', 'wipe', 60, SB.wipe(null), Object.assign({}, S, W)),
     G('sport_wipe_goal', 'GOAL', 'Sport Wipes', 'wipe', 'wipe', 60, SB.wipe('GOAL'), Object.assign({}, S, W)),
@@ -636,111 +636,6 @@ function makeGfx(app) {
     }
     for (const [k, names] of [...byGraphic].sort((a, b) => a[0].localeCompare(b[0]))) more(k, 'Built-in graphics (link this template to the graphic to fill these)', names.length > 3 ? names.slice(0, 3).join(', ') + ' +' + (names.length - 3) : names.join(', '));
     return { onAir: !!doc(fixtureId), mode: c.sport ? 'sport' : 'cricket', theme: themeState(), builtIn: catalog.filter((g) => g.group !== 'Custom').map((g) => ({ id: g.id, name: g.name, group: g.group, mode: g.mode })), devices: devicesBrief(), vars };
-  }
-  // ---- the Variables screen: every value a template can use, for every sport, with an example and what it is ----------
-  // samples: [{ id, name, kind, sport (a computed sample match), liveKeys }] from live.js
-  function reference(samples) {
-    const cNow = context({}, ''), nowMap = (() => { try { return resolve(Object.fromEntries(Object.entries(liveMap(cNow, null)).map(([k, v]) => [k, txt(v)])), 'web'); } catch { return {}; } })();
-    // cricket sample: an innings under way
-    let cc = Object.assign({}, cNow, { sport: null, fixture: null });
-    try {
-      const m = Cricket.newMatch();
-      Object.assign(m.teamA, { name: 'Home Lions', shortName: 'HOM' }); Object.assign(m.teamB, { name: 'Away Eagles', shortName: 'AWY' });
-      const e = new Cricket.Engine(m); e.startInnings('A'); cc = Object.assign(cc, { m: e.match, s: Cricket.compute(e.match) });
-    } catch { /* a blank match will do */ }
-    const keysOf = (c) => { try { return Object.assign({}, liveMap(c, null)); } catch { return {}; } };
-    const ctxFor = (x) => Object.assign({}, cNow, { sport: x.sport, liveKeys: x.liveKeys, fixture: null, m: cNow.m, s: cNow.s });
-    const sports = [{ id: 'cricket', name: 'Cricket', ctx: cc }].concat(samples.map((x) => ({ id: x.id, name: x.name, ctx: ctxFor(x) })));
-    // what each sport sends, and what its graphics add (lower thirds, tables …)
-    for (const sp of sports) {
-      sp.flat = keysOf(sp.ctx);
-      sp.graphic = {};
-      for (const g of catalog) {
-        if (g.group === 'Custom' || (g.mode === 'sport') !== (sp.id !== 'cricket') && g.mode !== 'any') continue;
-        let d = {};
-        try { d = g.build(Object.assign({}, sp.ctx, { p: { playerId: sp.id === 'cricket' ? null : (sp.ctx.sport && sp.ctx.sport.derived && sp.ctx.sport.derived.players[0] || {}).id } })); } catch { continue; }
-        for (const [k, v] of Object.entries(d)) { if (k === 'layout' || k === 'graphic_id' || sp.flat[k] !== undefined) continue; (sp.graphic[k] = sp.graphic[k] || { ex: txt(v), by: [] }).by.push(g.name); }
-      }
-    }
-    const isProd = (k) => /^(org_|accent$|date_text$|time_text$|competition_(logo|color)|tournament_(logo|color)|timeline_|var_)/.test(k) || (app.devices && app.devices.ids().some((d) => k.startsWith(d + '_')));
-    // in every sport (and cricket): one list for all
-    const all = Object.keys(sports[0].flat).filter((k) => !isProd(k) && sports.every((sp) => sp.flat[k] !== undefined));
-    const common = new Set(all);
-    // numbered series (sl1_name … sl16_name) become one row with a number to choose
-    const series = (keys) => {
-      const out = [], seen = new Map();
-      for (const k of keys) {
-        const m = /^([a-z_]*?[a-z])(\d+)(_[a-z0-9_]+)?$/i.exec(k);
-        if (!m || ['team', 'set', 'quarter', 'period'].includes(m[1]) && !m[3]) { out.push({ key: k }); continue; }
-        const pat = `${m[1]}{n}${m[3] || ''}`;
-        if (!seen.has(pat)) { const row = { key: k, pattern: pat, nums: [] }; seen.set(pat, row); out.push(row); }
-        seen.get(pat).nums.push(Number(m[2]));
-      }
-      for (const r of out) if (r.nums) { r.nums.sort((a, b) => a - b); if (r.nums.length < 2) { delete r.pattern; delete r.nums; } else { r.min = r.nums[0]; r.max = r.nums[r.nums.length - 1]; delete r.nums; } }
-      return out;
-    };
-    const GROUPS = [
-      ['Match', /^(title|competition|tournament|venue|city|match_|format|sport|variant|status|result|toss|date|day|session|period|half|innings_|finished|winner|strip_text)/],
-      ['Commentators and officials', /^(comm|commentator|official|referee|umpire)/],
-      ['Teams', /^(team[AB]_(name|short|logo|color|coach|abbr|full)|bat_|bowl_|batting_team|bowling_team)/],
-      ['Score', /^(score|team[AB]_(score|runs|wickets|overs|points|tries|goals|sets|games|lead)|runs|wickets|overs|target|need|req|crr|rrr|lead|margin|games|set\d|sets_|points|tiebreak|server|serv|flag|bonus|dls|par|extras|free_hit|powerplay|projected|prev_|max_overs|balls_remaining|last_ball|trybonus|losingbonus|logpts|centre_pass)/],
-      ['Clocks', /(clock|shot|gt_ms|sinbin|countdown|_ms$|_sig$|_running$|_dir$|_limit)/],
-      ['Players', /^(bat\d|bowl\d|batter|striker|nonstriker|non_striker|bowler|keeper|captain|player|p\d|batsman|partnership|last_wicket|fow)/],
-      ['Cards and last event', /^(card|last_|team[AB]_cards?|red|yellow|reds)/],
-      ['Statistics', /^(stat|leader|stats_|poss|terr|team[AB]_(stat|poss|terr|pen|fouls|timeouts)|teamfouls|timeouts|pens|corners|shots)/],
-      ['Lists and tables', /^(sl|rs|ev|col|xcol|table_|events_|scorers|lineup|row|ball\d|over_balls|this_over|recent)/],
-      ['Athletics: events', /^ath_(event|round|wind|kind|status|gender|age|discipline|winner)/],
-      ['Athletics: field events', /^ath_(up|bar|attempt)/],
-      ['Baseball', /^(inning$|half|balls$|strikes|outs|count|base\d|batting$|pitch|batter_|pitcher_|runs[AB]|hits[AB]|errors[AB])/],
-    ];
-    const groupOf = (k) => (GROUPS.find(([, re]) => re.test(k)) || ['Other'])[0];
-    const ex = (sp, k) => { const v = sp.flat[k]; return v === undefined ? '' : String(txt(v)).slice(0, 60); };
-    const grouped = (keys, exampleOf) => {
-      const map = new Map();
-      for (const r of series(keys.sort())) { const g = groupOf(r.key); if (!map.has(g)) map.set(g, []); map.get(g).push(Object.assign(r, { ex: exampleOf(r.key), now: nowMap[r.key] !== undefined ? String(nowMap[r.key]).slice(0, 60) : undefined })); }
-      const order = GROUPS.map((x) => x[0]).concat(['Other']);
-      return [...map].sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0])).map(([name, vars]) => ({ name, vars }));
-    };
-    const sections = [];
-    sections.push({ id: 'all', name: 'Every sport', note: 'The same names in cricket and every other sport.', groups: grouped([...common], (k) => ex(sports[1] || sports[0], k)) });
-    // the other sports share most names (clocks, cards, statistics …): listed once
-    const rest = sports.slice(1);
-    const shared = new Set(rest.length ? Object.keys(rest[0].flat).filter((k) => !common.has(k) && !isProd(k) && rest.every((sp) => sp.flat[k] !== undefined)) : []);
-    const sharedG = new Set(rest.length ? Object.keys(rest[0].graphic).filter((k) => !common.has(k) && rest.every((sp) => sp.graphic[k])) : []);
-    if (rest.length) {
-      const groups = grouped([...shared], (k) => ex(rest[0], k));
-      if (sharedG.size) groups.push({ name: 'Sent by their graphics (lower thirds, tables …)', vars: series([...sharedG].sort()).map((r) => Object.assign(r, { ex: rest[0].graphic[r.key].ex.slice(0, 60), note: [...new Set(rest[0].graphic[r.key].by)].slice(0, 3).join(', ') })) });
-      sections.push({ id: 'sports', name: 'All sports except cricket', note: 'Rugby, football, hockey, netball, basketball, tennis, padel, badminton, volleyball, baseball and athletics all send these.', groups });
-    }
-    for (const sp of sports) {
-      const own = Object.keys(sp.flat).filter((k) => !common.has(k) && !isProd(k) && (sp.id === 'cricket' || !shared.has(k)));
-      const groups = grouped(own, (k) => ex(sp, k));
-      const gk = Object.keys(sp.graphic).filter((k) => !common.has(k) && (sp.id === 'cricket' || !sharedG.has(k)));
-      if (gk.length) groups.push({ name: 'Sent by its graphics (lower thirds, tables …)', vars: series(gk.sort()).map((r) => Object.assign(r, { ex: sp.graphic[r.key].ex.slice(0, 60), note: [...new Set(sp.graphic[r.key].by)].slice(0, 3).join(', ') + (new Set(sp.graphic[r.key].by).size > 3 ? ' …' : '') })) });
-      // where the same key also exists
-      const others = (k) => sports.filter((x) => x !== sp && x.flat[k] !== undefined).map((x) => x.name);
-      for (const g of groups) for (const r of g.vars) if (!r.note) { const o = others(r.key); if (o.length && o.length < sports.length - 1) r.note = 'also ' + (o.length > 3 ? o.slice(0, 3).join(', ') + ' +' + (o.length - 3) : o.join(', ')); }
-      sections.push({ id: sp.id, name: sp.name, groups });
-    }
-    // production, timeline, devices and your own variables
-    const prodKeys = new Set(Object.keys(sports[0].flat).filter(isProd));
-    for (const k of ['timeline_name', 'timeline_state', 'timeline_time', 'timeline_remaining', 'timeline_section', 'timeline_section_left', 'timeline_next', 'timeline_next_in']) prodKeys.add(k);
-    if (app.devices) for (const x of app.devices.keys()) prodKeys.add(x.key);
-    if (app.automation) for (const v of [...app.cache.values()].filter((d) => d.type === 'variable' && !d.deleted)) prodKeys.add('var_' + app.automation.keyOf(v.data.key || v.data.name));
-    const pgroup = (k) => (/^timeline_/.test(k) ? 'Timeline' : /^var_/.test(k) ? 'Your variables (Live → Variables & triggers)' : /^(org_|accent|date_text|time_text|competition_|tournament_)/.test(k) ? 'Production' : 'Devices (vMix, ATEM, HyperDeck)');
-    const pmap = new Map();
-    for (const k of [...prodKeys].sort()) { const g = pgroup(k); if (!pmap.has(g)) pmap.set(g, []); pmap.get(g).push({ key: k, ex: sports[0].flat[k] !== undefined ? String(txt(sports[0].flat[k])).slice(0, 60) : '', now: nowMap[k] !== undefined ? String(nowMap[k]).slice(0, 60) : undefined }); }
-    sections.push({ id: 'production', name: 'Production and devices', groups: ['Production', 'Your variables (Live → Variables & triggers)', 'Timeline', 'Devices (vMix, ATEM, HyperDeck)'].filter((g) => pmap.has(g)).map((g) => ({ name: g, vars: pmap.get(g) })) });
-    // what built-in graphics send, whatever the sport (line1, line2, title …)
-    const gmap = new Map();
-    for (const g of catalog) {
-      if (g.group === 'Custom') continue;
-      const sp = g.mode === 'sport' ? sports[1] || sports[0] : sports[0];
-      let d = {}; try { d = g.build(Object.assign({}, sp.ctx, { p: {} })); } catch { continue; }
-      for (const k of Object.keys(d)) { if (k === 'layout' || k === 'graphic_id' || sp.flat[k] !== undefined) continue; if (!gmap.has(k)) gmap.set(k, new Set()); gmap.get(k).add(g.name); }
-    }
-    sections.push({ id: 'graphics', name: 'Graphic fields', note: 'What the built-in graphics send to their template (a template linked to that graphic gets them).', groups: [{ name: 'Fields', vars: series([...gmap.keys()].sort()).map((r) => Object.assign(r, { note: [...gmap.get(r.key)].slice(0, 3).join(', ') + (gmap.get(r.key).size > 3 ? ' +' + (gmap.get(r.key).size - 3) : '') })) }] });
-    return { onAir: !!doc(fixtureId), mode: cNow.sport ? 'sport' : 'cricket', sections };
   }
   const devicesBrief = () => (app.devices ? app.devices.state().map((d) => ({ id: d.id, name: d.name, type: d.type, connected: d.connected, commands: d.commands })) : []);
   // every live value for the match on air, as a browser would show it (dashboards)
@@ -1303,7 +1198,7 @@ function makeGfx(app) {
   function stop() { clearInterval(ticker); clearTimeout(adTimer); clearTimeout(refreshTimer); for (const t of pendingClear.values()) clearTimeout(t); amcp.stop(); }
 
   return { amcp, start, stop, catalog, publicCatalog, get: get0, buildData: (id, p, o, team) => resolve(buildData(get0(id), p, o, team), 'web'), show, update, hide, hideKey, hideAll, invoke, refreshLive,
-    onAirList, runButton, liveValues, reference, runActions: (list, o) => runActions(cleanActions(list), o), cleanActions, macrosFor, outputSnapshot, casparState, saveCasparSettings, setFixture, setTheme, themeState, custom, customStop, variables, playAdvert, startPlaylist, stopPlaylist, raw: (c) => send(c), log: () => amcpLog.slice(),
+    onAirList, runButton, liveValues, runActions: (list, o) => runActions(cleanActions(list), o), cleanActions, macrosFor, outputSnapshot, casparState, saveCasparSettings, setFixture, setTheme, themeState, custom, customStop, variables, playAdvert, startPlaylist, stopPlaylist, raw: (c) => send(c), log: () => amcpLog.slice(),
     get fixtureId() { return fixtureId; }, get strip() { return strip; }, set strip(v) { strip = String(v || ''); }, get autoWipes() { return autoWipes; }, set autoWipes(v) { autoWipes = !!v; }, get triggersOn() { return triggersOn; }, set triggersOn(v) { triggersOn = !!v; },
     playlistState: () => (playlist ? Object.assign({}, playlist) : null), setProvider: (fn) => { provider = fn; }, onMessage: (fn) => listeners.add(fn), templateFolder: folder };
 }
