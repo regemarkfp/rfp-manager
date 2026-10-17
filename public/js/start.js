@@ -12,6 +12,12 @@
       holder.replaceChildren(h('p', { class: 'dim small', style: { margin: 0, textAlign: 'center' } }, 'Google sign-in works on the production PC itself (', ['127.0.0.1', '::1', '[::1]'].includes(location.hostname) ? h('a', { href: `http://localhost:${location.port}${location.pathname}${location.search}` }, 'open it as localhost') : 'the RFP Manager app, or http://localhost:' + (location.port || 80), '). Here, use your email and password.'));
       return true;
     }
+    // the Android app: Google sign-in in the phone's browser, which hands the app back to here (signed in)
+    if (window.RFPNative && window.RFPNative.signInWithGoogle && App.cfg.mode === 'cloud') {
+      const nx = new URLSearchParams(location.search).get('next') || '/app' + location.hash;
+      holder.replaceChildren(h('button', { type: 'button', class: 'primary', style: { width: '100%' }, onclick: () => window.RFPNative.signInWithGoogle(nx) }, 'Sign in with Google'));
+      return true;
+    }
     const s = document.createElement('script');
     s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
     s.onload = () => {

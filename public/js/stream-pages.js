@@ -176,6 +176,35 @@
     return box;
   };
 
+  // push notifications for the apps: the two Firebase files (the site admin uploads them once)
+  function pushCard() {
+    const box = h('div', { class: 'card' }, h('h2', {}, 'Push notifications (Android app)'), h('div', { class: 'dim' }, 'Loading…'));
+    const read = (f) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsText(f); });
+    const pick = (key, label) => {
+      const inp = h('input', { type: 'file', accept: 'application/json,.json', style: { display: 'none' }, onchange: async () => {
+        if (!inp.files[0]) return;
+        try { await api('POST', '/api/push/config', { [key]: await read(inp.files[0]) }); toast('Saved'); paint(); } catch (e) { oops(e); }
+      } });
+      return [h('button', { class: 'sm', onclick: () => inp.click() }, label), inp];
+    };
+    const paint = async () => {
+      let c;
+      try { c = await api('GET', '/api/push/config'); } catch (e) { box.replaceChildren(h('h2', {}, 'Push notifications'), h('p', { class: 'dim' }, e.message)); return; }
+      box.replaceChildren(h('h2', {}, 'Push notifications (Android app)'),
+        h('p', {}, h('span', { class: 'led ' + (c.fcm && c.android ? 'ok' : 'bad') }), ' ', c.fcm && c.android ? `On, with the Firebase project ${c.project}.` : 'Not set up yet: the Android app works, without push notifications.',
+          c.windows ? ` ${c.windows} production PC${c.windows === 1 ? '' : 's'} connected for Windows notifications.` : ''),
+        h('ol', { style: { margin: '0 0 10px 18px', padding: 0, lineHeight: 1.7 } },
+          h('li', {}, 'console.firebase.google.com → Add project (free; Google Analytics not needed).'),
+          h('li', {}, 'Add app → Android, package name ', h('code', {}, 'com.regemarkfp.rfpmanager'), ' → Register → Download google-services.json → upload it below.'),
+          h('li', {}, 'Project settings → Service accounts → Generate new private key → upload that file below. Keep it secret: it lets this website send notifications.')),
+        h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } },
+          pick('googleServices', c.android ? '✓ google-services.json (replace)' : 'Upload google-services.json'),
+          pick('serviceAccount', c.fcm ? '✓ Service account key (replace)' : 'Upload the service account key')),
+        h('p', { class: 'dim small', style: { marginBottom: 0 } }, 'Windows notifications need nothing here: production PCs linked to this website get them while RFP Manager runs.'));
+    };
+    paint();
+    return box;
+  }
   // ---- Settings → Server (the online website, for its site admins) -------------------------------
   App.serverTab = () => {
     const box = h('div', {}, h('div', { class: 'card dim' }, 'Loading…'));
@@ -200,6 +229,7 @@
             s.expires ? h('p', { class: 'dim' }, `A setup link made by ${s.by} works until ${new Date(s.expires).toLocaleString('en-GB')}. Make a new one to see the command again (the old one stops working).`) : null,
           h('div', { class: 'row' }, h('button', { class: 'primary', onclick: async () => { try { paint(await api('POST', '/api/server/setup')); } catch (e) { oops(e); } } }, made || s.expires ? 'Make a new setup command' : 'Make the setup command'),
             s.expires ? h('button', { class: 'ghost', onclick: async () => { try { await api('DELETE', '/api/server/setup'); toast('Setup link stopped'); paint(); } catch (e) { oops(e); } } }, 'Stop the setup link') : null)),
+        pushCard(),
         h('div', { class: 'card' }, h('h2', {}, 'After it has run'),
           h('ol', { style: { margin: '0 0 0 18px', padding: 0, lineHeight: 1.8 } },
             h('li', {}, 'Open the server\'s firewall in the cloud console: TCP 80, 443, 1935, 8189 and UDP 443, 8189, 8890.'),

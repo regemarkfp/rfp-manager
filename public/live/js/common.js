@@ -415,3 +415,6 @@
     poll(); setInterval(poll, 3000); setInterval(paint, 250);
   })();
 })();
+
+// In the RFP Manager app for Android: the screen stays on on the live pages (scoring, control, MCR)
+try { if (window.RFPNative && window.RFPNative.keepAwake) window.RFPNative.keepAwake(true); } catch (e) { /* not the app */ }

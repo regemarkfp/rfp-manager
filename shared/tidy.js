@@ -40,7 +40,8 @@
     var hs = document.querySelectorAll('.card > h2, .card > .spread > h2, .panel > h4');
     for (var i = 0; i < hs.length; i++) {
       var h = hs[i], box = boxOf(h);
-      if (!box || box.dataset.nofold !== undefined || box.closest('.modal, aside.right')) continue;
+      if (!box || box.closest('.modal, aside.right')) continue;
+      if (box.dataset.nofold !== undefined) { h.classList.remove('fold-h'); box.classList.remove('is-folded'); continue; }
       var t = titleOf(h); if (!t) continue;
       h.classList.add('fold-h');
       var saved = store.get('rfp-fold:' + page + ':' + t);

@@ -72,6 +72,7 @@
 
   // ---- the Android app
   async function android() {
+    if (window.RFPNative) return;                                               // the app checks for its own updates
     const have = store.get(ANDROID_KEY);
     if (have === null) return;
     let info;

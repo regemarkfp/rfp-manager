@@ -23,6 +23,12 @@ using Microsoft.Web.WebView2.WinForms;
 using System.Threading.Tasks;
 #endif
 
+static class Shell
+{
+    [System.Runtime.InteropServices.DllImport("shell32.dll")]
+    public static extern int SetCurrentProcessExplicitAppUserModelID([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] string id);
+}
+
 static class Program
 {
     [STAThread]
@@ -38,6 +44,8 @@ static class Program
         bool first;
         using (Mutex m = new Mutex(true, "RFPManager.Launcher", out first))
         {
+            // the same app as the Start menu shortcut the installer makes: its notifications are listed as RFP Manager
+            try { Shell.SetCurrentProcessExplicitAppUserModelID("RegemarkFP.RFPManager"); } catch (Exception) { }
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             if (!first)
@@ -77,6 +85,7 @@ class Launcher : ApplicationContext
         tray.Text = "RFP Manager";
         tray.ContextMenuStrip = BuildMenu();
         tray.DoubleClick += delegate { OpenWindow(port, "/"); };
+        tray.BalloonTipClicked += delegate { BalloonClicked(); };
         tray.Visible = true;
         Current = this;
         native = Native.Check(console);
@@ -157,15 +166,53 @@ class Launcher : ApplicationContext
     void Line(string s)
     {
         if (s.StartsWith("ACCOUNT ") || s == "ACCOUNTS-END") { console.Account(s); return; }
+        if (s.StartsWith("@@NOTIFY ")) { Notify(s.Substring(9)); return; }
         console.Append(s);
         // the update check at start found a newer RFP Manager: say so from the tray as well (the window offers to install it)
         if (s.Contains(" is available (this PC has ") && !updateTold)
         {
             updateTold = true;
-            try { console.BeginInvoke((MethodInvoker)delegate { tray.ShowBalloonTip(8000, "Update available", Regex.Replace(s, "^\\[[^\\]]*\\] ", "").Replace(" Install it from the app.", "") + " Open RFP Manager to install it.", ToolTipIcon.Info); }); } catch (Exception) { }
+            try { console.BeginInvoke((MethodInvoker)delegate { balloonUrl = "/"; tray.ShowBalloonTip(8000, "Update available", Regex.Replace(s, "^\\[[^\\]]*\\] ", "").Replace(" Install it from the app.", "") + " Open RFP Manager to install it.", ToolTipIcon.Info); }); } catch (Exception) { }
         }
     }
     bool updateTold = false;
+
+    // ------------------------------------------------------------------ push notifications (from the website, through node)
+    // node prints "@@NOTIFY {"title":…,"body":…,"url":…,"kind":…}" for the people signed in on this PC; Windows shows it
+    // as a notification (and keeps it in the Action Centre). Clicking it opens that page: Studio pages in RFP Manager's
+    // own window, the website's other pages in the web browser.
+    string balloonUrl;
+    static string JsonField(string json, string key)
+    {
+        Match m = Regex.Match(json, "\"" + key + "\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+        if (!m.Success) return "";
+        try { return Regex.Unescape(m.Groups[1].Value); } catch (Exception) { return m.Groups[1].Value; }
+    }
+    static string Clip(string s, int n) { s = (s ?? "").Trim(); return s.Length <= n ? s : s.Substring(0, n - 1) + "…"; }
+    void Notify(string json)
+    {
+        string title = JsonField(json, "title"), body = JsonField(json, "body"), url = JsonField(json, "url"), kind = JsonField(json, "kind");
+        if (title.Length == 0) return;
+        console.Append("Notification: " + title + (body.Length > 0 ? " – " + body : ""));
+        ToolTipIcon icon = kind == "stream_dropped" || kind == "restream_failed" ? ToolTipIcon.Warning : ToolTipIcon.Info;
+        try
+        {
+            console.BeginInvoke((MethodInvoker)delegate
+            {
+                balloonUrl = url;
+                tray.ShowBalloonTip(10000, Clip(title, 63), Clip(body.Length > 0 ? body : "RFP Manager", 255), icon);
+            });
+        }
+        catch (Exception) { }
+    }
+    void BalloonClicked()
+    {
+        string u = balloonUrl;
+        balloonUrl = null;
+        if (string.IsNullOrEmpty(u)) return;
+        if (u.StartsWith("/")) { OpenWindow(port, u); return; }
+        if (u.StartsWith("https://") || u.StartsWith("http://")) { try { Process.Start(u); } catch (Exception) { } }
+    }
     void WaitUntilUp()
     {
         for (int i = 0; i < 120 && !quitting; i++)
@@ -178,7 +225,7 @@ class Launcher : ApplicationContext
                 console.BeginInvoke((MethodInvoker)delegate
                 {
                     tray.Text = "RFP Manager – http://localhost:" + port;
-                    if (!opened) { opened = true; OpenWindow(port, "/"); tray.ShowBalloonTip(3000, "RFP Manager is running", "Right-click the icon here for Graphics control, the scorer, dashboards and the console.", ToolTipIcon.Info); }
+                    if (!opened) { opened = true; OpenWindow(port, "/"); balloonUrl = null; tray.ShowBalloonTip(3000, "RFP Manager is running", "Right-click the icon here for Graphics control, the scorer, dashboards and the console.", ToolTipIcon.Info); }
                 });
                 return;
             }
@@ -298,6 +345,7 @@ class Launcher : ApplicationContext
     {
         if (quitting || toldTray) return;
         toldTray = true;
+        balloonUrl = null;
         tray.ShowBalloonTip(4000, "RFP Manager is still running", "Graphics, scorers and outputs keep working. Double-click the icon here to open it again, or right-click → Quit.", ToolTipIcon.Info);
     }
     public void ShowConsole() { console.ShowConsole(); }
@@ -315,6 +363,8 @@ class Launcher : ApplicationContext
         AddLink(m, "Timeline", "/live/timeline.html");
         AddLink(m, "Worship", "/live/worship.html");
         AddLink(m, "Monitors and screen links", "/#/monitors");
+        m.Items.Add(new ToolStripSeparator());
+        AddLink(m, "Notifications…", "/#/settings");
         m.Items.Add(new ToolStripSeparator());
         m.Items.Add(new ToolStripMenuItem("Console", null, delegate { console.ShowConsole(); }));
         m.Items.Add(new ToolStripMenuItem("Open in my web browser", null, delegate { try { Process.Start("http://localhost:" + port + "/"); } catch (Exception) { } }));

@@ -1,5 +1,5 @@
-// RFP Manager for Android: a Trusted Web Activity that opens the website full screen in Chrome
-// (so Google sign-in, the camera for receipts and everything else work as on the website).
+// RFP Manager for Android: a native app (WebView screens from the website, Firebase push notifications,
+// the camera, downloads, sharing and in-app updates).
 pluginManagement {
     repositories { google(); mavenCentral(); gradlePluginPortal() }
 }

@@ -229,9 +229,23 @@
     return box;
   }
 
+  // ---- the inbox (on the website); the number of unread ones in the menu
+  App.pages.notifications = () => {
+    const box = h('div', { class: 'card' });
+    if (window.RFPNotifyUI) window.RFPNotifyUI.inbox(box);
+    return { el: h('div', {}, pageHead('Notifications', h('button', { class: 'sm', onclick: () => { App.settingsTab = 'notifications'; location.hash = '#/settings'; } }, 'Choose what you get')), box) };
+  };
+  window.rfpUnread = (n) => {
+    App.unread = n;
+    const a = document.querySelector('.nav a[href="#/notifications"]');
+    if (a) a.textContent = 'Notifications' + (n ? ` (${n})` : '');
+  };
+  setInterval(() => { if (App.cfg && App.cfg.mode === 'cloud' && App.me && !document.hidden && window.RFPNotifyUI) window.RFPNotifyUI.unread().then(window.rfpUnread); }, 60000);
+  setTimeout(() => { if (App.cfg && App.cfg.mode === 'cloud' && App.me && window.RFPNotifyUI) window.RFPNotifyUI.unread().then(window.rfpUnread); }, 3000);
+
   App.pages.settings = () => {
     const local = App.cfg.mode === 'local';
-    const tabs = (App.cfg.bridge ? [] : [['team', 'Production team']]).concat([['members', 'Members'], ['account', 'My account']]);   // team settings are made on the website
+    const tabs = (App.cfg.bridge ? [] : [['team', 'Production team']]).concat([['members', 'Members'], ['account', 'My account'], ['notifications', 'Notifications']]);   // team settings are made on the website
     if ((local || App.machine.remote) && App.machine.admin) tabs.push(['connections', 'Connections'], ['machine', local ? 'This machine' : 'Production PC']);
     if (!App.cfg.bridge && App.teams.some((t) => t.role === 'Admin')) tabs.push(['keys', 'Machine keys']);   // keys are made on the website
     if (!local && App.machine.siteAdmin) tabs.push(['website', 'Website']);
@@ -240,7 +254,16 @@
     if (!App.cfg.bridge) tabs.push(['file', 'Save file']);
     if (App.cfg.bridge) tabs.sort((a, b) => ['connections', 'machine', 'members', 'account'].indexOf(a[0]) - ['connections', 'machine', 'members', 'account'].indexOf(b[0]));   // the PC: CasparCG and devices first
     if (!tabs.some(([k]) => k === tab)) tab = tabs.some(([k]) => k === 'connections') && App.cfg.bridge ? 'connections' : tabs[0][0];
-    const body = { team: teamTab, members: membersTab, account: accountTab, connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab, server: App.serverTab, website: websiteTab }[tab]();
+    // notifications are chosen on the website (on a production PC: a link there)
+    const notificationsTab = () => {
+      const box = h('div', { class: 'card' });
+      if (local) { const site = String(App.cfg.cloudUrl || '').replace(/\/+$/, ''); box.append(h('h2', {}, 'Notifications'), h('p', { class: 'dim' }, 'Notifications on this PC come from the website: choose them there. People who sign in on this PC get theirs as Windows notifications while RFP Manager runs.'), site ? h('a', { class: 'btn primary', href: site + '/app/#/settings', target: '_blank', rel: 'noopener', onclick: () => { App.settingsTab = 'notifications'; } }, 'Open the website') : null); return box; }
+      box.append(h('h2', {}, 'Notifications'));
+      const inner = h('div', {}); box.append(inner);
+      if (window.RFPNotifyUI) window.RFPNotifyUI.settings(inner);
+      return box;
+    };
+    const body = { notifications: notificationsTab, team: teamTab, members: membersTab, account: accountTab, connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab, server: App.serverTab, website: websiteTab }[tab]();
     return { el: h('div', {}, pageHead('Settings'), h('div', { class: 'tabs' }, tabs.map(([k, l]) => h('button', { class: k === tab ? 'on' : '', onclick: () => { tab = k; route(); } }, l))), body) };
   };
 })();

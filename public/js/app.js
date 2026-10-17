@@ -48,7 +48,7 @@ const App = {
   limited() { return !!Schema.ROLE_SEES[this.role]; },          // a coach or an official
   onlineUrl(hash) { return (this.cfg && this.cfg.cloudUrl ? this.cfg.cloudUrl.replace(/\/+$/, '') : '') + '/app' + (hash || ''); },
   // the Android app (TWA): it opens the website with ?android=<build>; remembered for this app session
-  isApp() { try { if (/[?&]android=\d+/.test(location.search)) sessionStorage.setItem('rfp-app', 'android'); return sessionStorage.getItem('rfp-app') === 'android'; } catch (e) { return false; } },
+  isApp() { if (window.RFPNative) return true; try { if (/[?&]android=\d+/.test(location.search)) sessionStorage.setItem('rfp-app', 'android'); return sessionStorage.getItem('rfp-app') === 'android'; } catch (e) { return false; } },
   // scoring: on the production PC (and its network), and in the Android app – not in a web browser on the website
   canScore() { return !!this.cfg && this.can('score') && (this.cfg.mode === 'local' || this.isApp()); },
   scorerUrl(id, f) { const s = Scoring.sportFor(f.sport); return `/live/${s && s.id === 'cricket' ? 'stats' : 'sport'}.html?fixture=${encodeURIComponent(id)}${this.cfg && this.cfg.mode === 'cloud' && this.isApp() ? '&app=android' : ''}`; },
@@ -186,7 +186,7 @@ function navFor() {
   }
   const local = c.mode === 'local', pc = local || !!App.pc;          // live screens: on a PC, or on the website with a PC chosen
   return [
-    ['', [['#/', 'Dashboard']]],
+    ['', [['#/', 'Dashboard'], local ? null : ['#/notifications', 'Notifications' + (App.unread ? ` (${App.unread})` : '')]].filter(Boolean)],
     ['Matches', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions']]],
     ['Productions', [['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], App.can('edit') && !local ? ['#/list/booking', 'Booking requests' + (App.waitingBookings && App.waitingBookings().length ? ` (${App.waitingBookings().length})` : '')] : null, ['#/list/expense', App.can('edit') ? 'Expenses' : 'My expenses'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment']].filter(Boolean)],
     ['Assets', [['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/theme', 'Themes'], ['#/images', 'Images']]],

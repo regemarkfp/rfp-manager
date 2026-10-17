@@ -218,6 +218,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
         el('p', { class: 'sub small' }, 'Production team members go to their Studio after signing in.')));
     document.body.append(wrap);
     if (!D.googleClientId) { holder.replaceChildren(el('span', { class: 'sub' }, 'Sign-in is not set up on this website yet.')); return; }
+    if (window.RFPNative && window.RFPNative.signInWithGoogle) { holder.replaceChildren(el('button', { class: 'primary', onclick: () => window.RFPNative.signInWithGoogle(backTo ? new URL(backTo, location.href).pathname : location.pathname) }, 'Sign in with Google')); return; }
     loadGsi().then(() => {
       google.accounts.id.initialize({ client_id: D.googleClientId, callback: async (resp) => {
         holder.replaceChildren(el('span', { class: 'sub' }, 'Signing in…'));
@@ -248,6 +249,13 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   async function get(url) { const r = await fetch(url, { credentials: 'same-origin' }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Something went wrong'); return j; }
   async function post(url, body) { const r = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-rfp': '1' }, body: JSON.stringify(body) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Something went wrong'); return j; }
 
+  // notifications: the inbox and what to get (lib/push.js); live now for channels you subscribe to, match moments …
+  function notificationsPage() {
+    if (!D.me) return el('div', { class: 'signin-box' }, el('h2', {}, 'Notifications'), el('p', {}, 'Sign in to get notifications when the channels you subscribe to go live, and for the key moments of their matches.'), signInButton());
+    const inbox = el('div', {}), set = el('div', {});
+    if (window.RFPNotifyUI) { window.RFPNotifyUI.inbox(inbox, { limit: 30 }); window.RFPNotifyUI.settings(set); }
+    return el('div', { style: { maxWidth: '760px', padding: '8px 4px' } }, el('h2', {}, 'Notifications'), inbox, el('h2', { style: { marginTop: '28px' } }, 'What you get'), set);
+  }
   function side() {
     const p = location.pathname;
     const link = (href, label, icon) => el('a', { href, 'data-nav': '', class: p === href ? 'on' : '' }, el('span', {}, icon), label);
@@ -262,7 +270,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     let menu = null;
     const toggle = (e) => { e.stopPropagation(); if (menu) { menu.remove(); menu = null; return; }
       menu = el('div', { class: 'me-menu' }, el('div', { class: 'who' }, el('b', {}, m.name || ''), el('div', { class: 'sub' }, m.email)),
-        m.teams ? el('a', { href: '/app' }, 'Studio') : null, el('a', { href: '/subscriptions', 'data-nav': '' }, 'Subscriptions'), el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); signOut(); } }, 'Sign out'));
+        m.teams ? el('a', { href: '/app' }, 'Studio') : null, el('a', { href: '/subscriptions', 'data-nav': '' }, 'Subscriptions'), el('a', { href: '/notifications', 'data-nav': '' }, 'Notifications'), el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); signOut(); } }, 'Sign out'));
       $('me').append(menu); document.addEventListener('click', () => { if (menu) { menu.remove(); menu = null; } }, { once: true }); };
     $('me').replaceChildren(m && m.teams ? el('a', { href: '/app' }, el('button', { class: 'studio' }, 'Studio')) : null,
       m ? el('button', { class: 'icon avatar-btn', title: m.email, onclick: toggle }, avatar(m.image, m.name || m.email)) : signInButton());
@@ -278,6 +286,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     else if (p === '/matches') view = matchesPage();
     else if (p === '/channels') view = channelsPage();
     else if (p === '/subscriptions') view = subscriptionsPage();
+    else if (p === '/notifications') view = notificationsPage();
     else if (p === '/book') view = await bookPage(params.get('service') || '');
     else if (p === '/' || p === '') view = await landingPage();
     else view = home();
