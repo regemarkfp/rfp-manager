@@ -83,13 +83,23 @@
     if (!m) return null;
     return m[2] !== undefined ? (+m[1] * 60 + +m[2]) * 1000 + (m[3] ? +m[3] * 100 : 0) : +m[1] * 60000;
   }
-  setInterval(() => {
-    $$('[data-sclock]').forEach(el => {
-      const name = el.dataset.sclock, c = sm() && sm().clocks && sm().clocks[name];
-      el.textContent = CG.fmtClock(CG.clockMs(name), name === 'shot' ? 10 : (c && c.direction < 0 && view() && view().sport === 'basketball' ? 60 : 0));
-      el.classList.toggle('run', !!(c && c.ticking));
-    });
-  }, 100);
+  // athletics: the race clock with decimals (setup.ath.clockDigits, hundredths unless chosen), drawn every frame
+  const raceDigits = () => { const s0 = sm() && sm().setup; if (!s0 || s0.sport !== 'athletics') return null; const n = s0.ath && s0.ath.clockDigits; return n === undefined || n === null || n === '' ? 2 : Math.max(0, Math.min(3, +n || 0)); };
+  let lastTick = 0;
+  function tickClocks(now) {
+    const dg = raceDigits();
+    if (dg >= 2 || now - lastTick >= 100) {
+      lastTick = now;
+      $$('[data-sclock]').forEach(el => {
+        const name = el.dataset.sclock, c = sm() && sm().clocks && sm().clocks[name];
+        const t = dg !== null && name === 'game' ? CG.raceClock(CG.clockMs(name), dg) : CG.fmtClock(CG.clockMs(name), name === 'shot' ? 10 : (c && c.direction < 0 && view() && view().sport === 'basketball' ? 60 : 0));
+        if (el.textContent !== t) el.textContent = t;
+        el.classList.toggle('run', !!(c && c.ticking));
+      });
+    }
+    requestAnimationFrame(tickClocks);
+  }
+  requestAnimationFrame(tickClocks);
 
   // ================================================================ player picker
   function pickPlayer(team, title, opts) {
@@ -437,10 +447,12 @@
   const NOTES = ['', 'PB', 'SB', 'NR', 'AR', 'CR', 'MR', 'WR', 'Q', 'q', 'DNF', 'DNS', 'DQ'];
   function athleticsHtml(v) {
     const x = v.extra, c = x.current;
-    const evBtns = x.events.map(e => `<button class="btn sm ${c && c.id === e.id ? 'on' : ''}" data-cur="${esc(e.id)}">${esc(e.name)}${e.round ? ' · ' + esc(e.round) : ''} <span class="muted">(${e.results}/${e.entries})</span>${e.complete ? ' ✓' : ''}</button>`).join(' ');
+    const evBtns = x.events.map(e => `<button class="btn sm ${c && c.id === e.id ? 'on' : ''}" data-cur="${esc(e.id)}">${e.num ? `<span class="muted">#${esc(e.num)}</span> ` : ''}${esc(e.name)}${e.round ? ' · ' + esc(e.round) : ''} <span class="muted">(${e.results}/${e.entries})</span>${e.complete ? ' ✓' : ''}</button>`).join(' ');
     const auto = x.auto || {};
-    const clockRow = `<div class="row" style="justify-content:center;margin-top:12px;gap:14px"><span class="muted">RACE CLOCK</span><div class="clock" data-sclock="game">--:--</div>
-      <button class="btn go" id="ck-toggle">START / STOP <span class="kbd">Space</span></button><button class="btn" id="ck-zero">Reset to 0</button></div>`;
+    const dg = x.clockDigits === undefined || x.clockDigits === null || x.clockDigits === '' ? 2 : +x.clockDigits;
+    const clockRow = `<div class="row" style="justify-content:center;margin-top:12px;gap:14px"><span class="muted">RACE CLOCK</span><div class="clock" data-sclock="game" style="min-width:3.6em;text-align:right">--:--</div>
+      <button class="btn go" id="ck-toggle">START / STOP <span class="kbd">Space</span></button><button class="btn" id="ck-zero">Reset to 0</button>
+      <select id="ck-digits" style="width:auto" title="Decimals on the race clock (scorer and graphics)">${[[0, '9'], [1, '9.8'], [2, '9.87'], [3, '9.876']].map(([n, l]) => `<option value="${n}" ${n === dg ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`;
     if (!c) return `<div class="panel"><h4>Events</h4><p class="muted">No events yet – add events and entries on the Setup tab.</p></div>` + clockRow;
     const field = c.kind === 'field';
     const head = `<div class="panel"><h4>Event <span class="sp"></span>${auto.mode === 'results' ? '<span class="badge" title="Set in graphics control → Athletics">AUTO NEXT</span> ' : ''}${esc(v.status)}</h4><div class="row">${evBtns}</div>${field ? '' : clockRow}</div>`;
@@ -448,7 +460,7 @@
       const rows = c.startlist.map(r => `<tr data-entry="${esc(r.id)}"><td class="n">${esc(r.lane)}</td><td class="muted">${esc(r.bib)}</td><td><b>${esc(r.tvName)}</b></td><td class="muted">${esc(r.team)}</td><td class="muted small">${esc(r.pb)}${r.sb ? ' / ' + esc(r.sb) : ''}</td>
         <td><input type="text" data-res style="width:100px" value="${esc(r.result)}" placeholder="10.23">${r.reaction ? ` <span class="small muted" title="Reaction time">RT ${esc(r.reaction)}</span>` : ''}</td>
         <td><select data-note>${NOTES.map(n => `<option ${n === r.note ? 'selected' : ''}>${n}</option>`).join('')}</select></td><td class="n"><b>${esc(r.rank || '')}</b></td><td><button class="btn sm ghost" data-lt="${esc(r.id)}" title="Lower third on air">LT</button></td></tr>`).join('');
-      return head + `<div class="panel" style="margin-top:12px"><h4>${esc(U.up(c.name))} ${c.round ? '· ' + esc(U.up(c.round)) : ''} ${c.wind ? '· WIND ' + esc(c.wind) : ''}</h4>
+      return head + `<div class="panel" style="margin-top:12px"><h4>${c.num ? 'EVENT ' + esc(c.num) + ' · ' : ''}${esc(U.up(c.name))} ${c.round ? '· ' + esc(U.up(c.round)) : ''} ${c.wind ? '· WIND ' + esc(c.wind) : ''}</h4>
         <table class="t"><tr><th class="n">Lane</th><th>Bib</th><th>Athlete</th><th>Team</th><th>PB / SB</th><th>Result</th><th>Note</th><th class="n">Pos</th><th></th></tr>${rows}</table>
         <p class="small muted">Type a time (10.23 or 1:45.32) and press Enter.</p></div>`;
     }
@@ -472,7 +484,7 @@
       <td class="fe-chips">${chips(r)}</td><td><b>${esc(r.result)}</b></td><td class="n"><b>${esc(r.rank || '')}</b></td>
       <td><select data-note>${NOTES.map(n => `<option ${n === r.note ? 'selected' : ''}>${n}</option>`).join('')}</select></td>
       <td class="n" style="white-space:nowrap"><button class="btn sm" data-upnow="${esc(r.id)}" title="Make this athlete up now">Up</button><button class="btn sm ghost" data-undo="${esc(r.id)}" title="Remove the last attempt" ${r.attempts.length ? '' : 'disabled'}>↶</button><button class="btn sm ghost" data-lt="${esc(r.id)}" title="Lower third on air">LT</button></td></tr>`).join('');
-    return head + upPanel + `<div class="panel" style="margin-top:12px"><h4>${esc(U.up(c.name))} ${c.round ? '· ' + esc(U.up(c.round)) : ''}</h4>
+    return head + upPanel + `<div class="panel" style="margin-top:12px"><h4>${c.num ? 'EVENT ' + esc(c.num) + ' · ' : ''}${esc(U.up(c.name))} ${c.round ? '· ' + esc(U.up(c.round)) : ''}</h4>
       <table class="t"><tr><th class="n">Order</th><th>Athlete</th><th>Team</th><th>Attempts</th><th>Best</th><th class="n">Pos</th><th>Note</th><th></th></tr>${rows}</table>
       <p class="small muted">${c.vertical ? 'O = cleared, X = failed, – = passed. Three failures in a row and the athlete is out; the best cleared height counts (ties: fewer failures).' : 'Type the mark and press Enter (or X / – for a foul or a pass). The next athlete comes up by themselves: fewest attempts first, in competition order.'}</p></div>`;
   }
@@ -480,6 +492,7 @@
   function wireAthletics(v) {
     const c = v.extra.current;
     const ck = $('#ck-toggle'); if (ck) ck.onclick = () => clock('toggle');
+    const cd = $('#ck-digits'); if (cd) cd.onchange = () => CG.send('sport', 'athClock', { digits: +cd.value }).catch(e => CG.toast(e.message, 'err'));
     const cz = $('#ck-zero'); if (cz) cz.onclick = () => CG.send('sport', 'clock', { name: 'game', action: 'reset', dir: 1, limitMs: 0, startMs: 0, stopAtLimit: false }).catch(() => { });
     $$('[data-cur]').forEach(b => b.onclick = () => commit(setup => { setup.ath.current = b.dataset.cur; }));
     if (!c) return;
@@ -666,6 +679,7 @@
   }
   function athSetupHtml(d) {
     d.ath.events.forEach(athUpgrade);
+    if (d.ath.events.length && d.ath.events.every(e => !e.num)) d.ath.events.forEach((e, i) => { e.num = String(i + 1); });   // older meets: number them in order
     const evs = d.ath.events;
     if (!athEdit || !evs.find(e => e.id === athEdit)) athEdit = evs.length ? evs[0].id : null;
     const e = evs.find(x => x.id === athEdit);
@@ -678,9 +692,10 @@
       <datalist id="a-bibs">${known.bibs.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
       <div class="grid cols-2" style="margin-top:12px">
       <div class="panel" data-nofold><h4>Events <span class="sp"></span><button class="btn sm" id="a-many">+ Several events</button><button class="btn sm" id="a-add">+ Event</button></h4>
-        <table class="t"><tr><th>Event</th><th>Round</th><th>Type</th><th>Entries</th><th></th></tr>${evs.map(x => `<tr class="click ${x.id === athEdit ? 'sel' : ''}" data-aev="${esc(x.id)}"><td><b>${esc(x.name)}</b></td><td class="muted">${esc(x.round || '')}</td><td class="muted">${x.kind === 'field' ? 'Field' : 'Track'}</td><td>${x.entries.length}</td><td class="n">${d.ath.current === x.id ? '<span class="badge live">CURRENT</span>' : ''}${x.timing ? ' <span class="badge" title="From the timing system">⏱</span>' : ''}</td></tr>`).join('') || '<tr><td class="muted" colspan="5">No events yet. Add them here, or let the timing system bring its start lists (Timing tab).</td></tr>'}</table></div>
+        <table class="t"><tr><th>No.</th><th>Event</th><th>Gender</th><th>Age group</th><th>Round</th><th>Type</th><th>Entries</th><th></th></tr>${evs.map(x => `<tr class="click ${x.id === athEdit ? 'sel' : ''}" data-aev="${esc(x.id)}"><td class="muted">${esc(x.num || '')}</td><td><b>${esc(x.name)}</b></td><td class="muted">${esc(x.gender || '')}</td><td>${esc(x.age || 'Open')}</td><td class="muted">${esc(x.round || '')}</td><td class="muted">${x.kind === 'field' ? 'Field' : 'Track'}</td><td>${x.entries.length}</td><td class="n">${d.ath.current === x.id ? '<span class="badge live">CURRENT</span>' : ''}${x.timing ? ' <span class="badge" title="From the timing system">⏱</span>' : ''}</td></tr>`).join('') || '<tr><td class="muted" colspan="8">No events yet. Add them here, or let the timing system bring its start lists (Timing tab).</td></tr>'}</table></div>
       <div class="panel" data-nofold>${e ? `<h4>Edit event<span class="sp"></span><button class="btn sm" id="a-dup">Copy as next heat</button><button class="btn sm" id="a-cur">Make current</button><button class="btn sm ghost" id="a-del">Delete event</button></h4>
         <div class="form-grid">
+          <label class="f"><span>Event no.</span>${sel('data-ae="num"', Array.from({ length: 300 }, (_, i) => String(i + 1)), e.num, '–')}</label>
           <label class="f"><span>Gender</span>${sel('data-ae="gender"', A.GENDERS, e.gender, 'Choose…')}</label>
           <label class="f"><span>Age group</span>${sel('data-ae="age"', A.AGES, e.age || 'Open')}</label>
           <label class="f"><span>Discipline</span>${discSelect('data-ae="discipline"', e.discipline)}</label>
@@ -700,8 +715,9 @@
         <div class="row" style="margin-top:8px"><button class="btn sm" id="a-adde">+ Entry</button><button class="btn sm" id="a-fill">Fill lanes</button><button class="btn sm" id="a-bulk">Bulk paste…</button></div>` : '<p class="muted">Add an event to start.</p>'}</div></div>`;
   }
   function windList() { const l = []; for (let w = -50; w <= 50; w++) { const v = w / 10; l.push((v > 0 ? '+' : v === 0 ? '±' : '') + v.toFixed(1)); } return l.concat(['NWI']); }
+  const nextNum = () => String(Math.max(0, ...draft.ath.events.map(e => parseInt(e.num, 10) || 0)) + 1);
   function newAthEvent(o) {
-    return athFix(Object.assign({ id: U.id(), name: '', gender: '', age: 'Open', discipline: '', roundType: 'Final', heat: '', round: '', kind: 'track', wind: '', entries: [] }, o || {}));
+    return athFix(Object.assign({ id: U.id(), num: nextNum(), name: '', gender: '', age: 'Open', discipline: '', roundType: 'Final', heat: '', round: '', kind: 'track', wind: '', entries: [] }, o || {}));
   }
 
   function collectDraft(root) {
@@ -807,7 +823,7 @@
       const roundType = A.NUMBERED.includes(p.roundType) ? p.roundType : 'Heat';
       const heat = String((Number(p.heat) || (A.NUMBERED.includes(p.roundType) ? 1 : 0)) + 1);
       if (!A.NUMBERED.includes(p.roundType)) { p.roundType = 'Heat'; p.heat = '1'; athFix(p); }
-      const e = newAthEvent({ gender: p.gender, age: p.age, discipline: p.discipline, kind: p.kind, roundType, heat });
+      const e = newAthEvent({ num: p.num, gender: p.gender, age: p.age, discipline: p.discipline, kind: p.kind, roundType, heat });
       draft.ath.events.splice(draft.ath.events.indexOf(p) + 1, 0, e); athEdit = e.id; dirty(); buildSetup(root);
     };
     const aMany = $('#a-many'); if (aMany) aMany.onclick = async () => {

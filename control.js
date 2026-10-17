@@ -433,9 +433,10 @@
       const el = h(`<div>
         <div class="panel"><h4>Events <span class="sp"></span>
             <button class="btn sm" id="ath-prev" title="Previous event">◀ Prev</button><button class="btn sm" id="ath-next" title="Next event">Next ▶</button></h4>
-          <div class="row" style="flex-wrap:wrap;gap:6px">${x ? x.events.map(e => `<button class="btn sm ${c && c.id === e.id ? 'go' : ''}" data-aev="${esc(e.id)}" title="${e.complete ? 'Results complete' : ''}">${esc(e.name)}${e.round ? ' · ' + esc(e.round) : ''}${e.complete ? ' ✓' : ''}</button>`).join('') : ''}</div>
+          <div class="row" style="flex-wrap:wrap;gap:6px">${x ? x.events.map(e => `<button class="btn sm ${c && c.id === e.id ? 'go' : ''}" data-aev="${esc(e.id)}" title="${e.complete ? 'Results complete' : ''}">${e.num ? '#' + esc(e.num) + ' ' : ''}${esc(e.name)}${e.round ? ' · ' + esc(e.round) : ''}${e.complete ? ' ✓' : ''}</button>`).join('') : ''}</div>
           <div class="row" style="margin-top:10px;gap:8px"><span class="small muted">Change events</span>
             <select id="ath-auto" style="width:auto"><option value="off" ${auto.mode !== 'results' ? 'selected' : ''}>By hand (or the timing system)</option><option value="results" ${auto.mode === 'results' ? 'selected' : ''}>Automatically when the results are in</option></select>
+            <span class="small muted" style="margin-left:14px">Race clock</span><select id="ath-digits" style="width:auto">${[[0, '9'], [1, '9.8'], [2, '9.87'], [3, '9.876']].map(([n, l]) => `<option value="${n}" ${n === (x && x.clockDigits !== undefined && x.clockDigits !== null && x.clockDigits !== '' ? +x.clockDigits : 2) ? 'selected' : ''}>${l}</option>`).join('')}</select>
             ${auto.mode === 'results' ? `<span class="small muted">after</span><select id="ath-delay" style="width:auto">${[[0, 'straight away'], [5, '5 s'], [10, '10 s'], [20, '20 s'], [30, '30 s'], [60, '1 min'], [120, '2 min'], [300, '5 min']].map(([n, l]) => `<option value="${n}" ${Number(auto.delay) === n ? 'selected' : ''}>${l}</option>`).join('')}</select>` : ''}</div>
         </div>
         <div class="panel"><h4>Athletics graphics</h4>${groupButtons('Athletics')}</div></div>`);
@@ -458,7 +459,7 @@
         });
         el.appendChild(lanes);
         const rows = (c.hasResults ? c.results : c.startlist);
-        const tbl = h(`<div class="panel"><h4>${esc(c.name)} ${esc(c.round || '')} – ${c.hasResults ? 'results' : 'start list'}</h4><table class="t"><tr><th>Pos</th><th>${field ? 'Order' : 'Lane'}</th><th>Athlete</th><th>Team</th>${field ? '<th>Attempts</th>' : ''}<th>Result</th></tr></table></div>`);
+        const tbl = h(`<div class="panel"><h4>${c.num ? 'Event ' + esc(c.num) + ' · ' : ''}${esc(c.name)} ${esc(c.round || '')} – ${c.hasResults ? 'results' : 'start list'}</h4><table class="t"><tr><th>Pos</th><th>${field ? 'Order' : 'Lane'}</th><th>Athlete</th><th>Team</th>${field ? '<th>Attempts</th>' : ''}<th>Result</th></tr></table></div>`);
         rows.forEach(r => {
           const tr = h(`<table><tr class="click"><td>${esc(r.rank || '')}</td><td>${esc(r.lane)}</td><td><b>${esc(r.tvName)}</b></td><td class="muted">${esc(r.team)}</td>${field ? `<td class="mono small">${esc(r.attempts.join('  '))}</td>` : ''}<td>${esc(r.result)} ${esc(r.note)}</td></tr></table>`).querySelector('tr');
           tr.onclick = () => select('ath_athlete_lt', { playerId: r.id });
@@ -472,6 +473,7 @@
       $('#ath-prev', el).onclick = () => send('athCurrent', { step: -1 });
       $('#ath-next', el).onclick = () => send('athCurrent', { step: 1 });
       $('#ath-auto', el).onchange = (e) => send('athAuto', { mode: e.target.value, delay: auto.delay == null ? 20 : auto.delay });
+      $('#ath-digits', el).onchange = (e) => send('athClock', { digits: Number(e.target.value) });
       const dl = $('#ath-delay', el); if (dl) dl.onchange = (e) => send('athAuto', { mode: 'results', delay: Number(e.target.value) });
       return el;
     },

@@ -1268,14 +1268,14 @@
           rows.forEach(r => { r.out = !!r.eliminated; });
         }
       } else complete = rows.length > 0 && rows.every(r => r.result);
-      return { id: e.id, name: e.name || '', round: e.round || '', wind: e.wind || '', kind, vertical, rounds, cut: e.cut || 0, bar: e.bar || '', gender: e.gender || '', age: e.age || '', discipline: e.discipline || '',
+      return { id: e.id, num: e.num || '', name: e.name || '', round: e.round || '', wind: e.wind || '', kind, vertical, rounds, cut: e.cut || 0, bar: e.bar || '', gender: e.gender || '', age: e.age || '', discipline: e.discipline || '',
         rows, startlist, results, hasResults: results.length > 0, up: up ? up.id : '', attemptRound: round, active: active.map(r => r.id), complete };
     },
     view(st, setup) {
       const v = baseView(this, setup);
       const evs = (st.ath.events || []).map(e => this.eventView(st, e));
       const cur = evs.find(e => e.id === st.ath.current) || evs[0] || null;
-      v.extra = { events: evs.map(e => ({ id: e.id, name: e.name, round: e.round, kind: e.kind, entries: e.rows.length, results: e.results.length, complete: e.complete })), current: cur, auto: Object.assign({ mode: 'off', delay: 20 }, st.ath.auto || {}) };
+      v.extra = { events: evs.map(e => ({ id: e.id, num: e.num, name: e.name, round: e.round, kind: e.kind, entries: e.rows.length, results: e.results.length, complete: e.complete })), current: cur, auto: Object.assign({ mode: 'off', delay: 20 }, st.ath.auto || {}), clockDigits: st.ath.clockDigits };
       v.periodLabel = cur ? `${U.up(cur.name)}${cur.round ? ' · ' + U.up(cur.round) : ''}` : 'ATHLETICS';
       v.status = cur ? (cur.hasResults ? 'RESULTS' : 'START LIST') : 'NO EVENT';
       v.score = { A: '', B: '' };
@@ -1386,7 +1386,7 @@
     if (v.kind === 'athletics') {
       const c = x.current;
       set('ath_event', c ? U.up(c.name) : ''); set('ath_round', c ? U.up(c.round) : ''); set('ath_wind', c ? c.wind : ''); set('ath_kind', c ? c.kind : '');
-      set('ath_status', v.status); set('ath_gender', c ? U.up(c.gender) : ''); set('ath_age', c && c.age && c.age !== 'Open' ? U.up(c.age) : ''); set('ath_discipline', c ? U.up(c.discipline || c.name) : '');
+      set('ath_status', v.status); set('ath_event_num', c ? c.num : ''); set('ath_gender', c ? U.up(c.gender) : ''); set('ath_age', c && c.age && c.age !== 'Open' ? U.up(c.age) : ''); set('ath_discipline', c ? U.up(c.discipline || c.name) : '');
       if (c) {
         set('sl_count', c.startlist.length);
         c.startlist.slice(0, 16).forEach((r, i) => { const p = `sl${i + 1}_`; set(p + 'lane', r.lane); set(p + 'bib', r.bib); set(p + 'name', r.tvName); set(p + 'team', U.up(r.team)); set(p + 'pb', r.pb); set(p + 'sb', r.sb); });

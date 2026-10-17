@@ -92,6 +92,15 @@ test('athletics control: automatic next event, lane lower thirds, the field athl
   assert.match(upLt.line2, /ROUND 1.*ATTEMPT 1/);
   await ctl.send('sport', 'athUp', { entry: 'j1' });
   await until(() => Sports.compute(sc.state.sport.setup, sc.state.sport.events).extra.current.up === 'j1', 2000, 'chosen athlete up');
+  // the Variables screen: every sport, with the athletics names and the race clock decimals
+  const ref = (await c.get('/live/api/varref')).data;
+  assert.deepEqual(ref.sections.slice(0, 3).map((x) => x.id), ['all', 'sports', 'cricket']);
+  const athKeys = ref.sections.find((x) => x.id === 'athletics').groups.flatMap((g) => g.vars.map((x) => x.pattern || x.key));
+  for (const k of ['ath_event_num', 'ath_up_name', 'ath_bar', 'rs{n}_reaction', 'clock_digits']) assert.ok(athKeys.includes(k), k);
+  assert.ok(ref.sections.find((x) => x.id === 'all').groups.some((g) => g.vars.some((x) => x.key === 'venue')));
+  await ctl.send('sport', 'athClock', { digits: 3 });
+  await until(() => sc.state.sport.setup.ath.clockDigits === 3, 2000, 'clock digits');
+  assert.equal(app.gfx.buildData('ath_clock', {}, null, team).clock_digits, '3');
   // prev / next from control
   await ctl.send('sport', 'athCurrent', { step: -1 });
   await until(() => sc.state.sport.setup.ath.current === 'm100', 2000, 'previous event');
