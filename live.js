@@ -292,7 +292,8 @@ function makeLive(app) {
     }
     Object.assign(s, { sportUndo: [], chain: Promise.resolve() });
     await recompute(s);
-    if (s.pulled) { s.pulled = false; await persist(s, '').catch((e) => log('Could not save refreshed match data:', e.message)); s.pristine = false; }
+    // only the machine that scores writes the score: on the website a session never writes it back (it would race the PC)
+    if (s.pulled) { s.pulled = false; if (app.isLocal) { await persist(s, '').catch((e) => log('Could not save refreshed match data:', e.message)); s.pristine = false; } }
     return s;
   }
   function session(id) {
@@ -325,7 +326,7 @@ function makeLive(app) {
       const d = await app.store.get(s.id);
       if (!d || d.deleted) return;
       if (s.pristine && !d.data.live) { Object.assign(s, await seed(d), { name: fixtureName(d.data) }); await recompute(s); s.pullError = ''; return; }
-      if (await pullMatch(s, d)) { s.name = fixtureName(d.data); await recompute(s); await persist(s, ''); }
+      if (await pullMatch(s, d)) { s.name = fixtureName(d.data); await recompute(s); if (app.isLocal) await persist(s, ''); }
       s.pullError = '';
     };
     s.chain = (s.chain || Promise.resolve()).then(run, run).catch((e) => { s.pullError = e.message; log('Could not read the match data for', s.name || s.id, '-', e.stack || e.message); });
@@ -348,7 +349,7 @@ function makeLive(app) {
       pullTimer = setTimeout(async () => {
         for (const x of [...sessions.values()]) {
           if (x.pristine || !x.id) continue;
-          const run = async () => { const d = await app.store.get(x.id); if (d && !d.deleted && d.data.live && await pullMatch(x, d)) { x.name = fixtureName(d.data); await recompute(x); await persist(x, ''); await afterChange(x); } };
+          const run = async () => { const d = await app.store.get(x.id); if (d && !d.deleted && d.data.live && await pullMatch(x, d)) { x.name = fixtureName(d.data); await recompute(x); if (app.isLocal) await persist(x, ''); await afterChange(x); } };
           x.chain = x.chain.then(run, run).catch((e) => log('Could not refresh match data:', e.message));
         }
       }, 300);

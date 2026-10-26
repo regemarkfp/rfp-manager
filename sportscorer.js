@@ -11,13 +11,19 @@
   let draft = null;          // setup being edited on the Setup tab
   let draftDirty = false;
   let athEdit = null;        // athletics event id being edited in setup
+  let focusNext = '';        // athletics: the result box to go to after Enter
 
   const sm = () => CG.state && CG.state.sport;
   const view = () => CG.sportView();
   const hasEvent = () => !!(sm() && sm().setup && sm().setup.sport);
 
   // ================================================================ tabs
-  $$('#tabs .tab').forEach(t => t.onclick = () => { page = t.dataset.page; CG.store.set('sportPage', page); render(); });
+  $$('#tabs .tab').forEach(t => t.onclick = async () => {
+    if (page === 'setup' && t.dataset.page !== 'setup' && draftDirty && canScoreHere()) {
+      if (!(await saveSetup(true))) CG.toast('The setup is not saved yet: press Save setup', 'err');
+    }
+    page = t.dataset.page; CG.store.set('sportPage', page); render();
+  });
 
   // ================================================================ committing changes (optimistic concurrency)
   let waiters = [];
@@ -185,7 +191,10 @@
     if (v.kind === 'timed') wireTimed(v);
     if (v.kind === 'sets') wireSets(v);
     if (v.kind === 'baseball') wireBaseball(v);
-    if (v.kind === 'athletics') wireAthletics(v);
+    if (v.kind === 'athletics') {
+      wireAthletics(v);
+      if (focusNext) { const b = document.querySelector(`tr[data-entry="${CSS.escape(focusNext)}"] [data-res]`); focusNext = ''; if (b) { b.focus(); b.select(); } }
+    }
   }
 
   function wireCommon(v) {
@@ -505,7 +514,18 @@
       const id = tr.dataset.entry;
       const res = $('[data-res]', tr), note = $('[data-note]', tr);
       const save = () => addEvent({ type: 'result', eventId: c.id, entry: id, value: res ? res.value.trim() : (v.extra.current.rows.find(r => r.id === id) || {}).result || '', note: note.value });
-      if (res) { res.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); save(); } }; res.onchange = save; }
+      if (res) {
+        res.onkeydown = e => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          res.onchange = null;
+          const rows = $$('tr[data-entry]'), i = rows.indexOf(tr);
+          focusNext = rows[i + 1] ? rows[i + 1].dataset.entry : '';
+          res.blur();                                        // the screen updates once the box is left, then on to the next athlete
+          save();
+        };
+        res.onchange = save;
+      }
       if (c.kind === 'field') note.onchange = () => addEvent({ type: 'result', eventId: c.id, entry: id, value: '', note: note.value });
       else note.onchange = save;
     });
@@ -720,6 +740,54 @@
     return athFix(Object.assign({ id: U.id(), num: nextNum(), name: '', gender: '', age: 'Open', discipline: '', roundType: 'Final', heat: '', round: '', kind: 'track', wind: '', entries: [] }, o || {}));
   }
 
+  // Saving the setup. quiet: leaving the Setup tab with changes saves them by itself (unless the sport or format changed,
+  // which clears the score: that one is only done with "Save setup").
+  async function saveSetup(quiet) {
+    const root = $('#setup-root');
+    if (!draft) return true;
+    if (!canScoreHere()) { CG.toast(VIEW_ONLY, 'err'); return false; }
+    collectDraft(root);
+    const cur = sm() && sm().setup;
+    const reset = !cur || !cur.sport || cur.sport !== draft.sport || cur.variant !== draft.variant;
+    if (reset && sm() && (sm().events || []).length) {
+      if (quiet) return false;
+      const ok = await CG.modal('Change sport / format', '<p>Changing the sport or format clears the current score and timeline. Continue?</p>', { ok: 'Change and clear', danger: true });
+      if (!ok) return false;
+    }
+    const d = U.clone(draft);
+    // what graphics control or the timing system changed meanwhile (current event, automatic changes, clock) is kept
+    const v = await commit((setup, events) => {
+      const keep = quiet && setup.ath ? { current: setup.ath.current, auto: setup.ath.auto, clockDigits: setup.ath.clockDigits } : null;
+      Object.keys(setup).forEach(k => delete setup[k]); Object.assign(setup, d);
+      if (keep && setup.ath) Object.assign(setup.ath, Object.fromEntries(Object.entries(keep).filter(([, x]) => x !== undefined)));
+      if (reset) events.length = 0;
+    });
+    if (v) {
+      draftDirty = false; CG.toast('Setup saved', 'ok'); markDirty();
+      if (reset) { resetClockFor(v, 'game'); if (v.clock.shot) resetClockFor(v, 'shot'); }
+      if (!quiet && CG.state.mode !== 'sport') CG.toast('Tip: press MAKE LIVE EVENT so the graphics use this sport', '');
+    }
+    return !!v;
+  }
+  // "Save setup •" while there are changes that are not saved
+  function markDirty() {
+    const b = $('#s-save'); if (!b) return;
+    b.textContent = draftDirty ? 'Save setup •' : 'Save setup';
+    b.title = draftDirty ? 'There are changes that are not saved yet' : '';
+  }
+  // scoring is done in the RFP Manager app (production PC, or the Android app), not in a web browser
+  const VIEW_ONLY = 'View only: scoring and setup are saved from the RFP Manager app (on the production PC or the Android app), not from a web browser.';
+  const canScoreHere = () => !CG.rfp || CG.rfp.canScore !== false;
+  function viewOnlyBanner() {
+    let b = document.getElementById('view-only-banner');
+    if (canScoreHere()) { if (b) b.remove(); return; }
+    if (b) return;
+    b = h(`<div id="view-only-banner" class="banner warn" style="margin:12px 12px 0;padding:10px 14px;border-radius:8px;background:#5a4300;color:#ffe08a;font-weight:600"></div>`);
+    b.textContent = VIEW_ONLY + ' Open this match in RFP Manager on the production PC to make changes.';
+    const main = document.querySelector('main'); main.parentNode.insertBefore(b, main);
+  }
+  CG.on('rfp', viewOnlyBanner);
+
   function collectDraft(root) {
     $$('[data-k]', root).forEach(i => { draft[i.dataset.k] = i.value; });
     const cm = $('#s-comms', root); if (cm) draft.commentators = cm.value.split('\n').map(x => x.trim()).filter(Boolean);
@@ -754,8 +822,10 @@
   }
 
   function wireSetup(root) {
-    const dirty = () => { draftDirty = true; };
+    const dirty = () => { draftDirty = true; markDirty(); };
     root.addEventListener('input', dirty);
+    root.addEventListener('change', dirty);
+    markDirty();
     $('#s-sport').onchange = e => {
       collectDraft(root);
       const keepTeams = draft.teams;
@@ -765,22 +835,7 @@
     };
     $('#s-variant').onchange = e => { collectDraft(root); draft.variant = e.target.value; draftDirty = true; };
     $('#s-discard').onclick = () => { draftDirty = false; renderSetup(view()); };
-    $('#s-save').onclick = async () => {
-      collectDraft(root);
-      const cur = sm() && sm().setup;
-      const reset = !cur || !cur.sport || cur.sport !== draft.sport || cur.variant !== draft.variant;
-      if (reset && sm() && (sm().events || []).length) {
-        const ok = await CG.modal('Change sport / format', '<p>Changing the sport or format clears the current score and timeline. Continue?</p>', { ok: 'Change and clear', danger: true });
-        if (!ok) return;
-      }
-      const d = U.clone(draft);
-      const v = await commit((setup, events) => { Object.keys(setup).forEach(k => delete setup[k]); Object.assign(setup, d); if (reset) events.length = 0; });
-      if (v) {
-        draftDirty = false; CG.toast('Setup saved', 'ok');
-        if (reset) { resetClockFor(v, 'game'); if (v.clock.shot) resetClockFor(v, 'shot'); }
-        if (CG.state.mode !== 'sport') CG.toast('Tip: press MAKE LIVE EVENT so the graphics use this sport', '');
-      }
-    };
+    $('#s-save').onclick = () => saveSetup(false);
     $('#s-new').onclick = async () => {
       const ok = await CG.modal('New match', '<p>Clear the score and timeline and keep the setup (teams, players, format)?</p>', { ok: 'Clear score', danger: true });
       if (!ok) return;

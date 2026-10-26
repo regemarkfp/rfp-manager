@@ -14,11 +14,31 @@ async function applyRemote(app, incoming, { fromSite = false } = {}) {
   if (!cur) { await app.put(incoming, { dirty: false }); return 'applied'; }
   // a record never changes team when a machine sends it; the website may move it (two teams merged into one)
   if (cur.type !== incoming.type || (cur.team !== incoming.team && !fromSite)) return 'rejected';
-  if (incoming.updatedAt > cur.updatedAt || (incoming.updatedAt === cur.updatedAt && stable(incoming) > stable({ ...cur, seq: incoming.seq }))) {
+  const newer = incoming.updatedAt > cur.updatedAt || (incoming.updatedAt === cur.updatedAt && stable(incoming) > stable({ ...cur, seq: incoming.seq }));
+  // The score of a match: the copy with more scoring in it wins, whatever the clocks say (a PC whose clock is behind,
+  // or the website saving the match while the PC scores, must never undo events or results). Sports count every change.
+  const li = liveVersion(incoming), lc = liveVersion(cur);
+  if (cur.type === 'fixture' && li !== null && lc !== null && li !== lc && !incoming.deleted && !cur.deleted) {
+    if (newer && li < lc) {                                   // the rest of the match is newer, its score is older: keep ours
+      await app.put({ ...incoming, data: { ...incoming.data, live: cur.data.live, result: cur.data.result || incoming.data.result, status: cur.data.status || incoming.data.status }, updatedAt: Math.max(incoming.updatedAt, cur.updatedAt) + 1 }, { dirty: !fromSite ? false : true });
+      return 'merged';
+    }
+    if (!newer && li > lc) {                                  // an older record with a newer score: take the score
+      await app.put({ ...cur, data: { ...cur.data, live: incoming.data.live, result: incoming.data.result || cur.data.result, status: incoming.data.status || cur.data.status }, updatedAt: Math.max(incoming.updatedAt, cur.updatedAt) + 1 }, { dirty: fromSite });
+      return 'merged';
+    }
+  }
+  if (newer) {
     await app.put(incoming, { dirty: false });
     return 'applied';
   }
   return 'stale';
+}
+// how far the scoring of a match has got (other sports: every change counts one); null = not comparable
+function liveVersion(d) {
+  const l = d && d.data && d.data.live;
+  if (!l || l.kind !== 'sport' || !Number.isFinite(Number(l.version))) return null;
+  return Number(l.version);
 }
 
 const cleanDoc = (d) => {
