@@ -11,13 +11,19 @@
   let draft = null;          // setup being edited on the Setup tab
   let draftDirty = false;
   let athEdit = null;        // athletics event id being edited in setup
+  let focusNext = '';        // athletics: the result box to go to after Enter
 
   const sm = () => CG.state && CG.state.sport;
   const view = () => CG.sportView();
   const hasEvent = () => !!(sm() && sm().setup && sm().setup.sport);
 
   // ================================================================ tabs
-  $$('#tabs .tab').forEach(t => t.onclick = () => { page = t.dataset.page; CG.store.set('sportPage', page); render(); });
+  $$('#tabs .tab').forEach(t => t.onclick = async () => {
+    if (page === 'setup' && t.dataset.page !== 'setup' && draftDirty && canScoreHere()) {
+      if (!(await saveSetup(true))) CG.toast('The setup is not saved yet: press Save setup', 'err');
+    }
+    page = t.dataset.page; CG.store.set('sportPage', page); render();
+  });
 
   // ================================================================ committing changes (optimistic concurrency)
   let waiters = [];
@@ -83,13 +89,23 @@
     if (!m) return null;
     return m[2] !== undefined ? (+m[1] * 60 + +m[2]) * 1000 + (m[3] ? +m[3] * 100 : 0) : +m[1] * 60000;
   }
-  setInterval(() => {
-    $$('[data-sclock]').forEach(el => {
-      const name = el.dataset.sclock, c = sm() && sm().clocks && sm().clocks[name];
-      el.textContent = CG.fmtClock(CG.clockMs(name), name === 'shot' ? 10 : (c && c.direction < 0 && view() && view().sport === 'basketball' ? 60 : 0));
-      el.classList.toggle('run', !!(c && c.ticking));
-    });
-  }, 100);
+  // athletics: the race clock with decimals (setup.ath.clockDigits, hundredths unless chosen), drawn every frame
+  const raceDigits = () => { const s0 = sm() && sm().setup; if (!s0 || s0.sport !== 'athletics') return null; const n = s0.ath && s0.ath.clockDigits; return n === undefined || n === null || n === '' ? 2 : Math.max(0, Math.min(3, +n || 0)); };
+  let lastTick = 0;
+  function tickClocks(now) {
+    const dg = raceDigits();
+    if (dg >= 2 || now - lastTick >= 100) {
+      lastTick = now;
+      $$('[data-sclock]').forEach(el => {
+        const name = el.dataset.sclock, c = sm() && sm().clocks && sm().clocks[name];
+        const t = dg !== null && name === 'game' ? CG.raceClock(CG.clockMs(name), dg) : CG.fmtClock(CG.clockMs(name), name === 'shot' ? 10 : (c && c.direction < 0 && view() && view().sport === 'basketball' ? 60 : 0));
+        if (el.textContent !== t) el.textContent = t;
+        el.classList.toggle('run', !!(c && c.ticking));
+      });
+    }
+    requestAnimationFrame(tickClocks);
+  }
+  requestAnimationFrame(tickClocks);
 
   // ================================================================ player picker
   function pickPlayer(team, title, opts) {
@@ -175,7 +191,10 @@
     if (v.kind === 'timed') wireTimed(v);
     if (v.kind === 'sets') wireSets(v);
     if (v.kind === 'baseball') wireBaseball(v);
-    if (v.kind === 'athletics') wireAthletics(v);
+    if (v.kind === 'athletics') {
+      wireAthletics(v);
+      if (focusNext) { const b = document.querySelector(`tr[data-entry="${CSS.escape(focusNext)}"] [data-res]`); focusNext = ''; if (b) { b.focus(); b.select(); } }
+    }
   }
 
   function wireCommon(v) {
@@ -437,37 +456,115 @@
   const NOTES = ['', 'PB', 'SB', 'NR', 'AR', 'CR', 'MR', 'WR', 'Q', 'q', 'DNF', 'DNS', 'DQ'];
   function athleticsHtml(v) {
     const x = v.extra, c = x.current;
-    const evBtns = x.events.map(e => `<button class="btn sm ${c && c.id === e.id ? 'on' : ''}" data-cur="${esc(e.id)}">${esc(e.name)}${e.round ? ' · ' + esc(e.round) : ''} <span class="muted">(${e.results}/${e.entries})</span></button>`).join(' ');
-    const clockRow = `<div class="row" style="justify-content:center;margin-top:12px;gap:14px"><span class="muted">RACE CLOCK</span><div class="clock" data-sclock="game">--:--</div>
-      <button class="btn go" id="ck-toggle">START / STOP <span class="kbd">Space</span></button><button class="btn" id="ck-zero">Reset to 0</button></div>`;
+    const evBtns = x.events.map(e => `<button class="btn sm ${c && c.id === e.id ? 'on' : ''}" data-cur="${esc(e.id)}">${e.num ? `<span class="muted">#${esc(e.num)}</span> ` : ''}${esc(e.name)}${e.round ? ' · ' + esc(e.round) : ''} <span class="muted">(${e.results}/${e.entries})</span>${e.complete ? ' ✓' : ''}</button>`).join(' ');
+    const auto = x.auto || {};
+    const dg = x.clockDigits === undefined || x.clockDigits === null || x.clockDigits === '' ? 2 : +x.clockDigits;
+    const clockRow = `<div class="row" style="justify-content:center;margin-top:12px;gap:14px"><span class="muted">RACE CLOCK</span><div class="clock" data-sclock="game" style="min-width:3.6em;text-align:right">--:--</div>
+      <button class="btn go" id="ck-toggle">START / STOP <span class="kbd">Space</span></button><button class="btn" id="ck-zero">Reset to 0</button>
+      <select id="ck-digits" style="width:auto" title="Decimals on the race clock (scorer and graphics)">${[[0, '9'], [1, '9.8'], [2, '9.87'], [3, '9.876']].map(([n, l]) => `<option value="${n}" ${n === dg ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`;
     if (!c) return `<div class="panel"><h4>Events</h4><p class="muted">No events yet – add events and entries on the Setup tab.</p></div>` + clockRow;
     const field = c.kind === 'field';
-    const rows = c.startlist.map(r => `<tr data-entry="${esc(r.id)}"><td class="n">${esc(r.lane)}</td><td class="muted">${esc(r.bib)}</td><td><b>${esc(r.tvName)}</b></td><td class="muted">${esc(r.team)}</td><td class="muted small">${esc(r.pb)}${r.sb ? ' / ' + esc(r.sb) : ''}</td>
-      ${field ? `<td class="mono">${esc(r.attempts.join('  '))}</td><td><input type="text" data-att style="width:80px" placeholder="7.85 / X"></td>` : ''}
-      <td><input type="text" data-res style="width:100px" value="${esc(r.result && !field ? r.result : (st(r) ? st(r) : ''))}" placeholder="${field ? 'best (auto)' : '10.23'}">${r.reaction ? ` <span class="small muted" title="Reaction time">RT ${esc(r.reaction)}</span>` : ''}</td>
-      <td><select data-note>${NOTES.map(n => `<option ${n === r.note ? 'selected' : ''}>${n}</option>`).join('')}</select></td><td class="n"><b>${esc(r.rank || '')}</b></td></tr>`).join('');
-    function st(r) { return field ? '' : r.result; }
-    return `<div class="panel"><h4>Event <span class="sp"></span>${esc(v.status)}</h4><div class="row">${evBtns}</div>${clockRow}</div>
-      <div class="panel" style="margin-top:12px"><h4>${esc(U.up(c.name))} ${c.round ? '· ' + esc(U.up(c.round)) : ''} ${c.wind ? '· WIND ' + esc(c.wind) : ''}</h4>
-      <table class="t"><tr><th class="n">Lane</th><th>Bib</th><th>Athlete</th><th>Team</th><th>PB / SB</th>${field ? '<th>Attempts</th><th>Add</th>' : ''}<th>${field ? 'Result override' : 'Result'}</th><th>Note</th><th class="n">Pos</th></tr>${rows}</table>
-      <p class="small muted">Type a time (10.23 or 1:45.32) or distance and press Enter. Field events: add each attempt (X = foul, - = pass); the best counts automatically.</p></div>`;
+    const head = `<div class="panel"><h4>Event <span class="sp"></span>${auto.mode === 'results' ? '<span class="badge" title="Set in graphics control → Athletics">AUTO NEXT</span> ' : ''}${esc(v.status)}</h4><div class="row">${evBtns}</div>${field ? '' : clockRow}</div>`;
+    if (!field) {
+      const rows = c.startlist.map(r => `<tr data-entry="${esc(r.id)}"><td class="n">${esc(r.lane)}</td><td class="muted">${esc(r.bib)}</td><td><b>${esc(r.tvName)}</b></td><td class="muted">${esc(r.team)}</td><td class="muted small">${esc(r.pb)}${r.sb ? ' / ' + esc(r.sb) : ''}</td>
+        <td><input type="text" data-res style="width:100px" value="${esc(r.result)}" placeholder="10.23">${r.reaction ? ` <span class="small muted" title="Reaction time">RT ${esc(r.reaction)}</span>` : ''}</td>
+        <td><select data-note>${NOTES.map(n => `<option ${n === r.note ? 'selected' : ''}>${n}</option>`).join('')}</select></td><td class="n"><b>${esc(r.rank || '')}</b></td><td><button class="btn sm ghost" data-lt="${esc(r.id)}" title="Lower third on air">LT</button></td></tr>`).join('');
+      return head + `<div class="panel" style="margin-top:12px"><h4>${c.num ? 'EVENT ' + esc(c.num) + ' · ' : ''}${esc(U.up(c.name))} ${c.round ? '· ' + esc(U.up(c.round)) : ''} ${c.wind ? '· WIND ' + esc(c.wind) : ''}</h4>
+        <table class="t"><tr><th class="n">Lane</th><th>Bib</th><th>Athlete</th><th>Team</th><th>PB / SB</th><th>Result</th><th>Note</th><th class="n">Pos</th><th></th></tr>${rows}</table>
+        <p class="small muted">Type a time (10.23 or 1:45.32) and press Enter.</p></div>`;
+    }
+    // ---- field events: the athlete who is up, their attempt, then the next one
+    const up = c.rows.find(r => r.id === c.up);
+    const heights = (() => { const l = []; const lo = /pole/i.test(c.discipline || c.name) ? 100 : 60, hi = /pole/i.test(c.discipline || c.name) ? 650 : 260; for (let h = lo; h <= hi; h++) l.push((h / 100).toFixed(2)); return l; })();
+    const chips = r => (r.attempts.length ? r.attempts : []).map(a => `<span class="att ${/X/i.test(a) ? 'x' : /-/.test(a) && !/\d/.test(a.replace(/-$/, '')) ? 'p' : /O|\d/.test(a) ? 'ok' : ''}">${esc(String(a).toUpperCase())}</span>`).join('') || '<span class="muted small">no attempts yet</span>';
+    const settings = c.vertical
+      ? `<span class="small muted">Bar</span><select id="fe-bar" style="width:auto"><option value="">–</option>${heights.map(hh => `<option ${hh === c.bar ? 'selected' : ''}>${hh}</option>`).join('')}</select><button class="btn sm" data-raise="0.03">+3 cm</button><button class="btn sm" data-raise="0.05">+5 cm</button><button class="btn sm" data-raise="0.10">+10 cm</button>`
+      : `<span class="small muted">Round <b>${esc(c.attemptRound || '–')}</b> of</span><select id="fe-rounds" style="width:auto">${[3, 4, 5, 6].map(n => `<option ${n === c.rounds ? 'selected' : ''}>${n}</option>`).join('')}</select>
+         <label class="row small" style="gap:4px"><input type="checkbox" id="fe-cut" ${c.cut ? 'checked' : ''}> Top 8 after round 3</label>`;
+    const upPanel = `<div class="panel fe-up" style="margin-top:12px"><h4>Up now <span class="sp"></span>${settings}</h4>
+      ${up ? `<div class="row" style="gap:16px;align-items:center;flex-wrap:wrap"><div class="fe-name">${esc(up.tvName)}</div><div class="muted">${esc(up.team)}${up.lane ? ' · order ' + esc(up.lane) : ''}</div>
+          <div class="fe-chips">${chips(up)}</div>${up.best != null ? `<div>Best <b>${esc(up.best.toFixed(2))}</b>${up.rank ? ` · pos ${esc(up.rank)}` : ''}</div>` : ''}</div>
+        <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">
+          ${c.vertical ? `<button class="btn go big" data-mk="O">O Clear</button><button class="btn danger big" data-mk="X">X Fail</button><button class="btn big" data-mk="-">– Pass</button><span class="muted small">at ${esc(c.bar || '–')} · try ${esc((up.atBar || '').length + 1)} of 3</span>`
+            : `<input type="text" id="fe-mark" inputmode="decimal" placeholder="7.85" style="width:120px;font-size:20px" autocomplete="off"><button class="btn go big" id="fe-rec">Record</button><button class="btn danger big" data-mk="X">X Foul</button><button class="btn big" data-mk="-">– Pass</button>`}
+          <span class="grow"></span><button class="btn" id="fe-skip">Skip ▶</button><button class="btn" id="fe-lt">LT on air</button></div>`
+        : `<p class="muted">${c.complete ? 'The event is complete.' : c.vertical ? (c.bar ? 'Everyone still in has cleared or passed this height: raise the bar.' : 'Choose the starting height.') : 'Nobody is up.'}</p>`}</div>`;
+    const rows = c.startlist.map(r => `<tr data-entry="${esc(r.id)}" class="${r.id === c.up ? 'hl' : ''} ${r.out || r.status ? 'out' : ''}"><td class="n">${esc(r.lane)}</td><td><b>${esc(r.tvName)}</b></td><td class="muted">${esc(r.team)}</td>
+      <td class="fe-chips">${chips(r)}</td><td><b>${esc(r.result)}</b></td><td class="n"><b>${esc(r.rank || '')}</b></td>
+      <td><select data-note>${NOTES.map(n => `<option ${n === r.note ? 'selected' : ''}>${n}</option>`).join('')}</select></td>
+      <td class="n" style="white-space:nowrap"><button class="btn sm" data-upnow="${esc(r.id)}" title="Make this athlete up now">Up</button><button class="btn sm ghost" data-undo="${esc(r.id)}" title="Remove the last attempt" ${r.attempts.length ? '' : 'disabled'}>↶</button><button class="btn sm ghost" data-lt="${esc(r.id)}" title="Lower third on air">LT</button></td></tr>`).join('');
+    return head + upPanel + `<div class="panel" style="margin-top:12px"><h4>${c.num ? 'EVENT ' + esc(c.num) + ' · ' : ''}${esc(U.up(c.name))} ${c.round ? '· ' + esc(U.up(c.round)) : ''}</h4>
+      <table class="t"><tr><th class="n">Order</th><th>Athlete</th><th>Team</th><th>Attempts</th><th>Best</th><th class="n">Pos</th><th>Note</th><th></th></tr>${rows}</table>
+      <p class="small muted">${c.vertical ? 'O = cleared, X = failed, – = passed. Three failures in a row and the athlete is out; the best cleared height counts (ties: fewer failures).' : 'Type the mark and press Enter (or X / – for a foul or a pass). The next athlete comes up by themselves: fewest attempts first, in competition order.'}</p></div>`;
   }
 
   function wireAthletics(v) {
     const c = v.extra.current;
-    $('#ck-toggle').onclick = () => clock('toggle');
-    $('#ck-zero').onclick = () => CG.send('sport', 'clock', { name: 'game', action: 'reset', dir: 1, limitMs: 0, startMs: 0, stopAtLimit: false }).catch(() => { });
+    const ck = $('#ck-toggle'); if (ck) ck.onclick = () => clock('toggle');
+    const cd = $('#ck-digits'); if (cd) cd.onchange = () => CG.send('sport', 'athClock', { digits: +cd.value }).catch(e => CG.toast(e.message, 'err'));
+    const cz = $('#ck-zero'); if (cz) cz.onclick = () => CG.send('sport', 'clock', { name: 'game', action: 'reset', dir: 1, limitMs: 0, startMs: 0, stopAtLimit: false }).catch(() => { });
     $$('[data-cur]').forEach(b => b.onclick = () => commit(setup => { setup.ath.current = b.dataset.cur; }));
     if (!c) return;
+    $$('[data-lt]').forEach(b => b.onclick = () => {
+      const on = (CG.state.gfx.onAir || []).some(e => !e.preview && e.graphicId === 'ath_athlete_lt' && e.params && String(e.params.playerId) === b.dataset.lt);
+      CG.gfx(on ? 'hide' : 'show', on ? { id: 'ath_athlete_lt' } : { id: 'ath_athlete_lt', params: { playerId: b.dataset.lt } });
+    });
+    const ev = setup => setup.ath.events.find(e => e.id === c.id);
     $$('tr[data-entry]').forEach(tr => {
       const id = tr.dataset.entry;
-      const res = $('[data-res]', tr), note = $('[data-note]', tr), att = $('[data-att]', tr);
-      const save = () => addEvent({ type: 'result', eventId: c.id, entry: id, value: res.value.trim(), note: note.value });
-      res.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); save(); } };
-      res.onchange = save;
-      note.onchange = save;
-      if (att) att.onkeydown = e => { if (e.key === 'Enter' && att.value.trim()) { e.preventDefault(); addEvent({ type: 'attempt', eventId: c.id, entry: id, value: att.value.trim() }); att.value = ''; } };
+      const res = $('[data-res]', tr), note = $('[data-note]', tr);
+      const save = () => addEvent({ type: 'result', eventId: c.id, entry: id, value: res ? res.value.trim() : (v.extra.current.rows.find(r => r.id === id) || {}).result || '', note: note.value });
+      if (res) {
+        res.onkeydown = e => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          res.onchange = null;
+          const rows = $$('tr[data-entry]'), i = rows.indexOf(tr);
+          focusNext = rows[i + 1] ? rows[i + 1].dataset.entry : '';
+          res.blur();                                        // the screen updates once the box is left, then on to the next athlete
+          save();
+        };
+        res.onchange = save;
+      }
+      if (c.kind === 'field') note.onchange = () => addEvent({ type: 'result', eventId: c.id, entry: id, value: '', note: note.value });
+      else note.onchange = save;
     });
+    if (c.kind !== 'field') return;
+    const up = c.rows.find(r => r.id === c.up);
+    const record = mark => {
+      if (!up) return;
+      let value = String(mark).trim().toUpperCase().replace(',', '.');
+      if (!value) return;
+      if (c.vertical) { if (!c.bar) { CG.toast('Choose the bar height first', 'err'); return; } value = `${c.bar} ${value}`; }
+      else if (!/^(X|-|\d+(\.\d+)?)$/.test(value)) { CG.toast('A mark like 7.85, or X / –', 'err'); return; }
+      const id = U.id();
+      const mkEl = $('#fe-mark'); if (mkEl) { mkEl.value = ''; mkEl.blur(); }     // let the screen move on to the next athlete
+      commit((setup, events) => { events.push({ id, t: Date.now(), type: 'attempt', eventId: c.id, entry: up.id, value }); const e = ev(setup); if (e) e.up = ''; }, id)
+        .then(() => { const m2 = $('#fe-mark'); if (m2 && (!document.activeElement || document.activeElement === document.body)) m2.focus(); });
+    };
+    $$('[data-mk]').forEach(b => b.onclick = () => record(b.dataset.mk));
+    const mk = $('#fe-mark');
+    if (mk) {
+      mk.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); record(mk.value); } };
+      if (!document.activeElement || document.activeElement === document.body) setTimeout(() => mk.focus(), 30);
+    }
+    const rec = $('#fe-rec'); if (rec) rec.onclick = () => record(mk.value);
+    const skip = $('#fe-skip'); if (skip) skip.onclick = () => {
+      const act = c.startlist.filter(r => c.active.includes(r.id));
+      const i = act.findIndex(r => r.id === c.up);
+      const next = act[(i + 1) % act.length];
+      if (next) commit(setup => { const e = ev(setup); if (e) e.up = next.id; });
+    };
+    const lt = $('#fe-lt'); if (lt) lt.onclick = () => CG.gfx('show', { id: 'ath_up_lt' });
+    $$('[data-upnow]').forEach(b => b.onclick = () => commit(setup => { const e = ev(setup); if (e) e.up = b.dataset.upnow; }));
+    $$('[data-undo]').forEach(b => b.onclick = () => commit((setup, events) => {
+      for (let i = events.length - 1; i >= 0; i--) if (events[i].type === 'attempt' && events[i].eventId === c.id && events[i].entry === b.dataset.undo) { events.splice(i, 1); return; }
+      return false;
+    }));
+    const bar = $('#fe-bar'); if (bar) bar.onchange = () => commit(setup => { const e = ev(setup); if (e) { e.bar = bar.value; e.up = ''; } });
+    $$('[data-raise]').forEach(b => b.onclick = () => commit(setup => { const e = ev(setup); if (!e) return false; const h0 = parseFloat(e.bar) || (/pole/i.test(c.discipline || c.name) ? 3.00 : 1.50); e.bar = (h0 + Number(b.dataset.raise)).toFixed(2); e.up = ''; }));
+    const rounds = $('#fe-rounds'); if (rounds) rounds.onchange = () => commit(setup => { const e = ev(setup); if (e) e.rounds = Number(rounds.value); });
+    const cut = $('#fe-cut'); if (cut) cut.onchange = () => commit(setup => { const e = ev(setup); if (e) e.cut = cut.checked ? 8 : 0; });
   }
 
   // ---------------------------------------------------------------- keyboard
@@ -476,6 +573,11 @@
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); const u = $('#btn-undo'); if (u) u.click(); return; }
     if (e.target.matches('input,select,textarea') || e.ctrlKey || e.metaKey || e.altKey) return;
     const v = view(); if (!v) return;
+    if (v.kind === 'athletics' && v.extra.current && v.extra.current.kind === 'field') {
+      const k = e.key.toUpperCase(), b = document.querySelector(`[data-mk="${k === '-' ? '-' : k}"]`);
+      if (b && ['X', 'O', '-'].includes(k)) { e.preventDefault(); b.click(); }
+      return;
+    }
     if (e.key === ' ' && (v.kind === 'timed' || v.kind === 'athletics')) { e.preventDefault(); clock('toggle'); }
     if (v.kind === 'sets' && (e.key === 'q' || e.key === 'Q')) addEvent({ type: 'point', team: 'A', how: '' });
     if (v.kind === 'sets' && (e.key === 'p' || e.key === 'P')) addEvent({ type: 'point', team: 'B', how: '' });
@@ -597,6 +699,7 @@
   }
   function athSetupHtml(d) {
     d.ath.events.forEach(athUpgrade);
+    if (d.ath.events.length && d.ath.events.every(e => !e.num)) d.ath.events.forEach((e, i) => { e.num = String(i + 1); });   // older meets: number them in order
     const evs = d.ath.events;
     if (!athEdit || !evs.find(e => e.id === athEdit)) athEdit = evs.length ? evs[0].id : null;
     const e = evs.find(x => x.id === athEdit);
@@ -609,9 +712,10 @@
       <datalist id="a-bibs">${known.bibs.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
       <div class="grid cols-2" style="margin-top:12px">
       <div class="panel" data-nofold><h4>Events <span class="sp"></span><button class="btn sm" id="a-many">+ Several events</button><button class="btn sm" id="a-add">+ Event</button></h4>
-        <table class="t"><tr><th>Event</th><th>Round</th><th>Type</th><th>Entries</th><th></th></tr>${evs.map(x => `<tr class="click ${x.id === athEdit ? 'sel' : ''}" data-aev="${esc(x.id)}"><td><b>${esc(x.name)}</b></td><td class="muted">${esc(x.round || '')}</td><td class="muted">${x.kind === 'field' ? 'Field' : 'Track'}</td><td>${x.entries.length}</td><td class="n">${d.ath.current === x.id ? '<span class="badge live">CURRENT</span>' : ''}${x.timing ? ' <span class="badge" title="From the timing system">⏱</span>' : ''}</td></tr>`).join('') || '<tr><td class="muted" colspan="5">No events yet. Add them here, or let the timing system bring its start lists (Timing tab).</td></tr>'}</table></div>
+        <table class="t"><tr><th>No.</th><th>Event</th><th>Gender</th><th>Age group</th><th>Round</th><th>Type</th><th>Entries</th><th></th></tr>${evs.map(x => `<tr class="click ${x.id === athEdit ? 'sel' : ''}" data-aev="${esc(x.id)}"><td class="muted">${esc(x.num || '')}</td><td><b>${esc(x.name)}</b></td><td class="muted">${esc(x.gender || '')}</td><td>${esc(x.age || 'Open')}</td><td class="muted">${esc(x.round || '')}</td><td class="muted">${x.kind === 'field' ? 'Field' : 'Track'}</td><td>${x.entries.length}</td><td class="n">${d.ath.current === x.id ? '<span class="badge live">CURRENT</span>' : ''}${x.timing ? ' <span class="badge" title="From the timing system">⏱</span>' : ''}</td></tr>`).join('') || '<tr><td class="muted" colspan="8">No events yet. Add them here, or let the timing system bring its start lists (Timing tab).</td></tr>'}</table></div>
       <div class="panel" data-nofold>${e ? `<h4>Edit event<span class="sp"></span><button class="btn sm" id="a-dup">Copy as next heat</button><button class="btn sm" id="a-cur">Make current</button><button class="btn sm ghost" id="a-del">Delete event</button></h4>
         <div class="form-grid">
+          <label class="f"><span>Event no.</span>${sel('data-ae="num"', Array.from({ length: 300 }, (_, i) => String(i + 1)), e.num, '–')}</label>
           <label class="f"><span>Gender</span>${sel('data-ae="gender"', A.GENDERS, e.gender, 'Choose…')}</label>
           <label class="f"><span>Age group</span>${sel('data-ae="age"', A.AGES, e.age || 'Open')}</label>
           <label class="f"><span>Discipline</span>${discSelect('data-ae="discipline"', e.discipline)}</label>
@@ -631,9 +735,58 @@
         <div class="row" style="margin-top:8px"><button class="btn sm" id="a-adde">+ Entry</button><button class="btn sm" id="a-fill">Fill lanes</button><button class="btn sm" id="a-bulk">Bulk paste…</button></div>` : '<p class="muted">Add an event to start.</p>'}</div></div>`;
   }
   function windList() { const l = []; for (let w = -50; w <= 50; w++) { const v = w / 10; l.push((v > 0 ? '+' : v === 0 ? '±' : '') + v.toFixed(1)); } return l.concat(['NWI']); }
+  const nextNum = () => String(Math.max(0, ...draft.ath.events.map(e => parseInt(e.num, 10) || 0)) + 1);
   function newAthEvent(o) {
-    return athFix(Object.assign({ id: U.id(), name: '', gender: '', age: 'Open', discipline: '', roundType: 'Final', heat: '', round: '', kind: 'track', wind: '', entries: [] }, o || {}));
+    return athFix(Object.assign({ id: U.id(), num: nextNum(), name: '', gender: '', age: 'Open', discipline: '', roundType: 'Final', heat: '', round: '', kind: 'track', wind: '', entries: [] }, o || {}));
   }
+
+  // Saving the setup. quiet: leaving the Setup tab with changes saves them by itself (unless the sport or format changed,
+  // which clears the score: that one is only done with "Save setup").
+  async function saveSetup(quiet) {
+    const root = $('#setup-root');
+    if (!draft) return true;
+    if (!canScoreHere()) { CG.toast(VIEW_ONLY, 'err'); return false; }
+    collectDraft(root);
+    const cur = sm() && sm().setup;
+    const reset = !cur || !cur.sport || cur.sport !== draft.sport || cur.variant !== draft.variant;
+    if (reset && sm() && (sm().events || []).length) {
+      if (quiet) return false;
+      const ok = await CG.modal('Change sport / format', '<p>Changing the sport or format clears the current score and timeline. Continue?</p>', { ok: 'Change and clear', danger: true });
+      if (!ok) return false;
+    }
+    const d = U.clone(draft);
+    // what graphics control or the timing system changed meanwhile (current event, automatic changes, clock) is kept
+    const v = await commit((setup, events) => {
+      const keep = quiet && setup.ath ? { current: setup.ath.current, auto: setup.ath.auto, clockDigits: setup.ath.clockDigits } : null;
+      Object.keys(setup).forEach(k => delete setup[k]); Object.assign(setup, d);
+      if (keep && setup.ath) Object.assign(setup.ath, Object.fromEntries(Object.entries(keep).filter(([, x]) => x !== undefined)));
+      if (reset) events.length = 0;
+    });
+    if (v) {
+      draftDirty = false; CG.toast('Setup saved', 'ok'); markDirty();
+      if (reset) { resetClockFor(v, 'game'); if (v.clock.shot) resetClockFor(v, 'shot'); }
+      if (!quiet && CG.state.mode !== 'sport') CG.toast('Tip: press MAKE LIVE EVENT so the graphics use this sport', '');
+    }
+    return !!v;
+  }
+  // "Save setup •" while there are changes that are not saved
+  function markDirty() {
+    const b = $('#s-save'); if (!b) return;
+    b.textContent = draftDirty ? 'Save setup •' : 'Save setup';
+    b.title = draftDirty ? 'There are changes that are not saved yet' : '';
+  }
+  // scoring is done in the RFP Manager app (production PC, or the Android app), not in a web browser
+  const VIEW_ONLY = 'View only: scoring and setup are saved from the RFP Manager app (on the production PC or the Android app), not from a web browser.';
+  const canScoreHere = () => !CG.rfp || CG.rfp.canScore !== false;
+  function viewOnlyBanner() {
+    let b = document.getElementById('view-only-banner');
+    if (canScoreHere()) { if (b) b.remove(); return; }
+    if (b) return;
+    b = h(`<div id="view-only-banner" class="banner warn" style="margin:12px 12px 0;padding:10px 14px;border-radius:8px;background:#5a4300;color:#ffe08a;font-weight:600"></div>`);
+    b.textContent = VIEW_ONLY + ' Open this match in RFP Manager on the production PC to make changes.';
+    const main = document.querySelector('main'); main.parentNode.insertBefore(b, main);
+  }
+  CG.on('rfp', viewOnlyBanner);
 
   function collectDraft(root) {
     $$('[data-k]', root).forEach(i => { draft[i.dataset.k] = i.value; });
@@ -669,8 +822,10 @@
   }
 
   function wireSetup(root) {
-    const dirty = () => { draftDirty = true; };
+    const dirty = () => { draftDirty = true; markDirty(); };
     root.addEventListener('input', dirty);
+    root.addEventListener('change', dirty);
+    markDirty();
     $('#s-sport').onchange = e => {
       collectDraft(root);
       const keepTeams = draft.teams;
@@ -680,22 +835,7 @@
     };
     $('#s-variant').onchange = e => { collectDraft(root); draft.variant = e.target.value; draftDirty = true; };
     $('#s-discard').onclick = () => { draftDirty = false; renderSetup(view()); };
-    $('#s-save').onclick = async () => {
-      collectDraft(root);
-      const cur = sm() && sm().setup;
-      const reset = !cur || !cur.sport || cur.sport !== draft.sport || cur.variant !== draft.variant;
-      if (reset && sm() && (sm().events || []).length) {
-        const ok = await CG.modal('Change sport / format', '<p>Changing the sport or format clears the current score and timeline. Continue?</p>', { ok: 'Change and clear', danger: true });
-        if (!ok) return;
-      }
-      const d = U.clone(draft);
-      const v = await commit((setup, events) => { Object.keys(setup).forEach(k => delete setup[k]); Object.assign(setup, d); if (reset) events.length = 0; });
-      if (v) {
-        draftDirty = false; CG.toast('Setup saved', 'ok');
-        if (reset) { resetClockFor(v, 'game'); if (v.clock.shot) resetClockFor(v, 'shot'); }
-        if (CG.state.mode !== 'sport') CG.toast('Tip: press MAKE LIVE EVENT so the graphics use this sport', '');
-      }
-    };
+    $('#s-save').onclick = () => saveSetup(false);
     $('#s-new').onclick = async () => {
       const ok = await CG.modal('New match', '<p>Clear the score and timeline and keep the setup (teams, players, format)?</p>', { ok: 'Clear score', danger: true });
       if (!ok) return;
@@ -738,7 +878,7 @@
       const roundType = A.NUMBERED.includes(p.roundType) ? p.roundType : 'Heat';
       const heat = String((Number(p.heat) || (A.NUMBERED.includes(p.roundType) ? 1 : 0)) + 1);
       if (!A.NUMBERED.includes(p.roundType)) { p.roundType = 'Heat'; p.heat = '1'; athFix(p); }
-      const e = newAthEvent({ gender: p.gender, age: p.age, discipline: p.discipline, kind: p.kind, roundType, heat });
+      const e = newAthEvent({ num: p.num, gender: p.gender, age: p.age, discipline: p.discipline, kind: p.kind, roundType, heat });
       draft.ath.events.splice(draft.ath.events.indexOf(p) + 1, 0, e); athEdit = e.id; dirty(); buildSetup(root);
     };
     const aMany = $('#a-many'); if (aMany) aMany.onclick = async () => {

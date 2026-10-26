@@ -1,6 +1,6 @@
 {
   "name": "rfp-manager",
-  "version": "0.1.16",
+  "version": "0.1.18",
   "rfpRelease": 2,
   "description": "All-in-one live production tool: assets, fixtures, productions, crew, live scoring and CasparCG graphics.",
   "main": "server.js",
