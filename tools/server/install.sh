@@ -10,9 +10,19 @@
 #                             Without one it uses <ip>.sslip.io, which works straight away.
 #   --email you@example.com   for the https certificate (optional)
 #   --keep-days 90            how long recordings (the videos) are kept; 0 = for ever
+#
+# At home (a Raspberry Pi 3/4/5 with 64-bit Raspberry Pi OS Lite, or any Debian/Ubuntu box) with no ports open:
+#   --tunnel <token>          a Cloudflare Tunnel connector token (Cloudflare → Zero Trust → Networks → Tunnels).
+#                             The website is reached through Cloudflare, so no port forwarding and no fixed IP.
+#                             Set the tunnel's public hostnames (e.g. regemarkfp.com, admin.regemarkfp.com) to
+#                             http://localhost:8080. Paste the token yourself; it is kept on this machine only.
+#   --home                    the same without installing the tunnel (one already runs, or you add it later).
+#   --recordings /mnt/usb     where the stream recordings go (a USB drive rather than the SD card).
+#   Tailscale is installed too: run "sudo tailscale up" once, then encoders on your tailnet send SRT / RTMP to
+#   this machine's Tailscale name (Cloudflare carries only the website, not SRT/RTMP/WebRTC).
 set -euo pipefail
 
-FROM=""; TOKEN=""; DOMAIN=""; ADMIN=""; EMAIL=""; KEEP_DAYS=90
+FROM=""; TOKEN=""; DOMAIN=""; ADMIN=""; EMAIL=""; KEEP_DAYS=90; TUNNEL=""; HOME_MODE=""; RECDIR=/var/lib/mediamtx/recordings
 while [ $# -gt 0 ]; do
   case "$1" in
     --from) FROM="${2%/}"; shift 2 ;;
@@ -21,6 +31,9 @@ while [ $# -gt 0 ]; do
     --admin-domain) ADMIN="${2#https://}"; ADMIN="${ADMIN%/}"; shift 2 ;;
     --email) EMAIL="$2"; shift 2 ;;
     --keep-days) KEEP_DAYS="$2"; shift 2 ;;
+    --tunnel) TUNNEL="$2"; HOME_MODE=1; shift 2 ;;
+    --home) HOME_MODE=1; shift ;;
+    --recordings) RECDIR="${2%/}"; shift 2 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -30,6 +43,9 @@ done
 exec > >(tee -a /var/log/rfp-install.log) 2>&1
 say() { printf '\n== %s\n' "$*"; }
 APP=/opt/rfp-manager; DATA=/var/lib/rfp-manager; ETC=/etc/rfp-manager
+# an update of a home server stays a home server
+[ -z "$HOME_MODE" ] && [ -f "$ETC/home" ] && HOME_MODE=1
+[ -f "$ETC/recordings" ] && [ "$RECDIR" = /var/lib/mediamtx/recordings ] && RECDIR="$(cat "$ETC/recordings")"
 
 case "$(uname -m)" in
   aarch64|arm64) NODE_ARCH=arm64; MTX_ARCH='linux_arm64(v8)?' ;;
@@ -48,12 +64,16 @@ apt-get update -y -q
 apt-get install -y -q curl ca-certificates tar xz-utils jq gnupg openssl ffmpeg fonts-dejavu-core iptables-persistent debian-keyring debian-archive-keyring apt-transport-https
 
 IP="$(curl -fsS --max-time 10 https://api.ipify.org || curl -fsS --max-time 10 https://ifconfig.me || true)"
-[ -n "$IP" ] || { echo "Could not find this server's public IP address."; exit 1; }
+[ -n "$IP" ] || [ -n "$HOME_MODE" ] || { echo "Could not find this server's public IP address."; exit 1; }
 # an update keeps the addresses set up before (from the last install's env file)
 ETC0=/etc/rfp-manager
 if [ -z "$DOMAIN" ] && [ -f "$ETC0/env" ]; then DOMAIN="$(grep -E '^PUBLIC_URL=' "$ETC0/env" | cut -d= -f2- | sed -e 's|^https://||' -e 's|/$||')"; fi
 if [ -z "$ADMIN" ] && [ -f "$ETC0/env" ]; then ADMIN="$(grep -E '^ADMIN_URL=' "$ETC0/env" | cut -d= -f2- | sed -e 's|^https://||' -e 's|/$||')"; fi
 SSLIP="$(echo "$IP" | tr . -).sslip.io"
+if [ -n "$HOME_MODE" ]; then
+  [ -n "$DOMAIN" ] || { echo "At home the website needs your own name: add --domain regemarkfp.com (and --admin-domain admin.regemarkfp.com)."; exit 1; }
+  SSLIP="$DOMAIN"                      # no sslip.io name through a tunnel
+fi
 [ -n "$DOMAIN" ] || DOMAIN="$SSLIP"
 [ "$ADMIN" = "$DOMAIN" ] && ADMIN=""
 # Caddy serves (and gets HTTPS certificates for) the website, the Studio address and always the sslip.io address
@@ -63,6 +83,13 @@ WWW=""; case "$DOMAIN" in www.*|*.sslip.io) ;; *) [ "$(echo "$DOMAIN" | tr -cd .
 [ -n "$WWW" ] && HOSTS="$DOMAIN, $WWW${HOSTS#"$DOMAIN"}"
 echo "Public IP $IP   ·   website https://$DOMAIN${ADMIN:+   ·   studio https://$ADMIN}"
 
+if [ -n "$HOME_MODE" ]; then
+  say "Home server: nothing is opened to the internet (Cloudflare Tunnel + Tailscale)"
+  # a Pi 3 has 1 GB: give it swap so npm and ffmpeg do not run out of memory
+  if [ "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -lt 1600000 ] && [ -f /etc/dphys-swapfile ]; then
+    sed -i -E 's/^#?CONF_SWAPSIZE=.*/CONF_SWAPSIZE=1024/' /etc/dphys-swapfile && (dphys-swapfile setup && dphys-swapfile swapon) >/dev/null 2>&1 || true
+  fi
+else
 say "Firewall (this server)"
 # Oracle's Ubuntu images reject everything but SSH; open the web and streaming ports. Also open them in the cloud
 # firewall (Oracle: the subnet's security list).
@@ -72,6 +99,24 @@ open_port tcp 1935                       # RTMP in
 open_port udp 8890                       # SRT in
 open_port udp 8189; open_port tcp 8189   # WebRTC to viewers
 netfilter-persistent save >/dev/null 2>&1 || iptables-save > /etc/iptables/rules.v4
+fi
+
+if [ -n "$HOME_MODE" ]; then
+  say "Cloudflare Tunnel (cloudflared) and Tailscale"
+  if ! command -v cloudflared >/dev/null; then
+    # Cloudflare's own package (also what its tunnel page installs); the .deb from its GitHub releases if that fails
+    curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$([ "$NODE_ARCH" = x64 ] && echo amd64 || echo arm64).deb" -o /tmp/cloudflared.deb
+    dpkg -i /tmp/cloudflared.deb || apt-get install -f -y -q
+    rm -f /tmp/cloudflared.deb
+  fi
+  cloudflared --version
+  if [ -n "$TUNNEL" ]; then
+    systemctl stop cloudflared 2>/dev/null || true
+    cloudflared service uninstall >/dev/null 2>&1 || true
+    cloudflared service install "$TUNNEL"
+  fi
+  command -v tailscale >/dev/null || curl -fsSL https://tailscale.com/install.sh | sh
+fi
 
 say "Node.js 22"
 if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 22 ]; then
@@ -100,14 +145,23 @@ fi
 
 say "RFP Manager"
 id rfp >/dev/null 2>&1 || useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin rfp
-mkdir -p "$DATA" "$ETC" /etc/mediamtx /var/lib/mediamtx/recordings
-chown -R rfp:rfp /var/lib/mediamtx
+mkdir -p "$DATA" "$ETC" /etc/mediamtx /var/lib/mediamtx "$RECDIR"
+chown -R rfp:rfp /var/lib/mediamtx "$RECDIR"
+if [ -n "$HOME_MODE" ]; then touch "$ETC/home"; else rm -f "$ETC/home"; fi
+echo "$RECDIR" > "$ETC/recordings"
 curl -fsSL "$FROM/api/server/bundle.tgz?t=$TOKEN" -o /tmp/rfp.tgz
 rm -rf /tmp/rfp-new && mkdir -p /tmp/rfp-new && tar -xzf /tmp/rfp.tgz -C /tmp/rfp-new
 rm -rf "$APP.old"; [ -d "$APP" ] && mv "$APP" "$APP.old"
 mv /tmp/rfp-new/rfp-manager "$APP"
 (cd "$APP" && npm install --omit=dev --no-audit --no-fund --loglevel=error)
 chown -R root:root "$APP"; chown -R rfp:rfp "$DATA"
+
+# where encoders send SRT / RTMP: at home, this machine's Tailscale name (Cloudflare carries the website only)
+STREAM_HOST="$DOMAIN"
+if [ -n "$HOME_MODE" ]; then
+  TS="$(tailscale status --json 2>/dev/null | jq -r '.Self.DNSName // empty' | sed 's/\.$//' || true)"
+  [ -n "$TS" ] && STREAM_HOST="$TS"
+fi
 
 # the hook secret stays the same across updates
 SECRET=""
@@ -120,7 +174,7 @@ SECRET=""
   [ -n "$ADMIN" ] && echo "ADMIN_URL=https://$ADMIN"
   echo "DATA_DIR=$DATA"
   echo "CONFIG=$DATA/config.json"
-  echo "STREAM_HOST=$DOMAIN"
+  echo "STREAM_HOST=$STREAM_HOST"
   echo "STREAM_API=http://127.0.0.1:9997"
   echo "STREAM_PLAYBACK=http://127.0.0.1:9996"
   echo "STREAM_HOOK_SECRET=$SECRET"
@@ -166,7 +220,7 @@ hlsAddress: 127.0.0.1:8888
 hlsVariant: fmp4
 hlsAlwaysRemux: true
 hlsSegmentCount: 7
-webrtc: true
+webrtc: $([ -n "$HOME_MODE" ] && echo false || echo true)
 webrtcAddress: 127.0.0.1:8889
 webrtcLocalUDPAddress: :8189
 webrtcLocalTCPAddress: :8189
@@ -177,7 +231,7 @@ playback: true
 playbackAddress: 127.0.0.1:9996
 pathDefaults:
   record: true
-  recordPath: /var/lib/mediamtx/recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+  recordPath: $RECDIR/%path/%Y-%m-%d_%H-%M-%S-%f
   recordFormat: fmp4
   recordSegmentDuration: 1h
   recordDeleteAfter: ${KEEP_DAYS}d
@@ -202,10 +256,14 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
+SITE="$HOSTS"
+# at home Cloudflare does https; Caddy answers plain http on 8080 for the tunnel (and the house network)
+[ -n "$HOME_MODE" ] && SITE="http://:8080"
 {
-  if [ -n "$EMAIL" ]; then printf '{\n  email %s\n}\n\n' "$EMAIL"; fi
+  if [ -n "$HOME_MODE" ]; then printf '{\n  servers {\n    trusted_proxies static private_ranges\n  }\n}\n\n'
+  elif [ -n "$EMAIL" ]; then printf '{\n  email %s\n}\n\n' "$EMAIL"; fi
   cat <<EOF
-$HOSTS {
+$SITE {
   handle_path /webrtc/* {
     reverse_proxy 127.0.0.1:8889
   }
@@ -235,6 +293,37 @@ systemctl restart mediamtx
 systemctl reload caddy 2>/dev/null || systemctl restart caddy
 sleep 2
 systemctl is-active --quiet mediamtx || { echo "MediaMTX did not start:"; journalctl -u mediamtx -n 30 --no-pager; exit 1; }
+
+if [ -n "$HOME_MODE" ]; then
+  TUN="not installed yet (run again with --tunnel <token>)"; systemctl is-active --quiet cloudflared 2>/dev/null && TUN="running"
+  TSNOTE=""; [ "$STREAM_HOST" = "$DOMAIN" ] && TSNOTE="Tailscale is not signed in yet: run  sudo tailscale up  and then this command again."
+  cat <<EOF
+
+────────────────────────────────────────────────────────────────
+  RFP Manager is running on this machine (home server).
+
+  Website     https://$DOMAIN${ADMIN:+
+  Studio      https://$ADMIN/app}
+  House network   http://$(hostname -I 2>/dev/null | awk '{print $1}'):8080
+  Cloudflare Tunnel: $TUN
+     Public hostnames (Cloudflare → Zero Trust → Networks → Tunnels → your tunnel):
+       $DOMAIN${ADMIN:+ and $ADMIN}  →  HTTP  localhost:8080
+  Streams in (over Tailscale)
+     RTMP     rtmp://$STREAM_HOST/live
+     SRT      srt://$STREAM_HOST:8890
+     $TSNOTE
+  Viewers watch through Cloudflare (HLS). For big audiences, restream to YouTube / Facebook.
+  Recordings: $RECDIR
+
+  Still to do:
+   · Google sign-in: https://$DOMAIN${ADMIN:+ and https://$ADMIN} must be in the OAuth client's origins.
+   · Production PCs: link them to https://${ADMIN:-$DOMAIN} (Settings → This machine).
+
+  Logs: journalctl -u rfp-manager -f     journalctl -u cloudflared -f
+────────────────────────────────────────────────────────────────
+EOF
+  exit 0
+fi
 
 cat <<EOF
 
