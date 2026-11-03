@@ -200,12 +200,16 @@ EOF
 fi
 
 say "RFP Manager"
-id rfp >/dev/null 2>&1 || useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin rfp
+# the program runs as its own system account "rfp"; if "rfp" is already a person's login (UID 1000 or more),
+# it uses "rfpsvc" instead, so the website never runs with an admin's rights
+SVC=rfp
+if id rfp >/dev/null 2>&1 && [ "$(id -u rfp)" -ge 1000 ]; then SVC=rfpsvc; fi
+id "$SVC" >/dev/null 2>&1 || useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin "$SVC"
 mkdir -p "$DATA" "$ETC" /etc/mediamtx /var/lib/mediamtx "$RECDIR"
-chown -R rfp:rfp /var/lib/mediamtx "$RECDIR"
+chown -R "$SVC:$SVC" /var/lib/mediamtx "$RECDIR"
 if [ -n "$HOME_MODE" ]; then touch "$ETC/home"; else rm -f "$ETC/home"; fi
 if [ -n "$LOCALDB" ]; then touch "$ETC/localdb"; fi
-if [ -n "$NAS" ]; then echo "$NAS" > "$ETC/nas"; usermod -aG nas rfp; fi
+if [ -n "$NAS" ]; then echo "$NAS" > "$ETC/nas"; usermod -aG nas "$SVC"; fi
 if [ "$RECORD" = false ]; then touch "$ETC/no-recordings"; else rm -f "$ETC/no-recordings"; fi
 echo "$RECDIR" > "$ETC/recordings"
 curl -fsSL "$FROM/api/server/bundle.tgz?t=$TOKEN" -o /tmp/rfp.tgz
@@ -213,7 +217,7 @@ rm -rf /tmp/rfp-new && mkdir -p /tmp/rfp-new && tar -xzf /tmp/rfp.tgz -C /tmp/rf
 rm -rf "$APP.old"; [ -d "$APP" ] && mv "$APP" "$APP.old"
 mv /tmp/rfp-new/rfp-manager "$APP"
 (cd "$APP" && npm install --omit=dev --no-audit --no-fund --loglevel=error)
-chown -R root:root "$APP"; chown -R rfp:rfp "$DATA"
+chown -R root:root "$APP"; chown -R "$SVC:$SVC" "$DATA"
 
 # where encoders send SRT / RTMP: at home, this machine's Tailscale name (Cloudflare carries the website only)
 STREAM_HOST="$DOMAIN"
@@ -263,7 +267,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=rfp
+User=$SVC
 EnvironmentFile=$ETC/env
 WorkingDirectory=$APP
 ExecStart=/usr/local/bin/node --disable-warning=ExperimentalWarning server.js
@@ -313,7 +317,7 @@ pathDefaults:
 paths:
   all_others:
 EOF
-chown root:rfp /etc/mediamtx/mediamtx.yml; chmod 640 /etc/mediamtx/mediamtx.yml
+chown "root:$SVC" /etc/mediamtx/mediamtx.yml; chmod 640 /etc/mediamtx/mediamtx.yml
 
 cat > /etc/systemd/system/mediamtx.service <<EOF
 [Unit]
@@ -322,7 +326,7 @@ After=network-online.target rfp-manager.service
 Wants=network-online.target
 
 [Service]
-User=rfp
+User=$SVC
 ExecStart=/usr/local/bin/mediamtx /etc/mediamtx/mediamtx.yml
 Restart=always
 RestartSec=3
