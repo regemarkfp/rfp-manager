@@ -55,6 +55,7 @@ label.f { display: block; } label.f > span, .flabel { display: block; font-size:
 .help { font-size: 12px; color: var(--dim); margin-top: 4px; }
 .form { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px 16px; }
 .form .wide { grid-column: 1 / -1; }
+.form h4.fgroup { margin: 10px 0 -4px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
 .card + .card { margin-top: 16px; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
