@@ -178,7 +178,7 @@ function navFor() {
   if (c.bridge) {
     return [
       ['', [['#/', 'Bridge']]],
-      ['Live', [['#/monitors', 'Monitors'], ['#/templates', 'Templates'], ['#/list/theme', 'Themes'], ['#/adverts', 'Advert playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'], ['#/playlog', 'Play log']]],
+      ['Live', [['#/monitors', 'Monitors'], ['#/templates', 'Templates'], ['#/variables', 'Variables'], ['#/list/theme', 'Themes'], ['#/adverts', 'Advert playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'], ['#/playlog', 'Play log']]],
       ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/bibles', 'Bibles'], ['#/ccli', 'CCLI report']]],
       ['From the website', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions'], ['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], ['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/crewMember', 'Crew'], ['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/images', 'Images']]],
       ['', [['#/settings', 'Settings']]],
@@ -193,7 +193,7 @@ function navFor() {
     ['Advertising', [['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log'], local ? null : ['#/streamads', 'Stream adverts']].filter(Boolean)],
     ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report']].concat(local ? [['#/bibles', 'Bibles']] : [])],
     local ? null : ['Streaming', [['#/list/channel', 'Channels'], App.can('edit') ? ['#/streams', 'Live streams'] : null, App.can('edit') ? ['#/analytics', 'Analytics'] : null, App.can('edit') ? ['#/sales', 'Ticket sales'] : null].filter(Boolean)],
-    ['Live', [App.pcs ? ['#/pcs', 'Production PCs'] : null, pc ? ['#/monitors', 'Monitors'] : null, pc ? ['#/templates', 'Templates'] : null, pc ? ['#/adverts', 'Advert playout'] : null,
+    ['Live', [App.pcs ? ['#/pcs', 'Production PCs'] : null, pc ? ['#/monitors', 'Monitors'] : null, pc ? ['#/templates', 'Templates'] : null, pc ? ['#/variables', 'Variables'] : null, pc ? ['#/adverts', 'Advert playout'] : null,
       ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers']].filter(Boolean)],
     ['', [['#/settings', 'Settings']]],
   ].filter(Boolean);
@@ -361,7 +361,7 @@ function fieldInput(f, value, onChange, ctx = {}) {
       return box;
     }
     case 'ref': {
-      let docs = App.sorted(f.ref);
+      let docs = App.sorted(f.ref).filter((d) => !d.data.archived || d.id === value);   // archived records stay out of the pickers
       if (f.sameSport && ctx.form && ctx.form.sport) { const k = Scoring.keyOf(ctx.form.sport); docs = docs.filter((d) => Scoring.keyOf(d.data.sport) === k || d.id === value); }
       const sel = h('select', { onchange: (e) => {
         if (e.target.value !== '+') return onChange(e.target.value);
@@ -421,8 +421,16 @@ function buildForm(type, initial, { fields, onChange } = {}) {
   const grid = h('div', { class: 'form' });
   const widgets = {};
   const paint = () => {
+    let lastGroup;
+    grid.replaceChildren(...all.flatMap((f) => {
+      const head = f.group && f.group !== lastGroup ? h('h4', { class: 'wide fgroup' }, f.group) : null;
+      lastGroup = f.group;
+      return head ? [head, one(f)] : [one(f)];
+    }));
+  };
+  const one = (f) => {
     const club = type === 'squad' && data.club ? App.get(data.club) : null;
-    grid.replaceChildren(...all.map((f) => {
+    {
       const inherited = f.inherit && club && club[f.inherit] && f.t !== 'image' ? `${club[f.inherit]} (from club)` : '';
       const input = fieldInput(f, data[f.k], (v) => { data[f.k] = v; if (onChange) onChange(f.k, v); if ((f.k === 'club' && type === 'squad') || (f.k === 'sport' && type === 'fixture')) paint(); }, { form: data, placeholder: inherited });
       widgets[f.k] = input;
@@ -432,7 +440,7 @@ function buildForm(type, initial, { fields, onChange } = {}) {
       return f.t === 'list' || f.t === 'multi' || f.t === 'image' || f.t === 'color'
         ? h('div', { class: wide ? 'wide' : '' }, h('div', { class: 'flabel' }, lab.textContent), input, help ? h('div', { class: 'help' }, help) : null)
         : h('label', { class: 'f' + (wide ? ' wide' : '') + (f.t === 'bool' ? ' row' : '') }, lab, input, help ? h('div', { class: 'help' }, help) : null);
-    }));
+    }
   };
   paint();
   return { el: grid, data, widgets, repaint: paint };

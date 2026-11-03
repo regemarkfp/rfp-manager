@@ -96,9 +96,10 @@
       const needle = q.toLowerCase();
       const docs = App.sorted(type).filter((d) => !needle || JSON.stringify(d.data).toLowerCase().includes(needle) || App.title(type, d.id).toLowerCase().includes(needle));
       if (type === 'production') docs.sort((a, b) => String(b.data.date || '').localeCompare(String(a.data.date || '')));
+      docs.sort((a, b) => (a.data.archived ? 1 : 0) - (b.data.archived ? 1 : 0));                     // archived last, greyed out
       body.replaceChildren(docs.length
         ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, cols.map((f) => h('th', { class: f.t === 'money' || f.t === 'number' ? 'r' : '' }, f.t === 'image' ? '' : f.l)))),
-          h('tbody', {}, docs.map((d) => h('tr', { class: 'click', tabindex: '0', onclick: () => { location.hash = `#/edit/${type}/${d.id}`; }, onkeydown: (ev) => { if (ev.key === 'Enter') location.hash = `#/edit/${type}/${d.id}`; } },
+          h('tbody', {}, docs.map((d) => h('tr', { class: 'click', tabindex: '0', style: d.data.archived ? { opacity: '.45' } : {}, onclick: () => { location.hash = `#/edit/${type}/${d.id}`; }, onkeydown: (ev) => { if (ev.key === 'Enter') location.hash = `#/edit/${type}/${d.id}`; } },
             cols.map((f) => h('td', { class: f.t === 'money' || f.t === 'number' ? 'r num' : '' }, cell(type, f, d.data[f.k], d.data))))))))
         : h('div', { class: 'card empty' }, q ? 'Nothing matches that search.' : `No ${e.plural.toLowerCase()} yet.`, ' ', App.canCreate(type) && !q ? h('a', { href: `#/edit/${type}/new` }, 'Add the first one') : null),
       type === 'advert' ? adReport() : null);
