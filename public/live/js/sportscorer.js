@@ -180,8 +180,8 @@
     const common = `<div class="row" style="margin-top:12px"><button class="btn" id="btn-undo">↶ Undo <span class="kbd">Ctrl+Z</span></button>
       <button class="btn" id="btn-note2">+ Note</button><span class="grow"></span>
       ${v.finished ? '<span class="badge live">FINISHED</span>' : '<button class="btn warn" id="btn-end">End match</button>'}</div>`;
-    if (v.kind === 'timed') root.innerHTML = timedHtml(v) + common;
-    else if (v.kind === 'sets') root.innerHTML = setsHtml(v) + common;
+    if (v.kind === 'timed') { root.innerHTML = timedHtml(v); wireTimed(v); return; }
+    if (v.kind === 'sets') root.innerHTML = setsHtml(v) + common;
     else if (v.kind === 'baseball') root.innerHTML = baseballHtml(v) + common;
     else if (v.kind === 'athletics') root.innerHTML = athleticsHtml(v) + common.replace(/<button class="btn warn" id="btn-end">End match<\/button>/, '');
     root.appendChild(h(`<div class="panel" style="margin-top:12px"><h4>Latest</h4><table class="t" id="recent"></table></div>`));
@@ -214,47 +214,155 @@
   }
 
   // ---------------------------------------------------------------- timed sports
-  function clockPanel(v) {
+  // ---------------------------------------------------------------- timed sports: the tap scorer (laid out like LIGR's)
+  // One row per event, the home team on the left and the away team on the right; tap a side to log it for that team.
+  // Above: the match phase button (start / end of each period), the clock, and how many players each side has on.
+  const PHASE_WORDS = { pre: 'NOT STARTED', live: '', break: '', final: 'FULL TIME' };
+  function tapRows(v) {
+    const o = v.options || {}, actions = Sports.actions(v.sport, v.variant, o);
+    const rows = [];
+    actions.filter(a => !a.type).forEach(a => rows.push({ kind: 'score', key: a.key, label: a.label, pts: a.pts, a, big: a.btn === 'big' }));
+    actions.filter(a => a.type === 'miss').forEach(a => rows.push({ kind: 'miss', key: a.key, label: a.label, a }));
+    actions.filter(a => a.type === 'stat' && a.group !== 'stats').forEach(a => rows.push({ kind: 'stat', key: a.key, label: a.label, a }));
+    Sports.cards(v.sport, o).forEach(c => rows.push({ kind: 'card', key: c.key, label: c.label.replace(/\s*\(.*\)/, ''), c }));
+    rows.push({ kind: 'sub', key: 'sub', label: v.sport === 'rugby' ? 'Interchange' : 'Substitution' });
+    if (v.sport === 'basketball') { rows.push({ kind: 'foul', key: 'foul', label: 'Foul' }); rows.push({ kind: 'timeout', key: 'timeout', label: 'Timeout' }); }
+    const soActive = !!Sports.SPORTS[v.sport].shootout && (sm().events || []).some(e => e.type === 'period' && e.to > o.periods);
+    if (soActive || o.kickingComp) { rows.push({ kind: 'so', key: '1', label: 'Shoot-out scored' }); rows.push({ kind: 'so', key: '0', label: 'Shoot-out missed' }); }
+    return rows;
+  }
+  function tapCounts() {
+    const n = {};
+    for (const e of (sm().events || [])) {
+      if (e.void || !e.team) continue;
+      const k = e.type === 'score' || e.type === 'miss' || e.type === 'stat' || e.type === 'card' ? `${e.type === 'card' ? 'card' : e.type}:${e.key}` : e.type === 'shootout' ? `so:${e.scored ? 1 : 0}` : `${e.type}:${e.type}`;
+      n[k + ':' + e.team] = (n[k + ':' + e.team] || 0) + 1;
+    }
+    return n;
+  }
+  const rowKey = r => `${r.kind}:${r.kind === 'sub' ? 'sub' : r.key}`;
+  const asks = (v, r) => {
+    const pe = (v.options && v.options.playerEvents) || 'all';
+    if (pe === 'none' || r.kind === 'timeout' || r.kind === 'sub') return r.kind === 'sub' && pe !== 'none';
+    if (r.kind === 'card' || r.kind === 'foul' || r.kind === 'so') return true;
+    if (r.a && !r.a.player) return false;
+    if (pe === 'scoring') return r.kind === 'score';
+    return r.kind === 'stat' && r.a && r.a.group === 'stats' ? askPlayer : true;
+  };
+  function onFieldNow(v, k) {
+    const gtNow = Sports.gameTime(v, CG.clockMs('game'));
+    const binned = v.sinbins.filter(s => s.team === k && s.untilGt > gtNow).length;
+    const adj = (sm().setup.onFieldAdj && +sm().setup.onFieldAdj[k]) || 0;
+    return Math.max(0, (v.extra.onFieldCount ? v.extra.onFieldCount[k] : 0) - binned + adj);
+  }
+  function phaseButtons(v) {
+    const x = v.extra || {}, ph = x.phase || 'live', o = v.options || {};
+    const evs = sm().events || [], logged = key => evs.some(e => e.type === 'status' && e.key === key);
+    const lastReg = v.timing && (sm().events || []).filter(e => e.type === 'period').reduce((a, e) => Math.max(a, e.to || 0), 1) >= o.periods;
+    if (ph === 'pre') return (logged('entering') ? '' : '<button class="btn" data-ph="entering">Players entering</button>') + (logged('about') ? '' : '<button class="btn" data-ph="about">About to start</button>')
+      + `<button class="btn primary lgph" data-ph="kickoff">START ${esc(x.periodName || '')}</button>`;
+    if (ph === 'live') return `<button class="btn primary lgph" data-ph="periodEnd">END ${esc(x.periodName || '')}</button>`;
+    if (ph === 'break') return lastReg
+      ? `<button class="btn" data-ph="next">${esc(o.overtime === false ? 'Start ' : 'Extra time: start ')}${esc(U.up(x.nextPeriodName || ''))}</button><button class="btn primary lgph" data-ph="final">FULL TIME</button>`
+      : `<button class="btn" data-ph="final" title="The match ends here (abandoned, called off)">End match</button><button class="btn primary lgph" data-ph="next">START ${esc(x.nextPeriodName || '')}</button>`;
+    return '<span class="badge live">FULL TIME</span>';
+  }
+  function timedHtml(v) {
+    const t = v.teams, o = v.options || {}, counts = tapCounts(), x = v.extra || {};
+    const cA = esc(t.A.color1 || '#1f6feb'), cB = esc(t.B.color1 || '#d92d34');
+    const row = r => {
+      const lab = `<span class="lab">${esc(U.up(r.label))}${r.pts ? `<small>+${r.pts}</small>` : ''}</span>`;
+      const n = k => `<span class="n">${counts[rowKey(r) + ':' + k] || 0}</span>`;
+      const dis = x.phase === 'final' ? 'disabled' : '';
+      return `<div class="lgrow${r.big ? ' big' : ''}"><button class="lgs a" ${dis} data-tap="${esc(rowKey(r))}" data-team="A">${lab}${n('A')}</button><span class="lgmid"></span><button class="lgs b" ${dis} data-tap="${esc(rowKey(r))}" data-team="B">${n('B')}${lab}</button></div>`;
+    };
+    const rows = tapRows(v);
+    const statRows = o.coverage === 'minimum' ? [] : Sports.actions(v.sport, v.variant, o).filter(a => a.group === 'stats');
+    const cats = [];
+    statRows.forEach(a => { const c = a.cat || 'Statistics'; if (!cats.includes(c)) cats.push(c); });
+    const shares = o.coverage === 'minimum' ? '' : (v.shareDefs || []).map(d => {
+      const sh = (x.shares || {})[d.key] || { A: 0, B: 0, cur: '', any: false };
+      const b = (k, label) => `<button class="btn sm ${sh.cur === k ? 'on' : ''}" data-share="${d.key}" data-team="${k}">${esc(label)}${k && sh.any ? ` <b>${sh[k]}%</b>` : ''}</button>`;
+      return `<div class="row lgshare"><span class="muted small">${esc(U.up(d.label))}</span>${b('A', t.A.short)}${b('B', t.B.short)}${b('', 'Stopped')}</div>`;
+    }).join('');
+    const field = k => `<div class="lgfield"><button class="btn sm ghost" data-onf="${k}" data-d="-1">−</button><span>${esc(U.up(t[k].short))} · <b data-onfn="${k}">${onFieldNow(v, k)}</b> ON FIELD</span><button class="btn sm ghost" data-onf="${k}" data-d="1">+</button></div>`;
     const shot = v.clock.shot;
-    return `<div class="row" style="justify-content:center;margin-top:12px;gap:14px">
-      <div class="clock" data-sclock="game">--:--</div>
-      <button class="btn go lg" id="ck-toggle">START / STOP <span class="kbd">Space</span></button>
-      <button class="btn sm" data-adj="-60000">−1m</button><button class="btn sm" data-adj="-1000">−1s</button>
-      <button class="btn sm" data-adj="1000">+1s</button><button class="btn sm" data-adj="60000">+1m</button>
-      <button class="btn sm" id="ck-set">Set…</button><button class="btn sm" id="ck-reset" title="Reset to the start of this period">Reset period</button>
-      <span class="grow"></span>
-      <button class="btn primary" id="ck-next">Next period ▸</button>
-    </div>
-    ${shot ? `<div class="row" style="justify-content:center;margin-top:8px;gap:10px"><span class="muted">SHOT CLOCK</span><span class="shotclock" data-sclock="shot">--</span>
-      <button class="btn sm" data-shot="toggle">Start/Stop</button><button class="btn sm" data-shot="full">${shot.limitMs / 1000}</button>${shot.reset2 ? `<button class="btn sm" data-shot="short">${shot.reset2 / 1000}</button>` : ''}</div>` : ''}`;
+    const ask = (o.playerEvents || 'all') === 'all' && statRows.length ? `<label class="chk small"><input type="checkbox" class="stats-ask" ${askPlayer ? 'checked' : ''}> Ask the player for statistics</label>` : '';
+    return `<div class="lg" style="--ca:${cA};--cb:${cB}">
+      <div class="lgbar"><button class="btn sm ghost" data-go="timeline">◷ HISTORY</button><button class="btn sm ghost" id="lg-lineup">☰ LINEUP</button><button class="btn sm ghost" data-go="setup">ⓘ MATCH INFO</button>
+        <span class="grow"></span><button class="btn sm ghost" id="btn-undo" title="Ctrl+Z">↶ UNDO</button><button class="btn sm ghost" id="lg-moment" title="Mark this moment for highlights">⚑ MOMENT</button>${phaseButtons(v)}</div>
+      <div class="lghead"><div class="per">${esc(PHASE_WORDS[x.phase] || v.periodLabel)}</div>
+        <div class="lgsc"><span class="tm">${CG.badge(t.A, 40)}<b>${esc(U.up(t.A.short))}</b></span><span class="num">${esc(v.score.A)}</span><span class="num">${esc(v.score.B)}</span><span class="tm b"><b>${esc(U.up(t.B.short))}</b>${CG.badge(t.B, 40)}</span></div>
+        <div class="lgfields">${field('A')}${field('B')}</div></div>
+      <div class="lgclock"><button class="btn ghost" id="ck-set" title="Set the clock">✎</button><button class="btn ghost" id="ck-toggle" title="Start / stop (Space)">${sm().clocks && sm().clocks.game && sm().clocks.game.running ? '❚❚' : '▶'}</button>
+        <div class="clock" data-sclock="game">--:--</div><button class="btn ghost" data-adj="-1000" title="−1 second">−</button><button class="btn ghost" data-adj="1000" title="+1 second">+</button>
+        ${shot ? `<span class="shotclock" data-sclock="shot">--</span><button class="btn sm" data-shot="toggle">Shot ▶/❚❚</button><button class="btn sm" data-shot="full">${shot.limitMs / 1000}</button>${shot.reset2 ? `<button class="btn sm" data-shot="short">${shot.reset2 / 1000}</button>` : ''}` : ''}</div>
+      <div class="lggrid">${rows.map(row).join('')}</div>
+      ${statRows.length || shares ? `<div class="lgstats"><div class="row" style="margin:6px 4px"><b class="small muted">MATCH STATISTICS</b><span class="grow"></span>${ask}</div>${shares}
+        ${cats.map(c => `<div class="lgcat">${esc(U.up(c))}</div><div class="lggrid">${statRows.filter(a => (a.cat || 'Statistics') === c).map(a => row({ kind: 'stat', key: a.key, label: a.label, a })).join('')}</div>`).join('')}</div>` : ''}
+    </div>`;
   }
 
-  function timedHtml(v) {
-    const actions = Sports.actions(v.sport, v.variant, v.options);
-    const cards = Sports.cards(v.sport);
-    const isBB = v.sport === 'basketball';
-    const soActive = !!Sports.SPORTS[v.sport].shootout && v.timing && (sm().events || []).some(e => e.type === 'period' && e.to > v.options.periods);
-    const col = k => {
-      const t = v.teams[k];
-      const scoreBtns = actions.filter(a => !a.type).map(a => `<button class="btn ${a.btn === 'big' ? 'big primary' : ''}" data-act="${a.key}" data-team="${k}">${esc(a.label)}${a.pts ? ` <span class="muted">+${a.pts}</span>` : ''}</button>`).join('');
-      const otherBtns = actions.filter(a => a.type && a.group !== 'stats').map(a => `<button class="btn sm" data-act="${a.key}" data-kind="${a.type}" data-team="${k}">${esc(a.label)}</button>`).join('');
-      const cardBtns = cards.map(c => `<button class="btn sm" data-card="${c.key}" data-team="${k}" style="border-color:${c.color || { yellow: '#f4c20d', red: '#e5484d', green: '#2ea043' }[c.key] || ''}">${esc(c.label)}</button>`).join('');
-      const extra = (isBB ? `<button class="btn sm" data-foul="${k}">Foul</button><button class="btn sm" data-to="${k}">Timeout</button>` : '')
-        + `<button class="btn sm" data-sub="${k}">Substitution</button><button class="btn sm" data-adjs="${k}" data-d="1">+1 fix</button><button class="btn sm" data-adjs="${k}" data-d="-1">−1 fix</button>`
-        + (soActive ? `<button class="btn sm go" data-so="${k}" data-s="1">SO goal</button><button class="btn sm" data-so="${k}" data-s="0">SO miss</button>` : '');
-      const inf = [];
-      if (isBB) inf.push(`TEAM FOULS ${v.extra.teamFouls[k]}`, `TIMEOUTS ${v.extra.timeouts[k]}`, v.extra.bonus && v.extra.bonus[k] ? 'IN BONUS' : '');
-      if (v.extra.centrePass === k) inf.push('CENTRE PASS');
-      const gtNow = Sports.gameTime(v, CG.clockMs('game'));
-      v.sinbins.forEach(s => { if (s.team === k && s.untilGt > gtNow) inf.push(`${s.card.toUpperCase()}: ${s.number ? '#' + s.number + ' ' : ''}${s.name}`); });
-      return `<div class="panel teamcol"><h4>${CG.badge(t, 22)}<span class="sw" style="background:${esc(t.color1)}"></span> ${esc(U.up(t.name))}<span class="sp"></span><span class="small">${esc(inf.filter(Boolean).join(' · '))}</span></h4>
-        <div class="actgrid">${scoreBtns}</div><div class="row" style="margin-top:8px">${otherBtns}</div>
-        <div class="row" style="margin-top:8px">${cardBtns}${extra}</div></div>`;
+  // the player picker: on the field first, then the bench
+  function squadOf(v, team) {
+    const all = (v ? v.players : []).filter(p => p.team === team);
+    const on = new Set((v.extra && v.extra.onField && v.extra.onField[team]) || []);
+    const marked = (sm().setup.teams[team].players || []).some(p => p.lineup);
+    const lu = id => ((sm().setup.teams[team].players || []).find(p => p.id === id) || {}).lineup || '';
+    const field = marked ? all.filter(p => on.has(p.id)) : all, bench = marked ? all.filter(p => !on.has(p.id) && lu(p.id) !== 'out') : [];
+    const byNo = (a, b) => (parseInt(a.number, 10) || 999) - (parseInt(b.number, 10) || 999);
+    return { field: field.sort(byNo), bench: bench.sort(byNo) };
+  }
+  function pickFrom(team, title, which, allowNone) {
+    return new Promise(resolve => {
+      const v = view(), sq = squadOf(v, team);
+      const btns = list => list.map(p => `<button class="btn" data-id="${esc(p.id)}"><b>${esc(p.number)}</b>${esc(p.tvName)}<small>${esc(p.position || '')}</small></button>`).join('');
+      const parts = which === 'bench' ? [['BENCH', sq.bench], ['ON THE FIELD', sq.field]] : [['ON THE FIELD', sq.field], ['BENCH', sq.bench]];
+      const body = parts.filter(([, l]) => l.length).map(([h2, l]) => `<div class="lgcat">${h2}</div><div class="pgrid">${btns(l)}</div>`).join('') || '<p class="muted">No players in this squad. Add them in RFP Manager (Assets → Teams) or on the Setup tab.</p>';
+      const back = h(`<div class="modal-back"><div class="modal" style="width:min(760px,96vw)"><h3>${esc(title)}</h3>${body}
+        <div class="modal-actions">${allowNone !== false ? '<button class="btn" data-id="">Team only</button>' : ''}<button class="btn ghost" data-cancel>Cancel</button></div></div></div>`);
+      const done = x => { back.remove(); document.removeEventListener('keydown', key, true); resolve(x); };
+      const key = e => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } };
+      document.addEventListener('keydown', key, true);
+      back.addEventListener('click', e => { const b = e.target.closest('[data-id]'); if (b) done(b.dataset.id); else if (e.target.closest('[data-cancel]') || e.target === back) done(null); });
+      document.body.appendChild(back);
+    });
+  }
+
+  // the line-up for this match: who starts and who is on the bench, with their numbers and positions
+  function lineupEditor() {
+    const v = view(); if (!v) return;
+    const setup = U.clone(sm().setup);
+    let k = 'A';
+    const size = (v.extra && v.extra.lineupSize) || 0, bench = +((v.options || {}).benchSize || 0);
+    const back = h(`<div class="modal-back"><div class="modal" style="width:min(820px,96vw)"><h3>Line-up</h3><div class="tabs lgtabs"></div><div class="lu"></div>
+      <div class="modal-actions"><button class="btn ghost" data-cancel>Cancel</button><button class="btn primary" data-save>Save line-up</button></div></div></div>`);
+    const paint = () => {
+      const ps = setup.teams[k].players || [];
+      if (!ps.some(p => p.lineup)) ps.forEach((p, i) => { p.lineup = !size || i < size ? 'start' : 'bench'; });
+      const n = w => ps.filter(p => p.lineup === w).length;
+      back.querySelector('.lgtabs').innerHTML = ['A', 'B'].map(t => `<button class="tab ${t === k ? 'active' : ''}" data-t="${t}">${esc(U.up(setup.teams[t].name))} (${(setup.teams[t].players || []).filter(p => p.lineup === 'start').length})</button>`).join('');
+      back.querySelector('.lu').innerHTML = `<p class="small muted">Starting ${n('start')}${size ? ' / ' + size : ''} · Bench ${n('bench')}${bench ? ' / ' + bench : ''}${size && n('start') !== size ? ' <b style="color:var(--amber)">· not ' + size + ' starters</b>' : ''}</p>
+        <table class="t"><tr><th>No.</th><th>Player</th><th>Position</th><th class="n">Starting</th><th class="n">Bench</th><th class="n">Not playing</th></tr>
+        ${ps.map((p, i) => `<tr><td><input data-i="${i}" data-f="number" value="${esc(p.number || '')}" style="width:56px"></td><td>${esc(p.tvName || p.name)}</td><td><input data-i="${i}" data-f="position" value="${esc(p.position || '')}" style="width:140px"></td>
+          ${['start', 'bench', 'out'].map(w => `<td class="n"><input type="radio" name="lu${i}" data-i="${i}" data-lu="${w}" ${p.lineup === w ? 'checked' : ''}></td>`).join('')}</tr>`).join('') || '<tr><td colspan="6" class="muted">No players in this squad.</td></tr>'}</table>`;
     };
-    const hasStats = actions.some(a => a.group === 'stats') || (v.shareDefs || []).length;
-    return header(v, clockPanel(v)) + `<div class="grid cols-2" style="margin-top:12px">${col('A')}${col('B')}</div>`
-      + (hasStats ? `<div class="panel" style="margin-top:12px"><h4>Match statistics <span class="sp"></span><button class="btn sm" id="stats-toggle">${statsOpen ? 'Hide' : 'Show'}</button></h4>
-        ${statsOpen ? statsEntryHtml(v, false) : '<div class="muted small">Tackles, turnovers, set pieces, possession and the rest. Open this panel to record them here, or use the Stats entry tab on a second screen.</div>'}</div>` : '');
+    back.addEventListener('click', e => {
+      const tb = e.target.closest('[data-t]'); if (tb) { k = tb.dataset.t; paint(); return; }
+      if (e.target.closest('[data-cancel]') || e.target === back) { back.remove(); return; }
+      if (e.target.closest('[data-save]')) {
+        back.remove();
+        commit((su) => { ['A', 'B'].forEach(t => { su.teams[t].players = setup.teams[t].players; }); su.lineupSet = true; }).then(r => { if (r) CG.toast('Line-up saved', 'ok'); });
+      }
+    });
+    back.addEventListener('change', e => {
+      const i = e.target.dataset.i; if (i === undefined) return;
+      const p = setup.teams[k].players[+i];
+      if (e.target.dataset.lu) p.lineup = e.target.dataset.lu; else p[e.target.dataset.f] = e.target.value;
+      if (e.target.dataset.lu) paint();
+    });
+    paint();
+    document.body.appendChild(back);
   }
 
   // ---------------------------------------------------------------- detailed statistics (same buttons on the scorer panel and the Stats entry tab)
@@ -298,61 +406,70 @@
   }
 
   function wireTimed(v) {
-    const actions = Sports.actions(v.sport, v.variant, v.options);
-    const tg = $('#stats-toggle'); if (tg) tg.onclick = () => { statsOpen = !statsOpen; CG.store.set('sportStatsOpen', statsOpen ? '1' : ''); render(); };
-    if (statsOpen) wireStatsEntry(v, $('#score-root'));
+    const root = $('#score-root'), o = v.options || {};
+    const rows = tapRows(v), statActs = Sports.actions(v.sport, v.variant, o).filter(a => a.group === 'stats');
+    const ask = $('.stats-ask', root); if (ask) ask.onchange = () => { askPlayer = ask.checked; CG.store.set('sportStatsAsk', askPlayer ? '1' : '0'); };
+    $$('[data-go]', root).forEach(b => b.onclick = () => { page = b.dataset.go; CG.store.set('sportPage', page); render(); });
+    $('#lg-lineup').onclick = lineupEditor;
+    $('#btn-undo').onclick = () => CG.send('sport', 'undo', {}).then(() => CG.toast('Undone', 'ok')).catch(e => CG.toast(e.message, 'err'));
+    $('#lg-moment').onclick = () => addEvent({ type: 'moment', moment: true }).then(r => { if (r) CG.toast('Moment marked', 'ok'); });
+    // match phase
+    $$('[data-ph]', root).forEach(b => b.onclick = async () => {
+      const ph = b.dataset.ph;
+      if (ph === 'entering' || ph === 'about') return addEvent({ type: 'status', key: ph });
+      if (ph === 'kickoff') { const r = await addEvent({ type: 'status', key: 'kickoff' }); if (r) clock('start'); return; }
+      if (ph === 'periodEnd') { clock('stop'); return addEvent({ type: 'status', key: 'periodEnd' }); }
+      if (ph === 'final') { clock('stop'); return addEvent({ type: 'end' }); }
+      if (ph === 'next') {
+        const to = (sm().events || []).filter(e => e.type === 'period').reduce((a, e) => Math.max(a, e.to || 0), 1) + 1;
+        const id1 = U.id(), id2 = U.id();
+        const nv = await commit((setup, events) => { events.push({ id: id1, t: Date.now(), type: 'period', to }); events.push({ id: id2, t: Date.now(), type: 'status', key: 'kickoff' }); });
+        if (nv) { resetClockFor(nv, 'game'); if (nv.clock.shot) resetClockFor(nv, 'shot'); setTimeout(() => clock('start'), 150); }
+      }
+    });
+    // clock
     $('#ck-toggle').onclick = () => clock('toggle');
-    $$('[data-adj]').forEach(b => b.onclick = () => clock('adjust', { delta: +b.dataset.adj }));
+    $$('[data-adj]', root).forEach(b => b.onclick = () => clock('adjust', { delta: +b.dataset.adj }));
     $('#ck-set').onclick = async () => {
-      const r = await CG.modal('Set clock', `<label class="f"><span>Clock value (mm:ss)</span><input type="text" name="v" value="${CG.fmtClock(CG.clockMs('game'))}" autofocus></label>`);
-      const ms = r && parseClock(r.v);
-      if (ms != null) clock('set', { ms });
-    };
-    $('#ck-reset').onclick = () => resetClockFor(v, 'game');
-    $('#ck-next').onclick = async () => {
-      const next = v.timing.period + (v.periodLabel === 'FULL TIME' ? 0 : 1);
-      const periods = v.options.periods;
-      const label = next <= periods ? `period ${next}` : 'extra time / overtime';
-      const r = await CG.modal('Next period', `<p>Stop the clock and start <b>${esc(label)}</b>?</p>`, { ok: 'Start next period' });
+      const r = await CG.modal('Set the clock', `<label class="f"><span>Clock (mm:ss)</span><input type="text" name="v" value="${CG.fmtClock(CG.clockMs('game'))}" autofocus></label>`,
+        { extraButtons: '<button type="button" class="btn" data-value="reset">Back to the start of this period</button>' });
       if (!r) return;
-      clock('stop');
-      const nv = await addEvent({ type: 'period', to: (sm().events || []).filter(e => e.type === 'period').reduce((a, e) => Math.max(a, e.to || 0), 1) + 1 });
-      if (nv) { resetClockFor(nv, 'game'); if (nv.clock.shot) resetClockFor(nv, 'shot'); }
+      if (r.__button === 'reset') return resetClockFor(v, 'game');
+      const ms = parseClock(r.v); if (ms != null) clock('set', { ms });
     };
-    $$('[data-shot]').forEach(b => b.onclick = () => {
+    $$('[data-shot]', root).forEach(b => b.onclick = () => {
       const s = v.clock.shot;
       if (b.dataset.shot === 'toggle') CG.send('sport', 'clock', { name: 'shot', action: 'toggle' }).catch(() => { });
       else CG.send('sport', 'clock', { name: 'shot', action: 'reset', dir: -1, limitMs: s.limitMs, startMs: b.dataset.shot === 'full' ? s.limitMs : s.reset2, stopAtLimit: true }).then(() => {
         if (sm().clocks.game && sm().clocks.game.running) CG.send('sport', 'clock', { name: 'shot', action: 'start' });
       }).catch(() => { });
     });
-    $$('[data-act]').forEach(b => b.onclick = async () => {
-      const a = actions.find(x => x.key === b.dataset.act), team = b.dataset.team;
+    // players on the field: a correction on top of line-up, subs, sin bins and red cards
+    $$('[data-onf]', root).forEach(b => b.onclick = () => commit(su => { su.onFieldAdj = su.onFieldAdj || {}; su.onFieldAdj[b.dataset.onf] = (+su.onFieldAdj[b.dataset.onf] || 0) + +b.dataset.d; }));
+    $$('[data-share]', root).forEach(b => b.onclick = () => addEvent({ type: 'share', key: b.dataset.share, team: b.dataset.team }));
+    // the rows
+    $$('[data-tap]', root).forEach(b => b.onclick = async () => {
+      const team = b.dataset.team, [kind, key] = b.dataset.tap.split(':');
+      const r = rows.find(x => rowKey(x) === b.dataset.tap) || (kind === 'stat' && { kind, key, label: (statActs.find(a => a.key === key) || {}).label || key, a: statActs.find(a => a.key === key) });
+      if (!r) return;
+      const tname = v.teams[team].name;
+      if (kind === 'sub') {
+        if (!asks(v, r)) return addEvent({ type: 'sub', team });
+        const off = await pickFrom(team, `${r.label} – ${tname}: player OFF`, 'field'); if (off === null) return;
+        const on = await pickFrom(team, `${r.label} – ${tname}: player ON`, 'bench'); if (on === null) return;
+        return addEvent({ type: 'sub', team, on, off });
+      }
+      if (kind === 'timeout') { addEvent({ type: 'timeout', team }); return clock('stop'); }
       let player = '';
-      if (a.player) { player = await pickPlayer(team, `${a.label} – ${v.teams[team].name}`); if (player === null) return; }
-      addEvent({ type: a.type || 'score', key: a.key, team, player });
+      if (asks(v, r)) { player = await pickFrom(team, `${r.label} – ${tname}`, 'field'); if (player === null) return; }
+      if (kind === 'so') return addEvent({ type: 'shootout', team, scored: key === '1', player });
+      if (kind === 'card') return addEvent({ type: 'card', key, team, player });
+      if (kind === 'foul') return addEvent({ type: 'foul', team, player });
+      addEvent({ type: r.a && r.a.type ? r.a.type : 'score', key, team, player });
     });
-    $$('[data-card]').forEach(b => b.onclick = async () => {
-      const team = b.dataset.team, c = Sports.cards(v.sport).find(x => x.key === b.dataset.card);
-      const player = await pickPlayer(team, `${c.label} – ${v.teams[team].name}`); if (player === null) return;
-      addEvent({ type: 'card', key: c.key, team, player });
-    });
-    $$('[data-foul]').forEach(b => b.onclick = async () => {
-      const team = b.dataset.foul, player = await pickPlayer(team, `Foul – ${v.teams[team].name}`); if (player === null) return;
-      addEvent({ type: 'foul', team, player });
-    });
-    $$('[data-to]').forEach(b => b.onclick = () => { addEvent({ type: 'timeout', team: b.dataset.to }); clock('stop'); });
-    $$('[data-sub]').forEach(b => b.onclick = async () => {
-      const team = b.dataset.sub;
-      const on = await pickPlayer(team, `Player ON – ${v.teams[team].name}`, { allowNone: false }); if (!on) return;
-      const off = await pickPlayer(team, `Player OFF – ${v.teams[team].name}`); if (off === null) return;
-      addEvent({ type: 'sub', team, on, off });
-    });
-    $$('[data-adjs]').forEach(b => b.onclick = () => addEvent({ type: 'adjust', team: b.dataset.adjs, delta: +b.dataset.d }));
-    $$('[data-so]').forEach(b => b.onclick = async () => {
-      const team = b.dataset.so, player = await pickPlayer(team, 'Shoot-out taker'); if (player === null) return;
-      addEvent({ type: 'shootout', team, scored: b.dataset.s === '1', player });
-    });
+    // the on-field count follows the sin-bin timers
+    clearInterval(wireTimed.t);
+    wireTimed.t = setInterval(() => { const vv = view(); if (!vv || vv.kind !== 'timed') return; ['A', 'B'].forEach(k => { const el = document.querySelector(`[data-onfn="${k}"]`); if (el) el.textContent = onFieldNow(vv, k); }); const tg = $('#ck-toggle'); if (tg) tg.textContent = sm().clocks.game && sm().clocks.game.running ? '❚❚' : '▶'; }, 1000);
   }
 
   // ---------------------------------------------------------------- sets sports
@@ -937,21 +1054,52 @@
   }
 
   // ---------------------------------------------------------------- TIMELINE / STATS
+  // black or white text, whichever reads on the team colour
+  const ink = c => { const m = /^#?([0-9a-f]{6})$/i.exec(String(c || '')); if (!m) return '#fff'; const n = parseInt(m[1], 16), l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; return l > 0.6 ? '#111' : '#fff'; };
   function renderTimeline(v) {
     const evs = (sm() && sm().events) || [];
     const byId = {};
     if (v) v.timeline.forEach(e => { byId[e.id] = e; });
+    const timed = v && v.kind === 'timed';
+    $('#tl').className = 't hist';
     $('#tl').innerHTML = `<tr><th>#</th><th>Time</th><th>Team</th><th>Event</th><th></th></tr>` + evs.slice().reverse().map((e, i) => {
       const t = byId[e.id];
-      const desc = t ? t.text : [e.type, e.key || e.how || e.kind || '', e.value || ''].filter(Boolean).join(' ').toUpperCase();
+      const desc = e.type === 'moment' ? 'MOMENT' : t ? t.text : [e.type, e.key || e.how || e.kind || '', e.value || ''].filter(Boolean).join(' ').toUpperCase();
       const team = e.team && v ? v.teams[e.team] : null;
-      return `<tr><td class="muted">${evs.length - i}</td><td class="mono">${esc(e.ct || (t && t.ct) || '')}</td><td>${team ? `<span class="badge" style="background:${esc(team.color1)}">${esc(team.short)}</span>` : ''}</td><td>${esc(desc)}</td>
-        <td class="n"><button class="btn sm ghost" data-del="${esc(e.id)}">✕</button></td></tr>`;
+      const when = (e.type === 'status' || e.type === 'moment') && e.t ? new Date(e.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : e.ct || (t && t.ct) || '';
+      const editable = timed && ['score', 'miss', 'stat', 'card', 'foul', 'sub', 'shootout'].includes(e.type);
+      return `<tr><td class="muted">${evs.length - i}</td><td class="mono">${esc(when)}</td><td>${team ? `<span class="badge" style="background:${esc(team.color1)};color:${ink(team.color1)}">${esc(team.short)}</span>` : ''}</td><td>${esc(desc)}</td>
+        <td class="n" style="white-space:nowrap"><button class="btn sm ghost tag ${e.moment ? 'on' : ''}" data-tag="${esc(e.id)}" title="Mark as a moment for highlights">⚑</button>${editable ? `<button class="btn sm ghost" data-edit="${esc(e.id)}" title="Change the team, player or time">✎</button>` : ''}<button class="btn sm ghost" data-del="${esc(e.id)}" title="Delete">✕</button></td></tr>`;
     }).join('');
     $$('[data-del]', $('#tl')).forEach(b => b.onclick = async () => {
       const ok = await CG.modal('Delete event', '<p>Delete this event? Everything after it is recalculated.</p>', { ok: 'Delete', danger: true });
       if (ok) removeEvent(b.dataset.del);
     });
+    $$('[data-tag]', $('#tl')).forEach(b => b.onclick = () => commit((setup, events) => { const e = events.find(x => x.id === b.dataset.tag); if (!e) return false; e.moment = !e.moment; }));
+    $$('[data-edit]', $('#tl')).forEach(b => b.onclick = () => editEvent(b.dataset.edit));
+    const add = $('#btn-addev'); if (add) { add.hidden = !timed; add.onclick = () => editEvent(''); }
+  }
+  // Add an event afterwards, or change the team / player / time of one already logged.
+  async function editEvent(id) {
+    const v = view(); if (!v || v.kind !== 'timed') return;
+    const cur = id ? (sm().events || []).find(e => e.id === id) : null;
+    const rows = tapRows(v).concat(Sports.actions(v.sport, v.variant, v.options).filter(a => a.group === 'stats').map(a => ({ kind: 'stat', key: a.key, label: a.label, a })));
+    const curKey = cur ? (cur.type === 'card' ? 'card:' + cur.key : cur.type === 'shootout' ? 'so:' + (cur.scored ? 1 : 0) : cur.type === 'sub' ? 'sub:sub' : cur.type === 'foul' ? 'foul:foul' : cur.type + ':' + cur.key) : '';
+    const players = k => v.players.filter(p => p.team === k);
+    const popts = sel => ['A', 'B'].map(k => `<optgroup label="${esc(v.teams[k].name)}">${players(k).map(p => `<option value="${esc(p.id)}" ${sel === p.id ? 'selected' : ''}>${esc(p.number)} ${esc(p.tvName)}</option>`).join('')}</optgroup>`).join('');
+    const r = await CG.modal(id ? 'Change event' : 'Add event', `
+      <label class="f"><span>Event</span><select name="what">${rows.map(x => `<option value="${esc(rowKey(x))}" ${rowKey(x) === curKey ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select></label>
+      <label class="f"><span>Team</span><select name="team"><option value="A" ${cur && cur.team === 'B' ? '' : 'selected'}>${esc(v.teams.A.name)}</option><option value="B" ${cur && cur.team === 'B' ? 'selected' : ''}>${esc(v.teams.B.name)}</option></select></label>
+      <label class="f"><span>${cur && cur.type === 'sub' ? 'Player ON' : 'Player'}</span><select name="player"><option value="">– team only –</option>${popts(cur ? (cur.type === 'sub' ? cur.on : cur.player) : '')}</select></label>
+      ${cur && cur.type === 'sub' ? `<label class="f"><span>Player OFF</span><select name="off"><option value="">–</option>${popts(cur.off)}</select></label>` : ''}
+      <label class="f"><span>Time</span><input name="ct" value="${esc(cur ? cur.ct || '' : stamp().ct || '')}" placeholder="23'"></label>`, { ok: id ? 'Save' : 'Add' });
+    if (!r) return;
+    const [kind, key] = r.what.split(':'), row = rows.find(x => rowKey(x) === r.what);
+    const ev = kind === 'card' ? { type: 'card', key } : kind === 'so' ? { type: 'shootout', scored: key === '1' } : kind === 'sub' ? { type: 'sub', on: r.player, off: r.off || '' }
+      : kind === 'foul' || kind === 'timeout' ? { type: kind } : { type: row && row.a && row.a.type ? row.a.type : 'score', key };
+    Object.assign(ev, { team: r.team, ct: r.ct || '' }, ev.type === 'sub' ? {} : { player: r.player || '' });
+    if (id) commit((setup, events) => { const i = events.findIndex(e => e.id === id); if (i < 0) return false; const keep = { id, t: events[i].t, gt: events[i].gt, period: events[i].period, moment: events[i].moment }; events[i] = Object.assign(keep, ev); });
+    else addEvent(Object.assign(ev, { ct: r.ct || stamp().ct || '' }));
   }
   $('#btn-note').onclick = () => { if (view()) addNote(); };
 
