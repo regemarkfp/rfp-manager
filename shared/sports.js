@@ -42,6 +42,12 @@
     }
     return null;
   }
+  // Who starts: players marked lineup 'start'. Squads without line-up marks: known = false (count from the line-up size).
+  function lineupOf(setup, k) {
+    const ps = (setup.teams && setup.teams[k] && setup.teams[k].players) || [];
+    const marked = ps.some(p => p.lineup);
+    return { known: marked, ids: (marked ? ps.filter(p => p.lineup === 'start') : []).map(p => p.id) };
+  }
   const pname = p => (p ? (p.tvName || U.up(p.name)) : '');
   const pnum = p => (p && p.number !== undefined && p.number !== '' ? '#' + p.number + ' ' : '');
 
@@ -74,7 +80,7 @@
         o, setup, period: 1, finished: false,
         score: { A: 0, B: 0 }, periodScore: [{ A: 0, B: 0 }],
         stats: { A: {}, B: {} }, pstats: {}, timeline: [], sinbins: [], reds: [], last: null,
-        shares: {}, lastGt: 0,
+        shares: {}, lastGt: 0, phase: 'pre', onField: { A: lineupOf(setup, 'A'), B: lineupOf(setup, 'B') }, gone: { A: 0, B: 0 },
         fouls: { A: [0], B: [0] }, timeouts: { A: 0, B: 0 }, shootout: { A: [], B: [] }, goalsInPeriod: [0],
       };
     };
@@ -90,6 +96,11 @@
 
     def.apply = (st, ev) => {
       const o = st.o, t = ev.team, p = findPlayer(st.setup, ev.player);
+      // match phase: pre (not started) → live → break (between periods) → live … → final. Matches scored before the
+      // status events existed go live with their first event.
+      if (ev.type === 'status') return applyStatus(st, ev);
+      if (ev.type === 'end') st.phase = 'final';
+      else if (st.phase === 'pre' || ev.type === 'period') st.phase = 'live';
       if (ev.gt != null && ev.gt > st.lastGt) st.lastGt = ev.gt;
       const ps = st.periodScore[st.period - 1] || (st.periodScore[st.period - 1] = { A: 0, B: 0 });
       const stamp = { id: ev.id, period: st.period, ct: ev.ct || '', gt: ev.gt, team: t, player: ev.player || '' };
@@ -126,7 +137,7 @@
           inc(st.stats[t], c.key + '_cards');
           if (p) inc(pst(st, p.id), c.key + '_cards');
           const mins = ev.minutes != null ? +ev.minutes : c.min;
-          if (c.permanent) st.reds.push({ team: t, player: ev.player || '', name: pname(p), number: p ? p.number : '', card: c.key });
+          if (c.permanent) { st.reds.push({ team: t, player: ev.player || '', name: pname(p), number: p ? p.number : '', card: c.key }); leave(st, t, ev.player); }
           else if (mins > 0 && ev.gt != null) st.sinbins.push({ team: t, player: ev.player || '', name: pname(p), number: p ? p.number : '', card: c.key, untilGt: ev.gt + mins * 60000 });
           const text = `${U.up(c.label)}${who}`;
           st.timeline.push(Object.assign(stamp, { kind: 'card', text, icon: c.key, key: c.key }));
@@ -154,6 +165,7 @@
         }
         case 'sub': {
           const on = findPlayer(st.setup, ev.on), off = findPlayer(st.setup, ev.off);
+          if (t === 'A' || t === 'B') { if (ev.off) st.onField[t].ids = st.onField[t].ids.filter(x => x !== ev.off); if (ev.on && !st.onField[t].ids.includes(ev.on)) st.onField[t].ids.push(ev.on); }
           const text = `ON ${pnum(on)}${pname(on)}${off ? ` · OFF ${pnum(off)}${pname(off)}` : ''}`;
           st.timeline.push(Object.assign(stamp, { kind: 'sub', text, icon: 'sub', on: ev.on || '', off: ev.off || '' }));
           st.last = { type: 'sub', team: t, player: ev.on || '', off: ev.off || '', text, onName: pname(on), offName: pname(off), onNumber: on ? on.number : '', offNumber: off ? off.number : '', wipe: '' };
@@ -201,11 +213,33 @@
       }
     };
 
+    function leave(st, t, id) {
+      if (t !== 'A' && t !== 'B') return;
+      const n = st.onField[t].ids.length;
+      if (id) st.onField[t].ids = st.onField[t].ids.filter(x => x !== id);
+      if (!st.onField[t].known || n === st.onField[t].ids.length) st.gone[t]++;
+    }
+    const STATUS_TEXT = { entering: () => 'PLAYERS ENTERING', about: () => 'ABOUT TO START', kickoff: (n) => `${n} STARTED`, periodEnd: (n) => `${n} FINISHED` };
+    function applyStatus(st, ev) {
+      const f = STATUS_TEXT[ev.key]; if (!f) return;
+      if (ev.key === 'kickoff') { st.phase = 'live'; st.finished = false; }
+      else if (ev.key === 'periodEnd') st.phase = 'break';
+      st.timeline.push({ id: ev.id, period: st.period, ct: ev.ct || '', gt: ev.gt, team: '', player: '', kind: 'status', key: ev.key, text: f(def.periodName(st.period, st.o)), icon: 'period' });
+    }
+
     def.view = (st, setup) => {
       const v = baseView(def, setup), o = st.o;
       v.score = { A: String(st.score.A), B: String(st.score.B) };
       v.periodLabel = st.finished ? 'FULL TIME' : def.periodName(st.period, o);
+      if (!st.finished && st.phase === 'break') v.periodLabel = o.periods === 2 && st.period === 1 ? 'HALF TIME' : 'END OF ' + def.periodName(st.period, o);
       v.finished = st.finished;
+      const size = o.lineupSize || (def.lineupSize ? def.lineupSize(o) : 0);
+      v.extra.phase = st.finished ? 'final' : st.phase;
+      v.extra.periodName = def.periodName(st.period, o);
+      v.extra.nextPeriodName = def.periodName(st.period + 1, o);
+      v.extra.lineupSize = size;
+      v.extra.onField = { A: st.onField.A.ids.slice(), B: st.onField.B.ids.slice() };
+      v.extra.onFieldCount = { A: (st.onField.A.known ? st.onField.A.ids.length : size) - (st.onField.A.known ? 0 : st.gone.A), B: (st.onField.B.known ? st.onField.B.ids.length : size) - (st.onField.B.known ? 0 : st.gone.B) };
       v.winner = st.finished ? (st.score.A > st.score.B ? 'A' : st.score.B > st.score.A ? 'B' : null) : null;
       const so = st.shootout.A.length + st.shootout.B.length > 0;
       if (so && st.score.A === st.score.B) {
@@ -313,7 +347,7 @@
     league: { try: 4, conv: 2, pen: 2, drop: 1, ptry: 6 },
   };
   register(timedSport({
-    id: 'rugby', name: 'Rugby',
+    id: 'rugby', name: 'Rugby', lineupSize: o => (o.points === 'sevens' ? 7 : o.points === 'league' ? 13 : 15),
     defaultVariant: 'union',
     variants: {
       union: { label: 'Rugby union – World Rugby (2 × 40)', options: { periods: 2, periodMin: 40, otMin: 10, points: 'union', sinbinMin: 10 } },
@@ -325,7 +359,7 @@
     },
     options: { clockDir: 'up', continuous: true },
     actions: o => {
-      const P = RUGBY_POINTS[o.points] || RUGBY_POINTS.union;
+      const P = Object.assign({}, RUGBY_POINTS[o.points] || RUGBY_POINTS.union, o.dropPts > 0 ? { drop: +o.dropPts } : {});
       return [
         { key: 'try', label: 'Try', pts: P.try, player: true, wipe: 'TRY', btn: 'big' },
         { key: 'conv', label: 'Conversion', pts: P.conv, player: true, attempt: 'conv_att' },
@@ -398,7 +432,7 @@
 
   // ----------------------------------------------------------------- hockey (field)
   register(timedSport({
-    id: 'hockey', name: 'Hockey (field)',
+    id: 'hockey', name: 'Hockey (field)', lineupSize: () => 11,
     defaultVariant: 'quarters',
     variants: {
       quarters: { label: '4 × 15 min', options: { periods: 4, periodMin: 15 } },
@@ -455,7 +489,7 @@
 
   // ----------------------------------------------------------------- football (IFAB Laws of the Game)
   register(timedSport({
-    id: 'football', name: 'Football',
+    id: 'football', name: 'Football', lineupSize: () => 11,
     defaultVariant: 'standard',
     variants: {
       standard: { label: 'IFAB (2 × 45, extra time 2 × 15)', options: { periods: 2, periodMin: 45, otMin: 15 } },
@@ -514,7 +548,7 @@
 
   // ----------------------------------------------------------------- netball
   register(timedSport({
-    id: 'netball', name: 'Netball',
+    id: 'netball', name: 'Netball', lineupSize: () => 7,
     defaultVariant: 'standard',
     variants: {
       standard: { label: 'Standard (4 × 15)', options: { periods: 4, periodMin: 15, superShot: false } },
@@ -574,7 +608,7 @@
 
   // ----------------------------------------------------------------- basketball
   register(timedSport({
-    id: 'basketball', name: 'Basketball',
+    id: 'basketball', name: 'Basketball', lineupSize: o => (o.threeByThree ? 3 : 5),
     defaultVariant: 'fiba',
     variants: {
       fiba: { label: 'FIBA (4 × 10)', options: { periods: 4, periodMin: 10, otMin: 5, foulOut: 5, bonusAt: 5, shotClock: 24, shotReset2: 14 } },
@@ -1197,35 +1231,91 @@
     },
     eventView(st, e) {
       const kind = e.kind || 'track';
-      const rows = (e.entries || []).map(en => {
+      const vertical = kind === 'field' && (!!e.vertical || /high jump|pole vault/i.test(e.discipline || e.name || ''));
+      const rounds = Math.max(1, Math.min(12, Number(e.rounds) || 6));
+      const STATUS = /^(DNS|DNF|DQ|NM|NH|RET|R)$/i;
+      const order = (r, i) => (+r.lane || +r.bib || 900 + i);
+      const rows = (e.entries || []).map((en, i) => {
         const key = `${e.id}|${en.id}`;
         const att = st.attempts[key] || [];
-        let result = st.results[key] || '';
-        if (!result && kind === 'field' && att.length) {
-          const best = att.map(a => parseMark(a, 'field')).filter(x => x != null);
-          if (best.length) result = Math.max(...best).toFixed(2);
+        const override = st.results[key] || '';
+        const note = st.notes[key] || '';
+        const r = { id: en.id, idx: i, lane: en.lane || '', bib: en.bib || '', name: en.name || '', tvName: en.tvName || U.up(en.name || ''), team: en.team || '', pb: en.pb || '', sb: en.sb || '',
+          result: override, note, reaction: st.reaction[key] || '', attempts: att, mark: null, tb: [], out: false };
+        r.status = STATUS.test(override) ? U.up(override) : STATUS.test(note) ? U.up(note) : '';
+        if (kind === 'field' && !vertical) {
+          const marks = att.map(a => parseMark(a, 'field')).filter(x => x != null).sort((a, b) => b - a);
+          r.best = marks.length ? marks[0] : null;
+          r.tb = marks;
+          if (!override && marks.length) r.result = marks[0].toFixed(2);
+          else if (!override && att.length >= rounds && att.every(a => /^[X-]$/i.test(String(a).trim()))) r.result = 'NM';
+        } else if (vertical) {
+          // "1.85 O" / "1.85 X" / "1.85 -": best cleared height; ties: fewer failures at that height, then fewer failures in all
+          const tries = att.map(a => { const m = /^\s*(\d+(?:[.,]\d+)?)\s*([OX\-])\s*$/i.exec(String(a)); return m ? { h: parseFloat(m[1].replace(',', '.')), m: m[2].toUpperCase() } : null; }).filter(Boolean);
+          const cleared = tries.filter(t => t.m === 'O').map(t => t.h);
+          r.best = cleared.length ? Math.max(...cleared) : null;
+          let streak = 0; for (const t of tries) { if (t.m === 'X') streak++; else if (t.m === 'O') streak = 0; }
+          r.eliminated = streak >= 3;
+          r.tries = tries;
+          const failsAtBest = r.best == null ? 0 : tries.filter(t => t.h === r.best && t.m === 'X').length;
+          r.tb = [-failsAtBest, -tries.filter(t => t.m === 'X').length];
+          if (!override && r.best != null) r.result = r.best.toFixed(2);
+          else if (!override && tries.length && r.eliminated) r.result = 'NH';
+          // what this athlete did at the bar now
+          const bar = parseFloat(String(e.bar || '').replace(',', '.'));
+          const atBar = isNaN(bar) ? [] : tries.filter(t => Math.abs(t.h - bar) < 1e-6);
+          r.atBar = atBar.map(t => t.m).join('');
         }
-        return { id: en.id, lane: en.lane || '', bib: en.bib || '', name: en.name || '', tvName: en.tvName || U.up(en.name || ''), team: en.team || '', pb: en.pb || '', sb: en.sb || '',
-          result, note: st.notes[key] || '', reaction: st.reaction[key] || '', attempts: att, mark: parseMark(result, kind) };
+        r.mark = parseMark(r.result, kind);
+        return r;
       });
-      const ranked = rows.filter(r => r.mark != null).sort((a, b) => (kind === 'field' ? b.mark - a.mark : a.mark - b.mark));
+      // ranking (field: ties broken by the next best marks / failures)
+      const cmpTb = (a, b) => { for (let i = 0; i < Math.max(a.tb.length, b.tb.length); i++) { const x = a.tb[i] == null ? -Infinity : a.tb[i], y = b.tb[i] == null ? -Infinity : b.tb[i]; if (x !== y) return y - x; } return 0; };
+      const ranked = rows.filter(r => r.mark != null).sort((a, b) => (kind === 'field' ? (b.mark - a.mark) || cmpTb(a, b) : a.mark - b.mark));
       let rank = 0, prev = null;
-      ranked.forEach((r, i) => { if (prev === null || r.mark !== prev) rank = i + 1; r.rank = rank; prev = r.mark; });
+      ranked.forEach((r, i) => { if (prev === null || (kind === 'field' ? cmpTb(r, prev) !== 0 || r.mark !== prev.mark : r.mark !== prev.mark)) rank = i + 1; r.rank = rank; prev = r; });
       const unranked = rows.filter(r => r.mark == null && r.result);
       const results = ranked.concat(unranked.map(r => Object.assign(r, { rank: '' })));
-      const startlist = rows.slice().sort((a, b) => (+a.lane || +a.bib || 999) - (+b.lane || +b.bib || 999));
-      return { id: e.id, name: e.name || '', round: e.round || '', wind: e.wind || '', kind, gender: e.gender || '', age: e.age || '', discipline: e.discipline || '', rows, startlist, results, hasResults: results.length > 0 };
+      const startlist = rows.slice().sort((a, b) => order(a, a.idx) - order(b, b.idx));
+      // field events: who is up next (fewest attempts, then the competition order)
+      let up = null, round = 0, complete = false, active = [];
+      if (kind === 'field') {
+        if (!vertical) {
+          active = startlist.filter(r => !r.status && r.attempts.length < rounds);
+          if (e.cut && rows.filter(r => !r.status).every(r => r.attempts.length >= 3 || r.out)) {
+            const top = ranked.slice(0, Number(e.cut) > 1 ? Number(e.cut) : 8).map(r => r.id);
+            rows.forEach(r => { if (r.attempts.length >= 3 && !top.includes(r.id)) r.out = true; });
+            active = active.filter(r => !r.out);
+          }
+          const min = active.length ? Math.min(...active.map(r => r.attempts.length)) : 0;
+          round = active.length ? min + 1 : rounds;
+          up = active.find(r => r.id === e.up) || active.find(r => r.attempts.length === min) || null;
+          complete = rows.length > 0 && !active.length;
+        } else {
+          const bar = parseFloat(String(e.bar || '').replace(',', '.'));
+          const stillIn = startlist.filter(r => !r.status && !r.eliminated);
+          active = isNaN(bar) ? [] : stillIn.filter(r => !/[O-]/.test(r.atBar || '') && (r.atBar || '').length < 3);
+          const min = active.length ? Math.min(...active.map(r => (r.atBar || '').length)) : 0;
+          round = active.length ? min + 1 : 0;
+          up = active.find(r => r.id === e.up) || active.find(r => (r.atBar || '').length === min) || null;
+          complete = rows.some(r => r.attempts.length) && !stillIn.length;
+          rows.forEach(r => { r.out = !!r.eliminated; });
+        }
+      } else complete = rows.length > 0 && rows.every(r => r.result);
+      return { id: e.id, num: e.num || '', name: e.name || '', round: e.round || '', wind: e.wind || '', kind, vertical, rounds, cut: e.cut || 0, bar: e.bar || '', gender: e.gender || '', age: e.age || '', discipline: e.discipline || '',
+        rows, startlist, results, hasResults: results.length > 0, up: up ? up.id : '', attemptRound: round, active: active.map(r => r.id), complete };
     },
     view(st, setup) {
       const v = baseView(this, setup);
       const evs = (st.ath.events || []).map(e => this.eventView(st, e));
       const cur = evs.find(e => e.id === st.ath.current) || evs[0] || null;
-      v.extra = { events: evs.map(e => ({ id: e.id, name: e.name, round: e.round, kind: e.kind, entries: e.rows.length, results: e.results.length })), current: cur };
+      v.extra = { events: evs.map(e => ({ id: e.id, num: e.num, name: e.name, round: e.round, kind: e.kind, entries: e.rows.length, results: e.results.length, complete: e.complete })), current: cur, auto: Object.assign({ mode: 'off', delay: 20 }, st.ath.auto || {}), clockDigits: st.ath.clockDigits };
       v.periodLabel = cur ? `${U.up(cur.name)}${cur.round ? ' · ' + U.up(cur.round) : ''}` : 'ATHLETICS';
       v.status = cur ? (cur.hasResults ? 'RESULTS' : 'START LIST') : 'NO EVENT';
       v.score = { A: '', B: '' };
       v.timeline = st.timeline; v.lastEvent = st.last;
-      if (cur) cur.rows.forEach(r => v.players.push({ id: r.id, team: '', name: r.name, tvName: r.tvName, number: r.bib, position: r.lane ? `LANE ${r.lane}` : '', stats: {}, statsText: [r.team, r.pb ? 'PB ' + r.pb : '', r.sb ? 'SB ' + r.sb : ''].filter(Boolean).join(' · '), teamName: r.team, result: r.result, rank: r.rank || '' }));
+      if (cur) cur.rows.forEach(r => v.players.push({ id: r.id, team: '', name: r.name, tvName: r.tvName, number: r.bib, position: r.lane ? `${cur.kind === 'field' ? 'ORDER' : 'LANE'} ${r.lane}` : '', stats: {}, statsText: [r.team, r.pb ? 'PB ' + r.pb : '', r.sb ? 'SB ' + r.sb : ''].filter(Boolean).join(' · '), teamName: r.team, result: r.result, rank: r.rank || '',
+        lane: r.lane, bib: r.bib, pb: r.pb, sb: r.sb, note: r.note, reaction: r.reaction, attemptsText: (r.attempts || []).join('  '), best: r.best != null ? r.best.toFixed(2) : '', kind: cur.kind }));
       v.clock.game = { dir: 1, limitMs: 0, startMs: 0, stopAtLimit: false };
       v.facts = [];
       if (cur && cur.results.length) {
@@ -1262,6 +1352,7 @@
     });
     set('scoreA', v.score.A); set('scoreB', v.score.B);
     set('period', v.periodLabel); set('status_text', v.status); set('finished', v.finished ? '1' : '');
+    if (v.kind === 'timed' && v.extra.phase) { set('match_phase', { pre: 'NOT STARTED', live: 'LIVE', break: v.periodLabel, final: 'FULL TIME' }[v.extra.phase] || ''); set('teamA_on_field', v.extra.onFieldCount ? String(v.extra.onFieldCount.A) : ''); set('teamB_on_field', v.extra.onFieldCount ? String(v.extra.onFieldCount.B) : ''); }
     set('winner', v.winner || ''); set('winner_name', v.winner ? U.up(v.teams[v.winner].name) : '');
     set('match_line', v.kind === 'athletics' ? v.periodLabel : `${U.up(v.teams.A.name)} ${v.score.A} – ${v.score.B} ${U.up(v.teams.B.name)}`);
     // period / set / inning table
@@ -1330,12 +1421,16 @@
     if (v.kind === 'athletics') {
       const c = x.current;
       set('ath_event', c ? U.up(c.name) : ''); set('ath_round', c ? U.up(c.round) : ''); set('ath_wind', c ? c.wind : ''); set('ath_kind', c ? c.kind : '');
-      set('ath_status', v.status); set('ath_gender', c ? U.up(c.gender) : ''); set('ath_age', c && c.age && c.age !== 'Open' ? U.up(c.age) : ''); set('ath_discipline', c ? U.up(c.discipline || c.name) : '');
+      set('ath_status', v.status); set('ath_event_num', c ? c.num : ''); set('ath_gender', c ? U.up(c.gender) : ''); set('ath_age', c && c.age && c.age !== 'Open' ? U.up(c.age) : ''); set('ath_discipline', c ? U.up(c.discipline || c.name) : '');
       if (c) {
         set('sl_count', c.startlist.length);
         c.startlist.slice(0, 16).forEach((r, i) => { const p = `sl${i + 1}_`; set(p + 'lane', r.lane); set(p + 'bib', r.bib); set(p + 'name', r.tvName); set(p + 'team', U.up(r.team)); set(p + 'pb', r.pb); set(p + 'sb', r.sb); });
         set('rs_count', c.results.length);
         c.results.slice(0, 16).forEach((r, i) => { const p = `rs${i + 1}_`; set(p + 'rank', r.rank); set(p + 'lane', r.lane); set(p + 'name', r.tvName); set(p + 'team', U.up(r.team)); set(p + 'result', r.result); set(p + 'note', U.up(r.note)); set(p + 'reaction', r.reaction); set(p + 'attempts', r.attempts.join(' ')); });
+        const u = c.rows.find(r => r.id === c.up);
+        set('ath_up_id', u ? u.id : ''); set('ath_up_name', u ? u.tvName : ''); set('ath_up_team', u ? U.up(u.team) : ''); set('ath_up_order', u ? u.lane : ''); set('ath_up_bib', u ? u.bib : '');
+        set('ath_up_attempts', u ? u.attempts.map(a => U.up(a)).join('  ') : ''); set('ath_up_best', u && u.best != null ? u.best.toFixed(2) : ''); set('ath_up_rank', u ? u.rank || '' : '');
+        set('ath_attempt_round', c.attemptRound || ''); set('ath_bar', c.bar || ''); set('ath_up_try', u && c.vertical ? (u.atBar || '').length + 1 : u ? u.attempts.length + 1 : '');
         const w = c.results[0];
         set('ath_winner_name', w ? w.tvName : ''); set('ath_winner_team', w ? U.up(w.team) : ''); set('ath_winner_result', w ? w.result : ''); set('ath_winner_note', w ? U.up(w.note) : '');
       }
@@ -1401,7 +1496,8 @@
       const o = resolveOptions(d, { variant, options: options || {} });
       return (typeof d.actions === 'function' ? d.actions(o) : d.actions);
     },
-    cards: sportId => (SPORTS[sportId] && SPORTS[sportId].cards) || [],
+    // the match setting "20-minute red card" off leaves only the yellow and the permanent red
+    cards: (sportId, options) => ((SPORTS[sportId] && SPORTS[sportId].cards) || []).filter(c => !(c.key === 'red20' && options && options.red20 === false)),
     cardColor: (sportId, key) => cardColor(((SPORTS[sportId] && SPORTS[sportId].cards) || []).find(c => c.key === key), key),
     hows: sportId => (SPORTS[sportId] && SPORTS[sportId].hows) || [],
   };

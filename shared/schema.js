@@ -17,6 +17,27 @@
   const BOOKING_STATUS = ['New', 'Assigned', 'Accepted', 'Declined by producer', 'Quoted', 'Booked', 'Not going ahead'];
   const EXPENSE_STATUS = ['Submitted', 'Approved', 'Rejected', 'Paid back'];
   const PRODUCTION_TYPES = ['Sport', 'Corporate', 'Religion', 'Concert', 'Conference', 'Wedding', 'Awards', 'Esports', 'Other'];
+  const GENDERS = ['Male', 'Female', 'Mixed'];
+  const AGE_GROUPS = ['Adults', 'Seniors', 'U21', 'U20', 'U19', 'U18', 'U17', 'U16', 'U15', 'U14', 'U13', 'U12', 'U11', 'U10', 'U9', 'U8', 'Veterans', 'Masters'];
+  const DIVISIONS = ['First Grade', 'Second Grade', 'Third Grade', 'Reserves', '1st Team', '2nd Team', 'A', 'B', 'C', 'D', 'Premier', 'Division 1', 'Division 2'];
+  const POSITION_TYPES = ['Forward', 'Back', 'Goalkeeper', 'Defender', 'Midfielder', 'Attacker', 'Shooter', 'Centre', 'Guard', 'Utility'];
+  const COVERAGE = ['Standard', 'Minimum'];
+  const PLAYER_EVENTS = ['All', 'Scoring only', 'None'];
+  // Match settings a competition gives every match (a match can set its own). Same set as LIGR's match config.
+  const MATCH_SETTINGS = (g) => [
+    { k: 'totalPeriods', l: 'Periods', t: 'number', ph: 'sport default', group: g },
+    { k: 'periodLength', l: 'Period length (min)', t: 'number', ph: 'sport default', group: g },
+    { k: 'breakLength', l: 'Break length (min)', t: 'number', ph: 'sport default', group: g, help: 'Half-time / break between periods.' },
+    { k: 'overtime', l: 'Overtime / extra time', t: 'bool', group: g },
+    { k: 'goldenPoint', l: 'Golden point (next score wins in overtime)', t: 'bool', group: g },
+    { k: 'kickingComp', l: 'Kicking competition / shoot-out if still level', t: 'bool', group: g },
+    { k: 'sinbinMin', l: 'Sin bin / suspension (min)', t: 'number', ph: 'sport default', group: g },
+    { k: 'red20', l: '20-minute red card (replacement after 20 min)', t: 'bool', group: g },
+    { k: 'statCoverage', l: 'Stats to capture', t: 'select', opts: COVERAGE, def: 'Standard', group: g, help: 'Minimum: scores and cards only. Standard: also the match statistics.' },
+    { k: 'playerEvents', l: 'Ask for the player', t: 'select', opts: PLAYER_EVENTS, def: 'All', group: g, help: 'All: every event asks who. Scoring only: only scores and cards. None: team only (fastest).' },
+    { k: 'lineupSize', l: 'Starting line-up size', t: 'number', ph: 'sport default', group: g },
+    { k: 'benchSize', l: 'Max bench size', t: 'number', ph: 'sport default', group: g },
+  ];
   const STATUSES = ['Upcoming', 'Live', 'Completed', 'Postponed', 'Cancelled'];
   const SOURCES = ['CAMS', 'EVS', 'VT', 'GFX', 'PRESENTATION', 'REMOTE', 'BREAK'];
   const EQUIP_CATS = ['Video', 'Audio', 'Grip', 'Lighting', 'Comms', 'Other'];
@@ -36,35 +57,55 @@
       { k: 'templateFolder', l: 'CasparCG template folder', t: 'text', ph: 'rfp', help: 'Folder inside CasparCG\'s template path that holds this theme\'s templates (bug, lowerthird, fullframe, advert).' }] },
 
     competition: { label: 'Competition', plural: 'Competitions', group: 'Assets', title: (d) => [d.name, d.season].filter(Boolean).join(' '), cols: ['logo', 'name', 'sport', 'season', 'theme'], fields: [
-      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'sport', l: 'Sport', t: 'combo', opts: 'sports' }, { k: 'format', l: 'Format / rules', t: 'combo', opts: 'formats', ph: 'Sport default', help: 'Used by every match in this competition unless the match sets its own.' }, { k: 'season', l: 'Season', t: 'text' },
+      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'graphicName', l: 'Graphic name', t: 'text', ph: 'The name', help: 'How the name reads on graphics.' }, { k: 'shortName', l: 'Short name', t: 'text', ph: 'CCC' },
+      { k: 'sport', l: 'Sport', t: 'combo', opts: 'sports' }, { k: 'format', l: 'Format / rules', t: 'combo', opts: 'formats', ph: 'Sport default', help: 'Used by every match in this competition unless the match sets its own.' }, { k: 'season', l: 'Season', t: 'text' },
+      { k: 'ageGroup', l: 'Age group', t: 'combo', opts: AGE_GROUPS }, { k: 'gender', l: 'Gender', t: 'select', opts: ['', ...GENDERS] }, { k: 'division', l: 'Division', t: 'combo', opts: DIVISIONS },
       { k: 'primaryColor', l: 'Primary colour', t: 'color' }, { k: 'secondaryColor', l: 'Secondary colour', t: 'color' },
-      { k: 'logo', l: 'Logo', t: 'image' }, { k: 'theme', l: 'Theme', t: 'ref', ref: 'theme' },
-      { k: 'pointsWin', l: 'Log points: win', t: 'number', ph: '3' }, { k: 'pointsDraw', l: 'Log points: draw', t: 'number', ph: '1' }, { k: 'pointsLoss', l: 'Log points: loss', t: 'number', ph: '0' }] },
+      { k: 'logo', l: 'Logo', t: 'image' }, { k: 'watermark', l: 'Primary watermark', t: 'image' }, { k: 'watermark2', l: 'Secondary watermark', t: 'image' }, { k: 'theme', l: 'Theme', t: 'ref', ref: 'theme' },
+      { k: 'teams', l: 'Teams in this competition', t: 'list', fields: [{ k: 'team', l: 'Team', t: 'ref', ref: 'squad' }] },
+      ...MATCH_SETTINGS('Match settings'),
+      { k: 'fieldGoalPoints', l: 'Field / drop goal points', t: 'number', ph: 'sport default', group: 'Match settings' },
+      { k: 'pointsWin', l: 'Log points: win', t: 'number', ph: '3', group: 'Log' }, { k: 'pointsDraw', l: 'Log points: draw', t: 'number', ph: '1', group: 'Log' }, { k: 'pointsLoss', l: 'Log points: loss', t: 'number', ph: '0', group: 'Log' },
+      { k: 'archived', l: 'Archived (greyed out in lists, left out of pickers)', t: 'bool', group: 'Archive' }] },
 
     player: { label: 'Player', plural: 'Players', group: 'Assets', title: (d) => [d.name, d.surname].filter(Boolean).join(' '), cols: ['image', 'name', 'surname', 'sports', 'nationality'], fields: [
-      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'surname', l: 'Surname', t: 'text' }, { k: 'sports', l: 'Sports', t: 'multi', opts: 'sports' },
+      { k: 'name', l: 'First name', t: 'text', req: true }, { k: 'surname', l: 'Last name', t: 'text' },
+      { k: 'graphicFirstName', l: 'Graphic first name', t: 'text', ph: 'First name', help: 'How the name reads on graphics (leave empty to use the name).' }, { k: 'graphicLastName', l: 'Graphic last name', t: 'text', ph: 'Last name' },
+      { k: 'sports', l: 'Sports', t: 'multi', opts: 'sports' },
       { k: 'dateOfBirth', l: 'Date of birth', t: 'date', help: 'Age is worked out from this.' }, { k: 'height', l: 'Height (cm)', t: 'number' }, { k: 'weight', l: 'Weight (kg)', t: 'number' },
-      { k: 'nationality', l: 'Nationality', t: 'text' }, { k: 'position', l: 'Position', t: 'text' }, { k: 'image', l: 'Photo', t: 'image' }] },
+      { k: 'nationality', l: 'Nationality', t: 'text' }, { k: 'position', l: 'Position', t: 'text' }, { k: 'positionType', l: 'Position type', t: 'combo', opts: POSITION_TYPES }, { k: 'image', l: 'Photo', t: 'image' },
+      { k: 'archived', l: 'Archived (greyed out in lists, left out of pickers)', t: 'bool' }] },
 
     venue: { label: 'Venue', plural: 'Venues', group: 'Assets', title: (d) => d.name, cols: ['name', 'city', 'country', 'sports', 'capacity'], fields: [
-      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'city', l: 'City', t: 'text' }, { k: 'country', l: 'Country', t: 'text' },
+      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'graphicName', l: 'Graphic name', t: 'text', ph: 'The name' }, { k: 'address', l: 'Address', t: 'text' }, { k: 'city', l: 'City', t: 'text' }, { k: 'country', l: 'Country', t: 'text' },
+      { k: 'homeClub', l: 'Home ground of', t: 'ref', ref: 'club' }, { k: 'areas', l: 'Areas / fields', t: 'list', fields: [{ k: 'name', l: 'Name', t: 'text', ph: 'Field 2, Court A …' }] },
       { k: 'sports', l: 'Used for', t: 'multi', opts: 'sports' }, { k: 'capacity', l: 'Capacity', t: 'number' },
       { k: 'turf', l: 'Surface', t: 'combo', opts: ['Natural Grass', 'Artificial Turf', 'Hard Court', 'Clay', 'Indoor', 'Stage', 'Auditorium'] }, { k: 'image', l: 'Image', t: 'image' }] },
 
     club: { label: 'Club', plural: 'Clubs', group: 'Assets', title: (d) => d.name, cols: ['image', 'name', 'graphicName', 'abbreviation', 'primaryColor'], fields: [
-      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'graphicName', l: 'Graphic name', t: 'text', help: 'Short name shown on graphics.' },
-      { k: 'abbreviation', l: 'Abbreviation', t: 'text', ph: 'CHE' }, { k: 'primaryColor', l: 'Primary colour', t: 'color' }, { k: 'secondaryColor', l: 'Secondary colour', t: 'color' },
-      { k: 'image', l: 'Logo', t: 'image' }] },
+      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'fullGraphicName', l: 'Full graphic name', t: 'text', ph: 'Vodacom Blue Bulls', help: 'Long name on full-frame graphics.' },
+      { k: 'graphicName', l: 'Graphic name', t: 'text', help: 'Medium name shown on most graphics.' },
+      { k: 'abbreviation', l: 'Abbreviation', t: 'text', ph: 'CHE' }, { k: 'defaultVenue', l: 'Home venue', t: 'ref', ref: 'venue' },
+      { k: 'primaryColor', l: 'Primary colour', t: 'color' }, { k: 'primaryTextColor', l: 'Primary text colour', t: 'color' },
+      { k: 'secondaryColor', l: 'Secondary colour', t: 'color' }, { k: 'secondaryTextColor', l: 'Secondary text colour', t: 'color' },
+      { k: 'image', l: 'Logo', t: 'image', help: 'A transparent background with no padding works best.' },
+      { k: 'homeKit1', l: 'Home kit: primary', t: 'color', group: 'Kits' }, { k: 'homeKit2', l: 'Home kit: secondary', t: 'color', group: 'Kits' },
+      { k: 'awayKit1', l: 'Away kit: primary', t: 'color', group: 'Kits' }, { k: 'awayKit2', l: 'Away kit: secondary', t: 'color', group: 'Kits' },
+      { k: 'altKit1', l: 'Alternative kit: primary', t: 'color', group: 'Kits' }, { k: 'altKit2', l: 'Alternative kit: secondary', t: 'color', group: 'Kits' },
+      { k: 'archived', l: 'Archived (greyed out in lists, left out of pickers)', t: 'bool', group: 'Archive' }] },
 
     squad: { label: 'Team', plural: 'Teams', group: 'Assets',
       title: (d, get) => { const c = d.club && get ? get(d.club) : null; return [d.name || (c && c.name), d.ageGroup].filter(Boolean).join(' ') + (d.sport ? ' · ' + d.sport : ''); },
       cols: ['club', 'sport', 'ageGroup', 'name'], fields: [
-      { k: 'club', l: 'Club', t: 'ref', ref: 'club', req: true }, { k: 'sport', l: 'Sport', t: 'combo', opts: 'sports', req: true }, { k: 'ageGroup', l: 'Age group / side', t: 'text', ph: '1st XV, U19A …' },
+      { k: 'club', l: 'Club', t: 'ref', ref: 'club', req: true }, { k: 'sport', l: 'Sport', t: 'combo', opts: 'sports', req: true }, { k: 'ageGroup', l: 'Age group / side', t: 'combo', opts: AGE_GROUPS, ph: '1st XV, U19A …' },
+      { k: 'gender', l: 'Gender', t: 'select', opts: ['', ...GENDERS] }, { k: 'division', l: 'Division', t: 'combo', opts: DIVISIONS },
       { k: 'name', l: 'Team name', t: 'text', inherit: 'name' }, { k: 'graphicName', l: 'Graphic name', t: 'text', inherit: 'graphicName' },
       { k: 'abbreviation', l: 'Abbreviation', t: 'text', inherit: 'abbreviation' }, { k: 'primaryColor', l: 'Primary colour', t: 'color', inherit: 'primaryColor' },
       { k: 'secondaryColor', l: 'Secondary colour', t: 'color', inherit: 'secondaryColor' }, { k: 'image', l: 'Logo', t: 'image', inherit: 'image' },
       { k: 'coach', l: 'Coach', t: 'text' },
-      { k: 'players', l: 'Players', t: 'list', fields: [{ k: 'number', l: 'No.', t: 'text', w: 70 }, { k: 'player', l: 'Player', t: 'ref', ref: 'player' }, { k: 'position', l: 'Position', t: 'text' }, { k: 'captain', l: 'Capt.', t: 'bool', w: 60 }] }] },
+      { k: 'players', l: 'Players', t: 'list', help: 'Starter ticked = in the starting line-up by default; the scorer can change the line-up for each match.', fields: [{ k: 'number', l: 'No.', t: 'text', w: 70 }, { k: 'player', l: 'Player', t: 'ref', ref: 'player' }, { k: 'position', l: 'Position', t: 'text' },
+        { k: 'positionType', l: 'Type', t: 'combo', opts: POSITION_TYPES, w: 120 }, { k: 'starter', l: 'Starter', t: 'bool', w: 70 }, { k: 'captain', l: 'Capt.', t: 'bool', w: 60 }] },
+      { k: 'archived', l: 'Archived (greyed out in lists, left out of pickers)', t: 'bool' }] },
 
     fixture: { label: 'Match', plural: 'Fixtures & Results', group: 'Matches', title: (d) => d.name || d.autoName || 'Match', cols: ['startDate', 'startTime', 'name', 'sport', 'status'], fields: [
       { k: 'name', l: 'Match name', t: 'text', ph: 'Generated from the teams unless you type one' }, { k: 'sport', l: 'Sport', t: 'combo', opts: 'sports', req: true, help: 'Decides the scorer and rules: Cricket, Rugby, Rugby Sevens, Football, Hockey, Netball, Tennis, Padel, Basketball, Volleyball, Badminton, Baseball, Athletics.' },
@@ -72,11 +113,13 @@
       { k: 'format', l: 'Format / rules', t: 'combo', opts: 'formats', ph: 'From the competition, else the sport default', help: 'The scorer opens with these rules, so nothing has to be set up at the match. Type the sport to filter the list.' },
       { k: 'team1', l: 'Team 1', t: 'ref', ref: 'squad', sameSport: true }, { k: 'team2', l: 'Team 2', t: 'ref', ref: 'squad', sameSport: true },
       { k: 'startDate', l: 'Start date', t: 'date' }, { k: 'startTime', l: 'Start time', t: 'time' }, { k: 'endDate', l: 'End date', t: 'date' }, { k: 'endTime', l: 'End time', t: 'time' },
-      { k: 'periodLength', l: 'Period length (min)', t: 'number', ph: 'sport default' }, { k: 'totalPeriods', l: 'Periods', t: 'number', ph: 'sport default' },
-      { k: 'venue', l: 'Venue', t: 'ref', ref: 'venue' }, { k: 'status', l: 'Status', t: 'select', opts: STATUSES, def: 'Upcoming' },
+      { k: 'venue', l: 'Venue', t: 'ref', ref: 'venue', ph: 'Home team\'s venue' }, { k: 'status', l: 'Status', t: 'select', opts: STATUSES, def: 'Upcoming' },
+      { k: 'scorer', l: 'Scorer', t: 'member', roles: ['Scorer', 'Producer', 'Admin'] },
       { k: 'commentators', l: 'Commentators', t: 'textarea', help: 'One per line. The scorer and the Commentators graphic take them from here.' },
       { k: 'officials', l: 'Match officials', t: 'textarea', help: 'One per line as Role: Name, for example Referee: A Name. The scorer and the officials graphics take them from here.' },
-      { k: 'notes', l: 'Notes', t: 'textarea' }, RUNDOWN] },
+      { k: 'notes', l: 'Notes', t: 'textarea' },
+      ...MATCH_SETTINGS('Match settings (empty = from the competition)').map((f) => Object.assign({}, f, { def: undefined, opts: f.t === 'select' ? ['', ...f.opts] : f.opts, t: f.t === 'bool' ? 'select' : f.t }, f.t === 'bool' ? { opts: ['', 'Yes', 'No'] } : {})),
+      RUNDOWN] },
 
     production: { label: 'Production', plural: 'Productions', group: 'Productions', title: (d) => d.name, cols: ['date', 'name', 'type', 'venue', 'client'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'type', l: 'Type', t: 'combo', opts: PRODUCTION_TYPES, def: 'Sport' },
@@ -239,7 +282,23 @@
     const name = pick('name') || '';
     return { name, graphicName: (has(s.graphicName) ? s.graphicName : has(s.name) ? s.name : c.graphicName) || name, abbreviation: pick('abbreviation') || name.slice(0, 3).toUpperCase(),
       primaryColor: pick('primaryColor') || '#ffffff', secondaryColor: pick('secondaryColor') || '#262626', image: pick('image') || '',
-      sport: s.sport || '', ageGroup: s.ageGroup || '', coach: s.coach || '', players: s.players || [] };
+      primaryTextColor: pick('primaryTextColor') || '', secondaryTextColor: pick('secondaryTextColor') || '', fullGraphicName: pick('fullGraphicName') || '',
+      kits: { home: [c.homeKit1 || '', c.homeKit2 || ''], away: [c.awayKit1 || '', c.awayKit2 || ''], alt: [c.altKit1 || '', c.altKit2 || ''] }, defaultVenue: c.defaultVenue || '',
+      sport: s.sport || '', ageGroup: s.ageGroup || '', gender: s.gender || '', division: s.division || '', coach: s.coach || '', players: s.players || [] };
+  }
+
+  // The match settings in force: the match's own, else its competition's. Booleans on a match are '', 'Yes' or 'No'.
+  function matchSettings(fixture, comp) {
+    const f = fixture || {}, c = comp || {}, out = {};
+    const num = (v) => (has(v) && Number(v) >= 0 && v !== '' ? Number(v) : null);
+    for (const k of ['totalPeriods', 'periodLength', 'breakLength', 'sinbinMin', 'lineupSize', 'benchSize', 'fieldGoalPoints']) { const v = num(f[k]) ?? num(c[k]); if (v !== null) out[k] = v; }
+    for (const k of ['overtime', 'goldenPoint', 'kickingComp', 'red20']) {
+      const v = f[k] === 'Yes' || f[k] === true ? true : f[k] === 'No' || f[k] === false ? false : has(c[k]) ? !!c[k] : null;
+      if (v !== null) out[k] = v;
+    }
+    out.statCoverage = f.statCoverage || c.statCoverage || 'Standard';
+    out.playerEvents = f.playerEvents || c.playerEvents || 'All';
+    return out;
   }
 
   // What a team looks like on air: name, colours, logo and squad list. get(id) returns a record's data.
@@ -250,9 +309,13 @@
     const players = [];
     for (const row of r.players) {
       const p = row.player ? get(row.player) : null;
-      if (p) players.push({ id: row.player, number: String(row.number || ''), name: [p.name, p.surname].filter(Boolean).join(' '), position: row.position || p.position || '', captain: !!row.captain, image: p.image || '' });
+      if (!p) continue;
+      const gfx = [p.graphicFirstName || p.name, p.graphicLastName || p.surname].filter(Boolean).join(' ');
+      players.push({ id: row.player, number: String(row.number || ''), name: [p.name, p.surname].filter(Boolean).join(' '), gfxName: p.graphicFirstName || p.graphicLastName ? gfx : '',
+        position: row.position || p.position || '', positionType: row.positionType || p.positionType || '', captain: !!row.captain, starter: row.bench ? false : row.starter === undefined ? undefined : !!row.starter, image: p.image || '' });
     }
-    return { id: squadId, name: r.graphicName || r.name, full: [r.name, r.ageGroup].filter(Boolean).join(' '), short: r.abbreviation, color1: r.primaryColor, color2: r.secondaryColor, logo: r.image, coach: r.coach, players };
+    return { id: squadId, name: r.graphicName || r.name, full: [r.name, r.ageGroup].filter(Boolean).join(' '), long: r.fullGraphicName || r.name, short: r.abbreviation, color1: r.primaryColor, color2: r.secondaryColor,
+      text1: r.primaryTextColor, text2: r.secondaryTextColor, kits: r.kits, logo: r.image, coach: r.coach, players };
   }
 
   const fieldsFor = (type, org) => {
@@ -324,6 +387,6 @@
     read: (role) => ROLES.includes(role),
   };
 
-  return { ENTITIES: E, LINE_COLORS, ROLES, STATUSES, PRODUCTION_TYPES, SOURCES, EQUIP_CATS, SYSTEM_TYPES, ALL_TYPES, PC_EDIT, ROLE_SEES, EXPENSE_CATS, EXPENSE_STATUS, BOOKING_STATUS, officiates, sees, resolveSquad, snapshotTeam, fieldsFor, age,
+  return { ENTITIES: E, GENDERS, AGE_GROUPS, DIVISIONS, POSITION_TYPES, matchSettings, LINE_COLORS, ROLES, STATUSES, PRODUCTION_TYPES, SOURCES, EQUIP_CATS, SYSTEM_TYPES, ALL_TYPES, PC_EDIT, ROLE_SEES, EXPENSE_CATS, EXPENSE_STATUS, BOOKING_STATUS, officiates, sees, resolveSquad, snapshotTeam, fieldsFor, age,
     parseDuration, fmtDuration, rundownTimes, costing, CAN };
 });
