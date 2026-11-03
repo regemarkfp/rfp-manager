@@ -20,9 +20,18 @@
 #   --recordings /mnt/usb     where the stream recordings go (a USB drive rather than the SD card).
 #   Tailscale is installed too: run "sudo tailscale up" once, then encoders on your tailnet send SRT / RTMP to
 #   this machine's Tailscale name (Cloudflare carries only the website, not SRT/RTMP/WebRTC).
+#
+# A home server that is also the database and a NAS (an old PC with Ubuntu Server 24.04):
+#   --local-db                MongoDB on this machine. The first time, everything is copied from the database the
+#                             website used (Atlas). Backed up every night to the NAS (or /var/backups/rfp-manager).
+#   --nas /srv/nas            a Samba share "NAS" for the house network and Tailscale, with assets/ (every image of
+#                             RFP Manager as a file), templates/, shared/ and backups/. Set your Samba password
+#                             once with:  sudo smbpasswd -a <your user>
+#   --no-recordings           streams are relayed but not recorded.
 set -euo pipefail
 
 FROM=""; TOKEN=""; DOMAIN=""; ADMIN=""; EMAIL=""; KEEP_DAYS=90; TUNNEL=""; HOME_MODE=""; RECDIR=/var/lib/mediamtx/recordings
+LOCALDB=""; NAS=""; RECORD=true
 while [ $# -gt 0 ]; do
   case "$1" in
     --from) FROM="${2%/}"; shift 2 ;;
@@ -34,6 +43,9 @@ while [ $# -gt 0 ]; do
     --tunnel) TUNNEL="$2"; HOME_MODE=1; shift 2 ;;
     --home) HOME_MODE=1; shift ;;
     --recordings) RECDIR="${2%/}"; shift 2 ;;
+    --local-db) LOCALDB=1; shift ;;
+    --nas) NAS="${2%/}"; shift 2 ;;
+    --no-recordings) RECORD=false; shift ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -46,6 +58,10 @@ APP=/opt/rfp-manager; DATA=/var/lib/rfp-manager; ETC=/etc/rfp-manager
 # an update of a home server stays a home server
 [ -z "$HOME_MODE" ] && [ -f "$ETC/home" ] && HOME_MODE=1
 [ -f "$ETC/recordings" ] && [ "$RECDIR" = /var/lib/mediamtx/recordings ] && RECDIR="$(cat "$ETC/recordings")"
+# and keeps its own database, NAS and recording choice
+[ -z "$LOCALDB" ] && [ -f "$ETC/localdb" ] && LOCALDB=1
+[ -z "$NAS" ] && [ -f "$ETC/nas" ] && NAS="$(cat "$ETC/nas")"
+[ "$RECORD" = true ] && [ -f "$ETC/no-recordings" ] && RECORD=false
 
 case "$(uname -m)" in
   aarch64|arm64) NODE_ARCH=arm64; MTX_ARCH='linux_arm64(v8)?' ;;
@@ -143,11 +159,54 @@ if ! command -v caddy >/dev/null; then
   apt-get update -y -q && apt-get install -y -q caddy
 fi
 
+if [ -n "$LOCALDB" ]; then
+  say "MongoDB (this machine)"
+  if ! command -v mongod >/dev/null; then
+    . /etc/os-release
+    grep -q -w avx /proc/cpuinfo || { echo "MongoDB needs a processor with AVX (Intel 2nd generation Core / Sandy Bridge or newer)."; exit 1; }
+    curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | gpg --batch --yes --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg
+    CODENAME="$VERSION_CODENAME"; case "$CODENAME" in noble|jammy) ;; *) CODENAME=noble ;; esac
+    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu $CODENAME/mongodb-org/8.0 multiverse" > /etc/apt/sources.list.d/mongodb-org-8.0.list
+    apt-get update -y -q && apt-get install -y -q mongodb-org
+  fi
+  # only this machine talks to it
+  sed -i -E 's/^( *bindIp:).*/\1 127.0.0.1/' /etc/mongod.conf
+  systemctl enable --now mongod >/dev/null 2>&1; systemctl restart mongod
+  for i in $(seq 1 30); do mongosh --quiet --eval 'db.runCommand({ping:1}).ok' >/dev/null 2>&1 && break; sleep 1; done
+fi
+
+if [ -n "$NAS" ]; then
+  say "NAS (Samba share)"
+  apt-get install -y -q samba
+  getent group nas >/dev/null || groupadd nas
+  mkdir -p "$NAS/assets/images" "$NAS/templates" "$NAS/shared" "$NAS/backups"
+  OWNER="${SUDO_USER:-}"; [ -n "$OWNER" ] && [ "$OWNER" != root ] && usermod -aG nas "$OWNER"
+  chgrp -R nas "$NAS"; chmod -R g+rwX "$NAS"; find "$NAS" -type d -exec chmod g+s {} +
+  if ! grep -q '^\[NAS\]' /etc/samba/smb.conf; then
+    cat >> /etc/samba/smb.conf <<EOF
+
+# RFP Manager's NAS (install.sh): the house network and Tailscale only
+[NAS]
+   path = $NAS
+   valid users = @nas
+   read only = no
+   create mask = 0664
+   directory mask = 2775
+   force group = nas
+   hosts allow = 127. 10. 172.16.0.0/12 192.168. 100.64.0.0/10
+EOF
+  fi
+  systemctl enable --now smbd >/dev/null 2>&1; systemctl restart smbd
+fi
+
 say "RFP Manager"
 id rfp >/dev/null 2>&1 || useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin rfp
 mkdir -p "$DATA" "$ETC" /etc/mediamtx /var/lib/mediamtx "$RECDIR"
 chown -R rfp:rfp /var/lib/mediamtx "$RECDIR"
 if [ -n "$HOME_MODE" ]; then touch "$ETC/home"; else rm -f "$ETC/home"; fi
+if [ -n "$LOCALDB" ]; then touch "$ETC/localdb"; fi
+if [ -n "$NAS" ]; then echo "$NAS" > "$ETC/nas"; usermod -aG nas rfp; fi
+if [ "$RECORD" = false ]; then touch "$ETC/no-recordings"; else rm -f "$ETC/no-recordings"; fi
 echo "$RECDIR" > "$ETC/recordings"
 curl -fsSL "$FROM/api/server/bundle.tgz?t=$TOKEN" -o /tmp/rfp.tgz
 rm -rf /tmp/rfp-new && mkdir -p /tmp/rfp-new && tar -xzf /tmp/rfp.tgz -C /tmp/rfp-new
@@ -162,6 +221,20 @@ if [ -n "$HOME_MODE" ]; then
   TS="$(tailscale status --json 2>/dev/null | jq -r '.Self.DNSName // empty' | sed 's/\.$//' || true)"
   [ -n "$TS" ] && STREAM_HOST="$TS"
 fi
+
+# the first time with --local-db: copy the database the website used (Atlas) to this machine
+DBNAME="$(grep -E '^MONGODB_DB=' /tmp/rfp-site.env | cut -d= -f2-)"; DBNAME="${DBNAME:-rfpmanager}"
+if [ -n "$LOCALDB" ] && [ ! -f "$ETC/db-copied" ]; then
+  REMOTE="$(grep -E '^MONGODB_URI=' /tmp/rfp-site.env | cut -d= -f2-)"
+  case "$REMOTE" in
+    mongodb*://127.0.0.1*|mongodb*://localhost*|"") echo "No other database to copy from: starting with this machine's." ;;
+    *) say "Copying the database ($DBNAME) to this machine"
+       mongodump --uri="$REMOTE" --db="$DBNAME" --archive --gzip | mongorestore --uri="mongodb://127.0.0.1:27017" --archive --gzip --drop
+       ;;
+  esac
+  touch "$ETC/db-copied"
+fi
+BACKUPS="/var/backups/rfp-manager"; [ -n "$NAS" ] && BACKUPS="$NAS/backups"
 
 # the hook secret stays the same across updates
 SECRET=""
@@ -178,6 +251,8 @@ SECRET=""
   echo "STREAM_API=http://127.0.0.1:9997"
   echo "STREAM_PLAYBACK=http://127.0.0.1:9996"
   echo "STREAM_HOOK_SECRET=$SECRET"
+  if [ -n "$LOCALDB" ]; then echo "MONGODB_URI=mongodb://127.0.0.1:27017"; echo "MONGODB_DB=$DBNAME"; fi   # later lines win
+  if [ -n "$NAS" ]; then echo "MEDIA_DIR=$NAS/assets/images"; fi
 } > "$ETC/env.new"
 install -m 600 -o root -g root "$ETC/env.new" "$ETC/env"; rm -f "$ETC/env.new" /tmp/rfp-site.env
 
@@ -230,7 +305,7 @@ webrtcAdditionalHosts: [$IP]
 playback: true
 playbackAddress: 127.0.0.1:9996
 pathDefaults:
-  record: true
+  record: $RECORD
   recordPath: $RECDIR/%path/%Y-%m-%d_%H-%M-%S-%f
   recordFormat: fmp4
   recordSegmentDuration: 1h
@@ -283,6 +358,36 @@ $SITE {
 EOF
 } > /etc/caddy/Caddyfile
 
+if [ -n "$LOCALDB" ]; then
+  mkdir -p "$BACKUPS"
+  cat > /usr/local/bin/rfp-backup <<EOF
+#!/bin/sh
+# RFP Manager: nightly database backup (install.sh). Keeps 14 days.
+set -e
+mkdir -p "$BACKUPS"
+mongodump --uri=mongodb://127.0.0.1:27017 --db=$DBNAME --archive="$BACKUPS/rfp-\$(date +%Y-%m-%d).archive.gz" --gzip --quiet
+find "$BACKUPS" -name 'rfp-*.archive.gz' -mtime +14 -delete
+EOF
+  chmod 755 /usr/local/bin/rfp-backup
+  cat > /etc/systemd/system/rfp-backup.service <<EOF
+[Unit]
+Description=RFP Manager database backup
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/rfp-backup
+EOF
+  cat > /etc/systemd/system/rfp-backup.timer <<EOF
+[Unit]
+Description=RFP Manager database backup every night
+[Timer]
+OnCalendar=*-*-* 03:15
+Persistent=true
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl daemon-reload; systemctl enable --now rfp-backup.timer >/dev/null 2>&1
+fi
+
 say "Starting"
 systemctl daemon-reload
 systemctl enable rfp-manager mediamtx caddy >/dev/null 2>&1
@@ -296,6 +401,7 @@ systemctl is-active --quiet mediamtx || { echo "MediaMTX did not start:"; journa
 
 if [ -n "$HOME_MODE" ]; then
   TUN="not installed yet (run again with --tunnel <token>)"; systemctl is-active --quiet cloudflared 2>/dev/null && TUN="running"
+  NASLINE=""; [ -n "$NAS" ] && NASLINE="NAS: \\\\$(hostname)\\NAS  (images in assets\\images). Set your password once: sudo smbpasswd -a ${SUDO_USER:-<user>}"
   TSNOTE=""; [ "$STREAM_HOST" = "$DOMAIN" ] && TSNOTE="Tailscale is not signed in yet: run  sudo tailscale up  and then this command again."
   cat <<EOF
 
@@ -313,7 +419,9 @@ if [ -n "$HOME_MODE" ]; then
      SRT      srt://$STREAM_HOST:8890
      $TSNOTE
   Viewers watch through Cloudflare (HLS). For big audiences, restream to YouTube / Facebook.
-  Recordings: $RECDIR
+  Recordings: $([ "$RECORD" = true ] && echo "$RECDIR" || echo "off")
+  Database: $([ -n "$LOCALDB" ] && echo "MongoDB on this machine, backed up every night to $BACKUPS" || echo "the website's (Atlas)")
+  $NASLINE
 
   Still to do:
    · Google sign-in: https://$DOMAIN${ADMIN:+ and https://$ADMIN} must be in the OAuth client's origins.
