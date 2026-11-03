@@ -217,6 +217,12 @@ rm -rf /tmp/rfp-new && mkdir -p /tmp/rfp-new && tar -xzf /tmp/rfp.tgz -C /tmp/rf
 rm -rf "$APP.old"; [ -d "$APP" ] && mv "$APP" "$APP.old"
 mv /tmp/rfp-new/rfp-manager "$APP"
 (cd "$APP" && npm install --omit=dev --no-audit --no-fund --loglevel=error)
+# the Android app (not in the program bundle): from the website this command came from, else keep the one we had
+mkdir -p "$APP/public/app"
+for f in rfp-manager.apk rfp-manager.json; do
+  curl -fsSL "$FROM/app/$f" -o "$APP/public/app/$f.new" 2>/dev/null && mv "$APP/public/app/$f.new" "$APP/public/app/$f" \
+    || { rm -f "$APP/public/app/$f.new"; [ -f "$APP.old/public/app/$f" ] && cp "$APP.old/public/app/$f" "$APP/public/app/$f"; true; }
+done
 chown -R root:root "$APP"; chown -R "$SVC:$SVC" "$DATA"
 
 # where encoders send SRT / RTMP: at home, this machine's Tailscale name (Cloudflare carries the website only)
