@@ -267,6 +267,50 @@ To update the server later, make a new setup command and run it again. The setti
 `journalctl -u rfp-manager -f` and `journalctl -u mediamtx -f`. Bandwidth: one 4 Mb/s stream uses about 1.8 GB
 an hour for each viewer (Oracle includes 10 TB a month).
 
+### A home server instead of a VM (Raspberry Pi + Cloudflare Tunnel + Tailscale, no monthly cost)
+
+The same server can run at home on a Raspberry Pi 3, 4 or 5 (64-bit Raspberry Pi OS Lite) or any Debian /
+Ubuntu box. Nothing is opened on the router, so it also works behind CGNAT:
+
+* **Cloudflare Tunnel** (free) carries the website and the Studio on your own names (regemarkfp.com,
+  admin.regemarkfp.com), with https. The domain's DNS has to be on Cloudflare (free plan).
+* **Tailscale** (free) carries SRT / RTMP from your own encoders, OBS and production PCs to the Pi. Cloudflare
+  does not carry SRT, RTMP or WebRTC, so viewers watch HLS through the tunnel. For big audiences restream to
+  YouTube / Facebook.
+* A Pi 3 relays and records streams fine but cannot re-encode live (master control burn-in, restreams with
+  graphics): do that on the production PC, or use a Pi 4 / 5. Keep the recordings on a USB drive.
+
+Steps:
+
+1. **The Pi.** Raspberry Pi Imager → *Raspberry Pi OS Lite (64-bit)*. In its settings set a host name
+   (`rfp-server`), a user and password, and switch SSH on. Use a network cable if you can. Then `ssh <user>@rfp-server.local`.
+2. **The USB drive** (optional, for recordings), mounted at `/mnt/usb`:
+   `lsblk` (find it, e.g. `sda1`) → `sudo mkdir -p /mnt/usb` → add
+   `UUID=<uuid from "sudo blkid"> /mnt/usb ext4 defaults,nofail 0 2` to `/etc/fstab` → `sudo mount -a`.
+   An empty drive is formatted first with `sudo mkfs.ext4 /dev/sda1`, which wipes it.
+3. **Tailscale.** `curl -fsSL https://tailscale.com/install.sh | sh` then `sudo tailscale up`, and open the link
+   it prints to sign in.
+4. **Cloudflare.**
+   1. Add the site (free plan). Check that every DNS record it imports is there, mail (MX, TXT) included.
+   2. At the registrar (Squarespace → Domains → DNS → nameservers), switch to Cloudflare's two nameservers.
+      Wait until Cloudflare shows the site as *Active*.
+   3. Zero Trust → Networks → Tunnels → **Create a tunnel** (Cloudflared), named e.g. `rfp-pi`. Copy the
+      token: the long text after `--token` in the command it shows.
+   4. Under the tunnel's *Public hostnames*, add `regemarkfp.com`, `www.regemarkfp.com` and `admin.regemarkfp.com`,
+      each as **HTTP** → `localhost:8080`. First delete any old A records for those names that point at the old server.
+5. **RFP Manager.** On a website that is still running (e.g. the Render one): Settings → Server → **Make the
+   setup command**. On the Pi, run that command with these added at the end:
+   `--domain regemarkfp.com --admin-domain admin.regemarkfp.com --tunnel <the Cloudflare token> --recordings /mnt/usb/recordings`.
+   Paste the token yourself; it stays on the Pi.
+6. **Old recordings** (optional), from the Pi:
+   `sudo rsync -av root@<old-server-ip>:/var/lib/mediamtx/recordings/ /mnt/usb/recordings/`.
+   The database, stream keys and Google sign-in are in MongoDB Atlas, so nothing else moves. Then switch the old
+   VM off.
+
+Encoders on the tailnet send to the address the installer prints: `rtmp://<pi>.<tailnet>.ts.net/live` and
+`srt://<pi>.<tailnet>.ts.net:8890`. To update the Pi later, make a new setup command and run it again. It stays a
+home server, and the flags are not needed again. Logs: `journalctl -u rfp-manager -f`, `journalctl -u cloudflared -f`.
+
 ### Who does what: the website manages, the PC is the CasparCG bridge
 
 * **The website** is where records are managed: clubs, teams, players, venues, competitions, fixtures, productions
@@ -1012,7 +1056,7 @@ lib/mail.js          email (Brevo, Resend, SMTP)   lib/notify.js   who gets whic
 android/             the Android app (Trusted Web Activity), built by .github/workflows/android.yml
 public/js/people-pages.js  coaches, officials, team sheets, results, expenses
 lib/stream.js        streaming channels: MediaMTX checks, live status, watch pages   lib/tarball.js  the program as .tar.gz
-tools/server/install.sh   sets up a server: website + MediaMTX + Caddy   public/watch.html  the viewer page
+tools/server/install.sh   sets up a server: website + MediaMTX + Caddy (VM, or at home with --tunnel)   public/watch.html  the viewer page
 shared/schema.js     every record type and field (forms, lists and the save file come from this)
 shared/cricket.js    cricket engine (ICC)    shared/sports.js     rules for every other sport
 shared/scoring.js    results, log tables and player statistics across sports
