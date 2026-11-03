@@ -348,6 +348,40 @@ results, logs and player statistics come from the same data.
 The variant is guessed from the fixture's sport (for example "Rugby Sevens") and its period settings, and can
 be changed in the scorer's set-up before the match starts.
 
+### The tap scorer (rugby, hockey, football, netball, basketball)
+
+The Score tab works like LIGR's scorer. One row per event (try, conversion, goal, cards, interchange …) with the
+home team on the left and the away team on the right: tap a side and it is logged for that team, then pick the
+player (on the field first, then the bench). The big number on each side is how many that team has.
+
+- **Top bar:** History, Lineup, Match info, Undo, Moment (marks the moment for highlights), and the phase button:
+  *Players entering* → *About to start* → **START FIRST HALF** → **END FIRST HALF** → **START SECOND HALF** … →
+  **FULL TIME**. Starting a period starts the clock; ending one stops it. During the break the graphics read HALF TIME.
+- **Clock row:** ✎ set the clock (or back to the start of the period), ▶ / ❚❚, and − / + one second.
+- **On the field:** players on for each side, from the line-up, substitutions, sin bins and red cards. − / +
+  corrects it by hand.
+- **Lineup:** who starts, who is on the bench and who is not playing, with their number and position for this
+  match. It starts from the team's squad (the *Starter* tick in Assets → Teams).
+- **History:** every event, newest first. ⚑ marks a moment, ✎ changes the team, player or time, ✕ deletes it, and
+  **+ Add event** logs one afterwards.
+- **Match statistics** (tackles, carries, possession …) sit under the scoring rows unless the competition or match is
+  set to *Stats to capture: Minimum*. *Ask for the player* (All / Scoring only / None) decides when the player list
+  pops up.
+
+### Data structure (same as LIGR)
+
+| Record | Fields |
+|---|---|
+| Competition | Name, graphic name, short name, sport, format, season, age group, gender, division, colours, logo, two watermarks, theme, teams, **match settings** (periods, period and break length, overtime, golden point, kicking competition, sin bin, 20-minute red card, stats to capture, ask for the player, line-up and bench size, field-goal points), log points, archived |
+| Club | Name, full graphic name, graphic name, abbreviation, home venue, primary / secondary colour and their text colours, logo, home / away / alternative kits, archived |
+| Team | Club, sport, age group, gender, division, name and colours (from the club unless set), coach, players (number, player, position, position type, starter, captain), archived |
+| Player | First and last name, graphic first and last name, sports, date of birth, height, weight, nationality, position, position type, photo, archived |
+| Venue | Name, graphic name, address, city, country, home ground of (club), areas / fields, used for, capacity, surface, image |
+| Match | Name, sport, competition, format, teams, dates and times, venue (the home club's ground if empty), status, scorer, commentators, officials, match settings (empty = from the competition) |
+
+A match's settings win over its competition's; anything left empty uses the sport's rules. Archived records are
+greyed out in the lists and left out of the pickers.
+
 ### Match statistics
 
 Each sport records the statistics its federation and broadcasters report. They can be entered on the scorer
@@ -865,8 +899,27 @@ for receipts). It runs through Chrome, which every Android phone has.
 
 ## 5. Templates
 
-Copy `templates/rfp` into CasparCG's template folder. It holds the CricketCG templates plus three for
-productions:
+Set **Templates → Template folder on this PC** to CasparCG's template folder (`template-path` in casparcg.config).
+RFP Manager then copies its own templates (`rfp/` and the themes that come with it) into that folder at every start
+and update – only files that changed, your own templates are never touched – and "Copy RFP Manager's templates now"
+does it by hand.
+
+**CasparCG on another computer (e.g. a headless Ubuntu server):** share its template folder and point RFP Manager at
+the share. On the server: `sudo apt install samba`, add to `/etc/samba/smb.conf`
+
+```
+[template]
+   path = /opt/casparcg/template        # CasparCG's template-path
+   read only = no
+   valid users = caspar                 # the Linux user that runs CasparCG
+```
+
+then `sudo smbpasswd -a caspar` and `sudo systemctl restart smbd` (`sudo ufw allow samba` with a firewall). On the PC,
+open `\\<server-ip>\template` in Explorer once and tick *Remember my credentials*, then use `\\<server-ip>\template`
+as the template folder. Also set **Settings → Connections → Images in templates → Web address** (the server can't open
+`file:///C:/…` paths on the PC). If the share is offline, RFP Manager tries again every five minutes.
+
+The templates folder holds the CricketCG templates plus three for productions:
 
 | Template | Used for |
 |---|---|
