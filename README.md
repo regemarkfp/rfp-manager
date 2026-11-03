@@ -267,7 +267,7 @@ To update the server later, make a new setup command and run it again. The setti
 `journalctl -u rfp-manager -f` and `journalctl -u mediamtx -f`. Bandwidth: one 4 Mb/s stream uses about 1.8 GB
 an hour for each viewer (Oracle includes 10 TB a month).
 
-### A home server instead of a VM (Raspberry Pi + Cloudflare Tunnel + Tailscale, no monthly cost)
+### A home server instead of a VM (Cloudflare Tunnel + Tailscale, no monthly cost)
 
 The same server can run at home on a Raspberry Pi 3, 4 or 5 (64-bit Raspberry Pi OS Lite) or any Debian /
 Ubuntu box. Nothing is opened on the router, so it also works behind CGNAT:
@@ -310,6 +310,30 @@ Steps:
 Encoders on the tailnet send to the address the installer prints: `rtmp://<pi>.<tailnet>.ts.net/live` and
 `srt://<pi>.<tailnet>.ts.net:8890`. To update the Pi later, make a new setup command and run it again. It stays a
 home server, and the flags are not needed again. Logs: `journalctl -u rfp-manager -f`, `journalctl -u cloudflared -f`.
+
+#### An old PC as server, database and NAS
+
+A spare PC (e.g. an Intel Core i5 2nd generation or newer, 8–16 GB, an SSD) with **Ubuntu Server 24.04 LTS**
+can be the website, its database and the house NAS in one:
+
+```
+<setup command> --domain regemarkfp.com --admin-domain admin.regemarkfp.com --tunnel <Cloudflare token> \
+  --local-db --nas /srv/nas --no-recordings
+```
+
+* `--local-db` installs MongoDB on the PC and, the first time, copies everything from the database the website
+  used (Atlas). From then on the database lives on the PC and is backed up every night at 03:15 to
+  `NAS/backups` (14 days kept). Render and Atlas are not updated any more; copy a backup somewhere off the PC now
+  and then (OneDrive, Google Drive, a USB drive).
+* `--nas /srv/nas` makes the Samba share `\\<pc-name>\NAS` for the house network and Tailscale, with
+  `assets/images` (every image in RFP Manager as a file, kept up to date), `templates` (point the production PC's
+  template folder or CasparCG at it), `shared` and `backups`. Set your Samba password once with
+  `sudo smbpasswd -a <your user>`, then map it in Windows: *This PC → Map network drive → \\<pc-name>\NAS*.
+  Away from home it works the same over Tailscale.
+* `--no-recordings`: streams are relayed but not recorded.
+* In the BIOS, set *Restore on AC power loss → Power on*, so the PC starts again after load shedding. A small UPS
+  keeps it up through short cuts.
+* A 2.5 Gb network card (Realtek RTL8125 or Intel i225/i226) works with Ubuntu 24.04 out of the box.
 
 ### Who does what: the website manages, the PC is the CasparCG bridge
 
