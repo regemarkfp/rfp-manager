@@ -65,7 +65,7 @@
     .lgclock .btn.ghost { width: 46px; height: 46px; font-size: 18px; padding: 0; background: var(--panel2); }
     .lgclock .clock { font-size: 34px; background: var(--panel2); border-radius: 8px; padding: 4px 14px; min-width: 120px; }
     .lggrid { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-    .lgrow { display: grid; grid-template-columns: 1fr 34px 1fr; align-items: stretch; border-top: 1px solid var(--line); }
+    .lgrow { display: grid; grid-template-columns: 1fr 46px 1fr; align-items: stretch; border-top: 1px solid var(--line); }
     .lgrow:first-child { border-top: 0; }
     .lgs { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 16px; min-height: 58px; font-weight: 700; font-size: 14px; letter-spacing: .03em; }
     .lgs:hover { background: var(--panel2); } .lgs:active { filter: brightness(1.3); }
@@ -75,7 +75,10 @@
     .lgs.a .n { color: color-mix(in srgb, var(--ca) 65%, #fff); } .lgs.b .n { color: color-mix(in srgb, var(--cb) 65%, #fff); }
     .lu input:not([type=radio]) { background: var(--panel2); color: var(--text); border: 1px solid var(--line2); border-radius: 6px; padding: 4px 6px; }
     .lgrow.big .lgs { min-height: 72px; font-size: 16px; } .lgrow.big .lgs .n { font-size: 48px; }
-    .lgmid { align-self: center; justify-self: center; width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(90deg, var(--ca) 0 50%, var(--cb) 50% 100%); opacity: .85; box-shadow: inset 0 0 0 3px var(--panel); }
+    .lgmid { align-self: center; justify-self: center; display: flex; gap: 3px; transform: skewX(-18deg); }
+    .lgmid::before, .lgmid::after { content: ''; width: 14px; height: 26px; border-radius: 2px; }
+    .lgmid::before { background: var(--ca); } .lgmid::after { background: var(--cb); }
+    .lgrow.big .lgmid::before, .lgrow.big .lgmid::after { height: 32px; }
     .lgstats { margin-top: 14px; }
     .lgcat { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--muted); margin: 12px 4px 6px; }
     .lgstats .lgs { min-height: 44px; font-size: 13px; } .lgstats .lgs .n { font-size: 26px; }
