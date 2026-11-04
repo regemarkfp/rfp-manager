@@ -250,8 +250,9 @@
     if (!pub) loadPublic();
     if (chatKey !== chatQuery() + ':' + !!info.needs) { chatKey = chatQuery() + ':' + !!info.needs; loadChat(); }
     if (info.needs === 'password') return askPassword();
-    if (info.needs === 'signin') return message('Sign in to watch', 'This channel is for members of the production team.', el('p', {}, el('a', { class: 'btn primary', href: '/?signin=1&next=' + encodeURIComponent(location.pathname + location.search) }, 'Sign in')));
-    if (info.needs === 'team') return message('This channel is for its production team', 'Ask the team to add you, or for a link you can use.');
+    if ((info.needs === 'signin' || info.needs === 'team') && info.expired) return message('This video is no longer public', 'It was open to watch for a limited time after the stream. Members of the production team can still watch it when signed in.', info.needs === 'signin' ? el('p', {}, el('a', { class: 'btn primary', href: '/?signin=1&next=' + encodeURIComponent(location.pathname + location.search) }, 'Sign in')) : null);
+    if (info.needs === 'signin') return message('Sign in to watch', 'This stream is for members of the production team.', el('p', {}, el('a', { class: 'btn primary', href: '/?signin=1&next=' + encodeURIComponent(location.pathname + location.search) }, 'Sign in')));
+    if (info.needs === 'team') return message('This stream is for its production team', 'Ask the team to add you, or for a link you can use.');
     if (info.needs === 'ticket') { if (paidId) return waitForPayment(); return buy(); }
     if (vodStart) { if (info.vod) { if (!playing) playVod(); return; } return message(matchId ? 'This match video is not ready yet' : 'This recording is no longer here', '', el('p', {}, el('a', { class: 'btn', href: location.pathname }, 'Back to the stream'))); }
     if (!info.streaming) return message('Streaming is not set up on this website yet', '');
