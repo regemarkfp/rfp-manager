@@ -9,3 +9,20 @@ self.addEventListener('fetch', (e) => {
   if (e.request.mode !== 'navigate') return;          // only page loads; API calls, media and sockets go straight through
   e.respondWith(fetch(e.request).catch(() => caches.match(OFFLINE)));
 });
+
+// ---- browser push: match updates for the teams people follow, streams going live … (lib/webpush.js)
+self.addEventListener('push', (e) => {
+  let n = {};
+  try { n = e.data ? e.data.json() : {}; } catch { n = { title: e.data ? e.data.text() : 'RegemarkFP' }; }
+  e.waitUntil(self.registration.showNotification(n.title || 'RegemarkFP', { body: n.body || '', icon: '/icons/icon-192.png', badge: '/icons/favicon-64.png',
+    tag: n.tag || undefined, renotify: !!n.tag, data: { url: n.url || '/', id: n.id || '' } }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || '/', self.location.origin).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    const same = list.find((c) => c.url === url);
+    if (same) return same.focus();
+    return self.clients.openWindow(url);
+  }));
+});
