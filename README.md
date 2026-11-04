@@ -1015,8 +1015,19 @@ Received → Being reviewed → Quote sent → Confirmed → Crew booked → Eve
   booking and the Producer (or the Admins when nobody is allocated) gets an email and a notification.
 * **Copy tracking link** and **What the client sees ↗** are on the booking.
 
-**WhatsApp (Settings → Server → WhatsApp, site admins).** Messages are sent by the website through Meta's WhatsApp
-Business Cloud API, from a business number (not one already on the WhatsApp app):
+**WhatsApp (Settings → Server → WhatsApp, site admins)** works one of two ways.
+
+*Link my WhatsApp (phone)*: the business's own WhatsApp is linked to the website the way WhatsApp Web is, with a QR
+code (or a code typed in WhatsApp → Linked devices → Link with phone number instead). Messages then go from that number
+by themselves and the clients' answers come back to the booking. Nothing to set up at Meta. **This is not an official
+WhatsApp API: WhatsApp's terms do not allow it and it can ban the number.** The website keeps the risk down: it only
+writes to people who sent a booking request, one message at a time with a pause between them, at most 60 an hour. Use
+a WhatsApp Business number rather than a personal one. The first link installs the library it uses (Baileys) into the
+data folder (`whatsapp/lib`, with npm, a few minutes); the linked session is kept in `whatsapp/auth`. Unlink there, or
+on the phone under Linked devices. The phone has to come online now and then, or WhatsApp unlinks the website.
+
+*Meta Business API*: the official way, sent through Meta's WhatsApp Business Cloud API from a business number (not
+one already on the WhatsApp app):
 
 1. developers.facebook.com → *Create app* (Business) → add **WhatsApp**, linked to your Meta Business account.
 2. *WhatsApp → API setup*: add and verify the business number; copy its **Phone number ID** into the settings.
@@ -1153,7 +1164,7 @@ lib/blobs.js         per-machine image folder
 lib/auth.js          Google sign-in, passwords, sessions, machine keys
 lib/api.js           HTTP API                lib/hub.js           WebSocket for the management app
 lib/bookings.js      booking tracking (/track/<key>) and client messages
-lib/whatsapp.js      WhatsApp Business Cloud API: send, webhook (replies, ticks)
+lib/whatsapp.js      WhatsApp: Meta Cloud API (send, webhook) or a linked phone (lib/walinked.js, Baileys)
 lib/live.js          live match sessions, scorer/control/monitor WebSocket, rundown monitor API
 lib/gfx.js           graphics catalog, CasparCG playout, adverts and playlists, play log, button actions
 lib/devices.js       vMix, ATEM, HyperDeck, OBS, Companion, OSC, Art-Net, MIDI, X-keys, Pi GPIO; input mappings
