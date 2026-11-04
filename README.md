@@ -887,11 +887,17 @@ Cancel puts the colour back. A colour without transparency is stored as `#rrggbb
 
 Click a match on regemarkfp.com (Matches, or Live matches on the home page) for its match centre at /match/<id>: the score and running clock, what happened (scores, cards, substitutions), team statistics, players and line-ups, match officials; the full scorecard for cricket. It updates every few seconds while the match is live. The same live stats show under the video on a watch page when the stream has a match (the picture covers them in full screen). Matches show when the team has "Show matches on the website" on, or when they are in a production that streams.
 
+### Verse of the day (per person)
+
+Settings → My account → Verse of the day: switch it on or off for your home page, pick the translation (Bibles imported on that machine under Worship → Bibles, any language you are licensed for, then the free online ones: KJV, WEB, BBE, Open English Bible, Portuguese Almeida, Romanian, Latin Vulgate) and the time your day turns over (midnight unless you choose another, e.g. 05:00). The day is your computer's day, and the card turns over by itself at that time.
+
 ### Following teams and clubs (match updates, like Google)
 
 - On regemarkfp.com, **Teams** lists every club and team of production teams that show their matches on the website. A fan signs in and presses **Follow** on a club (all its teams) or one team: on the Teams page, a club's or team's page (/team/<id>), or under a match.
 - They choose what they hear about, per team: line-ups, kick-off, every score, half time and full time, red cards and big moments (cricket: wickets, fifties and hundreds, end of the innings, the result). **Following** (/following) lists their teams with these choices.
 - The updates go to the RFP Manager app for Android (Firebase push, once the site admin has added the Firebase files under Settings → Server), to the browser (Chrome, Edge, Firefox on phone or PC; on an iPhone after "Add to Home Screen") and to the inbox. After the first follow the site offers to turn on notifications in that browser; Notifications → "Turn on" does it too. Quiet hours apply.
+- **How often, per team**: updates as it happens and in the digest, as it happens only, or only in the digest; scores every time, only when the lead changes, or at most every 10 / 15 / 30 minutes; and which kinds of update.
+- **How often, overall** (Following → How often): a score digest (off, the evening of a match day, every day, or once a week on a chosen day) at the fan's time in their own time zone, with coming fixtures or not, as a notification and/or by email ("Send me one now" to try it); and a pause for all live updates (1 hour, until tomorrow, a week). One match can be muted from its page.
 - The website works them out from the match as the scorer saves it (it reaches the website by sync), so it does not matter which PC or phone scores. Matches more than two days old are not announced.
 
 ### Production teams
