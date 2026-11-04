@@ -34,7 +34,7 @@ test('following teams and clubs: pages, alerts and match updates', async (t) => 
   await put('fixture', 'fixture_1', { sport: 'Rugby', team1: 'squad_a', team2: 'squad_b', startDate: new Date().toISOString().slice(0, 10), startTime: '15:00' });
 
   // nothing to follow until the team shows its matches on the website
-  assert.deepEqual((await client(app.url).get('/api/public/teams')).data, { clubs: [], teams: [] });
+  assert.deepEqual((await client(app.url).get('/api/public/teams')).data, { clubs: [], teams: [], competitions: [] });
   const org = await app.store.get(team);
   await app.save(team, 'org', team, { ...org.data, publicMatches: true });
   const cat = (await client(app.url).get('/api/public/teams')).data;
