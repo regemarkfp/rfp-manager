@@ -205,6 +205,14 @@ test('server setup: one command for a site admin hands out the program and the s
   await eve.post('/api/auth/signup', { name: 'Eve', email: 'eve@example.com', password: 'correct horse' });
   assert.equal((await eve.post('/api/server/setup')).status, 403);
   assert.equal((await eve.get('/api/me')).data.machine.siteAdmin, false);
+  // the server's own update key: asked for once with the link, then good for the nightly updates
+  const ukey = (await fetch(`${cloud.url}/api/server/update-key?t=${token}`).then((r) => r.text())).trim();
+  assert.match(ukey, /^su_[0-9a-f]{48}$/);
+  assert.equal((await fetch(`${cloud.url}/api/server/update-key?u=${ukey}`)).status, 403, 'a key cannot make another key');
   assert.equal((await web.del('/api/server/setup')).status, 200);
   assert.equal((await fetch(`${cloud.url}/api/server/bundle.tgz?t=${token}`)).status, 403);
+  assert.equal((await fetch(`${cloud.url}/api/server/bundle.tgz?u=${ukey}`)).status, 200, 'the update key still works after the link is gone');
+  assert.match(await fetch(`${cloud.url}/api/server/env?u=${ukey}`).then((r) => r.text()), /^MODE=cloud$/m);
+  assert.equal((await web.del('/api/server/update-keys')).status, 200);
+  assert.equal((await fetch(`${cloud.url}/api/server/env?u=${ukey}`)).status, 403, 'stopped');
 });
