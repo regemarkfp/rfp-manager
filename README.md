@@ -1043,6 +1043,20 @@ one already on the WhatsApp app):
 
 Numbers people type with a leading 0 get the country code from the settings (27: 068 … → 2768 …).
 
+### Payments with PayFast (Settings → Server → PayFast)
+
+One PayFast merchant account for the website takes every payment: stream tickets and channel passes, **invoices**
+(a *Pay now* button in the invoice email and on the client page; paid invoices turn *Paid* by themselves), **booking
+deposits** (set *Deposit* on a booking request; the client pays on their tracking page and the booking turns
+*Booked*, which the client sees as *Confirmed*) and **software** with a price (on /software/<app>; the buyer signs in,
+pays, and their account may download it from then on). The payer gets a receipt by email and the team is told.
+
+Set up: a PayFast business account (payfast.io) → *Settings → Developer settings*: copy the **Merchant ID** and
+**Merchant Key** and set a **Passphrase**, then type the three into Settings → Server → PayFast (site admins). Try it
+first with a sandbox account (sandbox.payfast.co.za) and **Sandbox** ticked. PayFast confirms each payment to
+`<site>/api/pay/payfast/itn`; the website checks the signature, PayFast's address, the amount and asks PayFast to
+confirm before anything counts as paid. The `PAYFAST_*` variables still work and are used when nothing is saved there.
+
 ### Android app
 
 The Android app is an APK that opens the website as an app (full screen, its own icon, Google sign-in, the camera
@@ -1164,6 +1178,7 @@ lib/blobs.js         per-machine image folder
 lib/auth.js          Google sign-in, passwords, sessions, machine keys
 lib/api.js           HTTP API                lib/hub.js           WebSocket for the management app
 lib/bookings.js      booking tracking (/track/<key>) and client messages
+lib/payments.js      PayFast for invoices, booking deposits and software (lib/pay.js: the checkout)
 lib/whatsapp.js      WhatsApp: Meta Cloud API (send, webhook) or a linked phone (lib/walinked.js, Baileys)
 lib/live.js          live match sessions, scorer/control/monitor WebSocket, rundown monitor API
 lib/gfx.js           graphics catalog, CasparCG playout, adverts and playlists, play log, button actions
