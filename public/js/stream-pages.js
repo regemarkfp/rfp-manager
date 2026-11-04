@@ -249,18 +249,73 @@
     try { const r = await api('POST', `/api/productions/${encodeURIComponent(id)}/stream/reopen?team=${App.team}`); if (r.doc) App.docs.set(r.doc.id, r.doc); toast('Stream key open: you can stream again'); return true; } catch (e) { oops(e); return false; }
   };
   App.endStream = endStream; App.reopenStream = reopenStream;
+  // ---- setting up a stream: on an existing production, or a new production made for it (with a match if picked).
+  // The stream lives on the production, so whatever is set here shows on the production and the other way round.
+  const streamFields = () => Schema.fieldsFor('production', App.org()).filter((f) => f.group === 'Live stream' && !f.hidden);
+  const todayIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const showKeys = (doc) => UI.modal({ title: `Stream key: ${doc.data.streamTitle || doc.data.name}`, wide: true, body: streamCard(doc), actions: [{ label: 'Done' }] });
+  App.streamSetup = (prodId, onDone) => {
+    const cur = prodId ? App.docs.get(prodId) : null;
+    const prods = App.list('production').filter((d) => !d.data.streamChannel).sort((a, b) => String(b.data.date || '').localeCompare(String(a.data.date || '')));
+    const fixtures = App.list('fixture').filter((d) => !d.data.startDate || d.data.startDate >= todayIso()).sort((a, b) => String(a.data.startDate || '').localeCompare(String(b.data.startDate || '')));
+    const channels = App.sorted('channel');
+    let mode = cur ? 'edit' : 'new', target = '', match = '';
+    const top = h('div', {}), formBox = h('div', {});
+    const base = [{ k: 'name', l: 'Production name', t: 'text', ph: 'From the match if you pick one' }, { k: 'date', l: 'Date', t: 'date' }, { k: 'txTime', l: 'TX / start time', t: 'time' }, { k: 'venue', l: 'Venue', t: 'ref', ref: 'venue' }];
+    let form = null;
+    const build = () => {
+      const fields = mode === 'new' ? [...base, ...streamFields()] : streamFields();
+      const init = mode === 'edit' ? cur.data : mode === 'existing' && target ? App.docs.get(target).data : {};
+      const start = { ...init };
+      if (!start.streamChannel && channels.length === 1) start.streamChannel = channels[0].id;
+      form = buildForm('production', start, { fields });
+      formBox.replaceChildren(form.el);
+    };
+    const pick = (m) => { mode = m; paintTop(); build(); };
+    function paintTop() {
+      if (cur) { top.replaceChildren(h('p', { class: 'dim', style: { marginTop: 0 } }, 'These are the stream settings of the production "', h('b', {}, cur.data.name), '": changing them here changes the production.')); return; }
+      top.replaceChildren(
+        h('div', { class: 'tabs', style: { marginBottom: '10px' } }, h('button', { class: mode === 'new' ? 'on' : '', onclick: () => pick('new') }, 'New production'), h('button', { class: mode === 'existing' ? 'on' : '', disabled: !prods.length, onclick: () => pick('existing') }, `Existing production (${prods.length})`)),
+        mode === 'new' ? h('label', { class: 'f' }, h('span', {}, 'Match (optional)'), h('select', { onchange: (e) => {
+          match = e.target.value; const f = match && App.get(match);
+          if (f && form) { const d = form.data; if (!d.name) d.name = App.fixtureName(f); if (!d.date) d.date = f.startDate || ''; if (!d.txTime) d.txTime = f.startTime || ''; if (!d.venue) d.venue = f.venue || ''; form.repaint(); }
+        } }, h('option', { value: '' }, '– no match: an event, a service, a concert … –'), fixtures.map((d) => h('option', { value: d.id, selected: d.id === match }, `${d.data.startDate || ''} ${App.fixtureName(d.data)}`))),
+        h('div', { class: 'help' }, 'Makes the production with this match in it, so the scorer, graphics and the report know it.'))
+          : h('label', { class: 'f' }, h('span', {}, 'Production'), h('select', { onchange: (e) => { target = e.target.value; build(); } }, h('option', { value: '' }, '– pick a production –'), prods.map((d) => h('option', { value: d.id, selected: d.id === target }, `${d.data.date || ''} ${d.data.name}`)))));
+    }
+    paintTop(); build();
+    if (!channels.length) formBox.prepend(h('p', { class: 'pill warn', style: { whiteSpace: 'normal' } }, 'You have no channel yet: make one under Streaming → Channels first (a stream always plays on a channel).'));
+    UI.modal({ title: cur ? 'Stream settings' : 'New live stream', wide: true, body: h('div', {}, top, formBox), actions: [{ label: 'Cancel' }, { label: cur ? 'Save' : 'Create stream', primary: true, onClick: async () => {
+      const d = form.data;
+      if (!d.streamChannel) { toast('Pick the channel it streams on', 'error'); return false; }
+      let doc;
+      if (mode === 'edit') doc = await App.save('production', cur.id, { ...App.docs.get(cur.id).data, ...d });
+      else if (mode === 'existing') { if (!target) { toast('Pick a production', 'error'); return false; } doc = await App.save('production', target, { ...App.docs.get(target).data, ...d }); }
+      else {
+        const f = match && App.get(match);
+        const name = d.name || (f ? App.fixtureName(f) : '') || d.streamTitle;
+        if (!name) { toast('Give the production a name (or pick a match)', 'error'); return false; }
+        doc = await App.save('production', App.newId('production'), { type: f ? 'Sport' : 'Other', ...d, name, date: d.date || todayIso(), fixtures: f ? [{ fixture: match }] : [] });
+      }
+      toast(cur ? 'Stream settings saved' : 'Stream ready: here is what to put in OBS / vMix');
+      if (onDone) onDone(doc);
+      if (!cur) setTimeout(() => showKeys(doc), 50);
+    } }] });
+  };
   let liveFilter = 'Live';
   App.pages.streams = () => {
     const tabs = h('div', { class: 'tabs' }), body = h('div', {}, h('div', { class: 'card dim' }, 'Loading…'));
-    let timer = null;
+    let timer = null, first = true;
     const paint = async () => {
       if (!body.isConnected && timer) { clearInterval(timer); return; }
       let r;
       try { r = await api('GET', '/api/streams?team=' + App.team); } catch (e) { body.replaceChildren(h('div', { class: 'card' }, e.message)); return; }
       const rows = r.list.map((s) => ({ ...s, doc: App.docs.get(s.parent || s.id) })).filter((s) => s.doc);
-      const groups = { Live: rows.filter((s) => s.live), Closed: rows.filter((s) => s.closed && !s.live), All: rows };
+      const today = todayIso();
+      const groups = { Live: rows.filter((s) => s.live), Upcoming: rows.filter((s) => !s.live && !s.closed && (s.doc.data.date || '') >= today), Closed: rows.filter((s) => s.closed && !s.live), All: rows };
+      if (first) { first = false; if (!groups.Live.length && liveFilter === 'Live' && groups.Upcoming.length) liveFilter = 'Upcoming'; }
       tabs.replaceChildren(...Object.keys(groups).map((t) => h('button', { class: t === liveFilter ? 'on' : '', onclick: () => { liveFilter = t; paint(); } }, `${t} (${groups[t].length})`)));
-      const list = groups[liveFilter].sort((a, b) => (b.live - a.live) || String(b.doc.data.date || '').localeCompare(String(a.doc.data.date || '')));
+      const list = groups[liveFilter].sort((a, b) => (b.live - a.live) || (liveFilter === 'Upcoming' ? -1 : 1) * String(b.doc.data.date || '').localeCompare(String(a.doc.data.date || '')));
       const can = App.canEdit('production');
       const card = (s) => {
         const d = s.doc.data, ch = App.docs.get(d.streamChannel);
@@ -280,17 +335,19 @@
           h('div', { class: 'row', style: { gap: '6px', flexWrap: 'wrap', marginTop: 'auto' } },
             h('a', { class: 'btn sm', href: watch, target: '_blank', rel: 'noopener' }, 'Watch ↗'),
             h('a', { class: 'btn sm', href: '#/edit/production/' + (s.parent || s.id) }, 'Production'),
+            can ? h('button', { class: 'sm', onclick: () => App.streamSetup(s.parent || s.id, () => paint()) }, 'Settings') : null,
+            can && !s.parent ? h('button', { class: 'sm', onclick: () => showKeys(App.docs.get(s.id)) }, 'Stream key') : null,
             can && App.mcrPanel ? h('button', { class: 'sm primary', onclick: () => App.mcrPanel(s) }, 'Master control') : null,
             can && (s.live || !s.closed) ? h('button', { class: 'sm danger', onclick: async () => { if (await endStream(s.id, name)) paint(); } }, 'End stream') : null,
             can && s.closed ? h('button', { class: 'sm', onclick: async () => { if (await reopenStream(s.id)) paint(); } }, 'Open key again') : null));
       };
       body.replaceChildren(list.length ? h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' } }, list.map(card))
-        : h('div', { class: 'card empty' }, liveFilter === 'Live' ? 'Nothing is live right now. Streams show up here the moment a camera or encoder connects.' : 'None.'),
+        : h('div', { class: 'card empty' }, liveFilter === 'Live' ? 'Nothing is live right now. Streams show up here the moment a camera or encoder connects.' : liveFilter === 'Upcoming' ? 'No streams coming up. Set one up with "New stream".' : 'None.'),
         !r.enabled ? h('p', { class: 'dim' }, 'This website has no streaming server yet.') : r.health && r.health.lastError ? h('p', { class: 'pill warn' }, 'The streaming server is not answering: ' + r.health.lastError) : null);
     };
     paint();
     timer = setInterval(paint, 5000);
-    return { el: h('div', {}, pageHead('Live streams'), h('p', { class: 'dim', style: { marginTop: '-8px' } }, 'Every stream of your production team, matches streaming on their own included. Master control puts slates, ad breaks and graphics on what viewers see in the app (the stream and recording stay clean). End stream cuts the camera off, shows viewers that it has ended and closes the stream key until you open it again.'), tabs, body), keepScroll: true, destroy: () => clearInterval(timer) };
+    return { el: h('div', {}, pageHead('Live streams', App.canEdit('production') ? h('button', { class: 'primary', onclick: () => App.streamSetup('', () => { liveFilter = 'Upcoming'; paint(); }) }, '+ New stream') : null), h('p', { class: 'dim', style: { marginTop: '-8px' } }, 'Every stream of your production team, matches streaming on their own included. New stream sets one up on a new or existing production (the stream settings live on the production, so changes show in both places). Master control puts slates, ad breaks and graphics on what viewers see in the app (the stream and recording stay clean). End stream cuts the camera off, shows viewers that it has ended and closes the stream key until you open it again.'), tabs, body), keepScroll: true, destroy: () => clearInterval(timer) };
   };
 
   // ---- Streaming → Ticket sales (Producers and Admins)

@@ -178,7 +178,7 @@ function navFor() {
   if (c.bridge) {
     return [
       ['', [['#/', 'Bridge']]],
-      ['Live', [['#/monitors', 'Monitors'], ['#/templates', 'Templates'], ['#/variables', 'Variables'], ['#/list/theme', 'Themes'], ['#/adverts', 'Advert playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'], ['#/playlog', 'Play log']]],
+      ['Live', [['#/monitors', 'Monitors'], ['#/templates', 'Templates'], ['#/variables', 'Variables'], ['#/list/theme', 'Themes'], ['#/adverts', 'Advert playout'], ['#/music', 'Music playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'], ['#/playlog', 'Play log']]],
       ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/bibles', 'Bibles'], ['#/ccli', 'CCLI report']]],
       ['From the website', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions'], ['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], ['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/crewMember', 'Crew'], ['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/images', 'Images']]],
       ['', [['#/settings', 'Settings']]],
@@ -191,6 +191,7 @@ function navFor() {
     ['Productions', [['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], App.can('edit') && !local ? ['#/list/booking', 'Booking requests' + (App.waitingBookings && App.waitingBookings().length ? ` (${App.waitingBookings().length})` : '')] : null, ['#/list/expense', App.can('edit') ? 'Expenses' : 'My expenses'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment']].filter(Boolean)],
     ['Assets', [['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/theme', 'Themes'], ['#/images', 'Images']]],
     ['Advertising', [['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log'], local ? null : ['#/streamads', 'Stream adverts']].filter(Boolean)],
+    ['Music', [['#/list/track', 'Music library'], pc ? ['#/music', 'Music playout'] : null, App.can('edit') ? ['#/musicrights', 'Music use report'] : null].filter(Boolean)],
     ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report']].concat(local ? [['#/bibles', 'Bibles']] : [])],
     local ? null : ['Streaming', [['#/list/channel', 'Channels'], App.can('edit') ? ['#/streams', 'Live streams'] : null, App.can('edit') ? ['#/analytics', 'Analytics'] : null, App.can('edit') ? ['#/sales', 'Ticket sales'] : null].filter(Boolean)],
     ['Live', [App.pcs ? ['#/pcs', 'Production PCs'] : null, pc ? ['#/monitors', 'Monitors'] : null, pc ? ['#/templates', 'Templates'] : null, pc ? ['#/variables', 'Variables'] : null, pc ? ['#/adverts', 'Advert playout'] : null,
