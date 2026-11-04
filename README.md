@@ -226,6 +226,8 @@ members. Old links to `/#/…` still work and lead to `/app`. Matches are on the
 
 ### Live streaming: channels and streams (SRT / RTMP in, watch pages and videos out)
 
+Streaming → Live streams is where streams are run and set up: **+ New stream** makes one on a new production (pick a match and it fills in the name, date and time) or on an existing one, then shows the stream key for OBS / vMix. The tabs show what is live, coming up, ended and everything; each stream has Settings, Stream key, Master control and End stream. The stream settings live on the production, so a change in either place shows in both.
+
 The website can run its own streaming server, so you do not need YouTube or Facebook.
 
 * A **channel** (Streaming → Channels) is a branded page: the production company's, or a club's, a team's or a
@@ -867,6 +869,14 @@ Cancel puts the colour back. A colour without transparency is stored as `#rrggbb
 - **Themes**: copy `templates/rfp` to a new folder, restyle it, create a Theme pointing at that folder and set
   it on a competition.
 - **Save file**: Settings → Save file exports and imports XML in the layout of the original save file template.
+
+### Music rights, cue sheets and the production report
+
+- **Music library** (Music → Music library): every track with its title, artist, composers, publishers, ISWC / ISRC, length, and its rights: where it comes from (commercial release, production music library, royalty-free, commissioned …), whether it is cleared, what for (TV, stream, social, PA, radio) and from / until when. Admins and Producers edit it.
+- **Theme music**: a competition has its own theme music (Competition → Theme music), and a production can add more (Production → Music & report). Music playout on the production PC shows the theme music of the match on air first, then the whole library.
+- **What gets logged, by itself**: tracks played from Music playout (CasparCG, layer 60 of the program channel), a vMix input whose title is a track's "vMix input title" while it runs (and is not muted), and the music under stream slates (Master control). Anything else (a DJ, the stadium PA, a band, the ATEM) goes on the production under "Music used (added by hand)". Tracks that are not cleared ask before they play and are flagged on the report.
+- **After the production**: Production → Report & cue sheet. The report has the summary, matches and results, commentators and officials, crew and costs, the graphics and adverts that went to air, the music, the stream's viewers and recordings, and the incidents logged on the production (PDF or print). The music cue sheet comes in the SAMRO layout and a broadcaster layout, each as PDF or CSV, timed from the TX time.
+- **Rights holders**: Music → Music use report lists every use over a period for a composer, publisher or library (CSV to send them).
 
 ### Production teams
 
