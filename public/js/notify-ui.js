@@ -52,6 +52,40 @@
     window.addEventListener('hashchange', awake); awake();
   }
 
+  // ---- browsers (not in the app): Web Push through the service worker
+  const webOk = () => !native && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && location.protocol === 'https:';
+  const keyBytes = (b64) => { const s = atob(b64.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((b64.length + 3) % 4)); return Uint8Array.from(s, (c) => c.charCodeAt(0)); };
+  const browserName = () => { const u = navigator.userAgent; const b = /Edg\//.test(u) ? 'Edge' : /Firefox\//.test(u) ? 'Firefox' : /Chrome\//.test(u) ? 'Chrome' : /Safari\//.test(u) ? 'Safari' : 'Browser'; return `${b} on ${/Android/.test(u) ? 'Android' : /iPhone|iPad/.test(u) ? 'iPhone' : /Windows/.test(u) ? 'Windows' : /Mac/.test(u) ? 'Mac' : /Linux/.test(u) ? 'Linux' : 'this device'}`; };
+  async function webState() {
+    if (!webOk()) return 'unsupported';
+    if (Notification.permission === 'denied') return 'blocked';
+    const reg = await navigator.serviceWorker.getRegistration('/');
+    const sub = reg && (await reg.pushManager.getSubscription());
+    return sub ? 'on' : 'off';
+  }
+  async function enableWeb() {
+    if (!webOk()) { say(/iPhone|iPad/.test(navigator.userAgent) ? 'On an iPhone: Share → Add to Home Screen, open the site from there, then turn notifications on.' : 'This browser cannot get notifications', true); return false; }
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { say('Notifications are blocked for this site. Allow them in the browser\'s site settings.', true); return false; }
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+    const { key } = await call('GET', '/api/push/web-key');
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
+    await call('POST', '/api/push/register', { platform: 'web', subscription: sub.toJSON(), name: browserName() });
+    return true;
+  }
+  async function disableWeb() {
+    const reg = await navigator.serviceWorker.getRegistration('/');
+    const sub = reg && (await reg.pushManager.getSubscription());
+    if (sub) { await call('POST', '/api/push/unregister', { platform: 'web', endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe().catch(() => {}); }
+  }
+  // signed in with notifications already allowed: keep this browser's subscription registered
+  if (webOk() && Notification.permission === 'granted') navigator.serviceWorker.getRegistration('/').then(async (reg) => {
+    const sub = reg && (await reg.pushManager.getSubscription());
+    if (sub) fetch('/api/push/register', { method: 'POST', credentials: 'same-origin', headers: { 'x-rfp': '1', 'content-type': 'application/json' }, body: JSON.stringify({ platform: 'web', subscription: sub.toJSON(), name: browserName() }) }).catch(() => {});
+  }).catch(() => {});
+
   async function inbox(box, { limit } = {}) {
     style();
     box.replaceChildren(el('div', { class: 'rn-note' }, 'Loading…'));
@@ -78,12 +112,22 @@
     const qFrom = el('input', { type: 'time', value: quiet.from || '22:00', onchange: (e) => { quiet.from = e.target.value; save({ quiet }); } });
     const qTo = el('input', { type: 'time', value: quiet.to || '07:00', onchange: (e) => { quiet.to = e.target.value; save({ quiet }); } });
     const devices = el('div', {});
-    const paintDevices = (list) => devices.replaceChildren(list.length ? list.map((x) => el('div', { class: 'rn-dev' }, el('span', {}, (x.platform === 'android' ? '📱 ' : '🖥 ') + x.name),
+    const paintDevices = (list) => devices.replaceChildren(list.length ? list.map((x) => el('div', { class: 'rn-dev' }, el('span', {}, (x.platform === 'android' ? '📱 ' : x.platform === 'web' ? '🌐 ' : '🖥 ') + x.name),
       el('button', { class: 'btn sm ghost', onclick: async () => { try { await call('DELETE', '/api/push/devices/' + x.id); paintDevices(list.filter((y) => y.id !== x.id)); } catch (e) { say(e.message, true); } } }, 'Remove')))
       : el('p', { class: 'rn-note' }, 'No phone or PC gets your notifications yet. Install the RFP Manager app for Android and sign in, or sign in on a production PC with RFP Manager for Windows.'));
     paintDevices(d.devices);
+    const webBox = el('div', {});
+    const paintWeb = async () => {
+      const st = await webState().catch(() => 'unsupported');
+      if (st === 'unsupported') { webBox.replaceChildren(native ? null : el('p', { class: 'rn-note' }, /iPhone|iPad/.test(navigator.userAgent) ? 'On an iPhone, add this site to your home screen (Share → Add to Home Screen) and open it from there to get notifications.' : 'This browser cannot get notifications.')); return; }
+      webBox.replaceChildren(el('div', { class: 'rn-dev' }, el('span', {}, st === 'on' ? '🔔 Notifications are on in this browser' : st === 'blocked' ? '🔕 Blocked in this browser (allow them in the site settings)' : '🔕 Not on in this browser'),
+        st === 'on' ? el('button', { class: 'btn sm ghost', onclick: async () => { await disableWeb(); paintWeb(); settings(box); } }, 'Turn off')
+          : st === 'off' ? el('button', { class: 'btn sm primary', onclick: async () => { try { if (await enableWeb()) { say('Notifications on in this browser'); settings(box); } } catch (e) { say(e.message, true); } } }, 'Turn on') : null));
+    };
+    paintWeb();
     box.replaceChildren(
-      el('p', { class: 'rn-note' }, 'Choose what reaches your phone (RFP Manager for Android) and your production PC (RFP Manager for Windows). Everything also stays in your inbox here.'),
+      webBox,
+      el('p', { class: 'rn-note' }, 'Choose what reaches your phone (the RFP Manager app, or this browser) and your production PC (RFP Manager for Windows). Everything also stays in your inbox here.'),
       native && !d.devices.some((x) => x.platform === 'android') ? el('p', {}, el('button', { class: 'btn primary', onclick: async () => { if (native.askPermission) native.askPermission(); setTimeout(async () => { if (await registerApp()) settings(box); else say('Allow notifications for RFP Manager, then try again', true); }, 1500); } }, 'Get notifications on this phone')) : null,
       groups.map((g) => [el('div', { class: 'rn-group' }, g), d.events.filter((e) => e.group === g).map((e) => el('label', { class: 'rn-row' },
         el('input', { type: 'checkbox', checked: prefs[e.key], onchange: (ev) => { prefs[e.key] = ev.target.checked; save({ prefs: { [e.key]: ev.target.checked } }); } }), el('span', {}, e.label)))]),
@@ -98,5 +142,5 @@
       el('p', {}, el('button', { class: 'btn sm', onclick: async () => { try { const r = await call('POST', '/api/push/test', {}); say(r.devices ? `Sent to ${r.pushed} of ${r.devices} device${r.devices === 1 ? '' : 's'}` : 'Sent to your inbox (no devices yet)'); } catch (e) { say(e.message, true); } } }, 'Send me a test notification')));
   }
 
-  window.RFPNotifyUI = { inbox, settings, registerApp, unread: async () => { try { return (await call('GET', '/api/notifications')).unread; } catch (e) { return 0; } } };
+  window.RFPNotifyUI = { inbox, settings, registerApp, enableWeb, webState, native: !!native, unread: async () => { try { return (await call('GET', '/api/notifications')).unread; } catch (e) { return 0; } } };
 })();

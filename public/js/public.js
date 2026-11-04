@@ -64,6 +64,96 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       m.watch ? el('a', { class: 'watch-btn' + (m.watch.live ? ' live' : ''), href: m.watch.href }, m.watch.live ? '● Watch live' : '▶ Watch the match') : null,
       live || m.score ? el('div', { class: 'more' }, live ? 'Live stats ›' : 'Match stats ›') : null);
   }
+  // ---- following teams and clubs: match updates in the app, the browser and the inbox
+  const following = (id) => !!(D && D.me && (D.me.follows || []).includes(id));
+  const say = (t) => { const n = el('div', { class: 'toast' }, t); document.body.append(n); setTimeout(() => n.remove(), 3500); };
+  // after the first follow: offer notifications in this browser (the app registers itself)
+  async function offerPush() {
+    const N = window.RFPNotifyUI;
+    if (!N || N.native) return;
+    const st = await N.webState().catch(() => 'unsupported');
+    if (st !== 'off' && st !== 'unsupported') return;
+    const old = document.getElementById('push-offer'); if (old) old.remove();
+    const box = el('div', { id: 'push-offer', class: 'push-offer' },
+      el('div', {}, el('b', {}, 'Get match updates on this device?'), el('div', { class: 'sub' }, st === 'unsupported' ? (/iPhone|iPad/.test(navigator.userAgent) ? 'On an iPhone: Share → Add to Home Screen, then open the site from there.' : 'This browser cannot show notifications. The RFP Manager app for Android can.') : 'Line-ups, kick-off, scores, half time and full time for the teams you follow.')),
+      st === 'off' ? el('button', { class: 'primary', onclick: async () => { try { if (await N.enableWeb()) { box.remove(); say('Notifications are on'); } } catch (e) { say(e.message); } } }, 'Turn on') : null,
+      el('button', { class: 'icon', 'aria-label': 'Not now', onclick: () => box.remove() }, '✕'));
+    document.body.append(box);
+  }
+  async function toggleFollow(id, on, alerts) {
+    if (!D.me) { signIn('Sign in to follow teams and clubs and get their match updates.'); return null; }
+    const r = await post('/api/public/follow', { id, follow: on, alerts });
+    D.me.follows = r.follows.map((f) => f.id);
+    if (on) { say('Following – you get its match updates'); if (D.me.follows.length === 1 || !alerts) offerPush(); }
+    side();
+    return r;
+  }
+  function followBtn(id, { small } = {}) {
+    const b = el('button', { class: 'follow' + (following(id) ? ' on' : '') + (small ? ' sm' : ''), onclick: async (e) => {
+      e.stopPropagation(); e.preventDefault();
+      const on = !following(id);
+      try { const r = await toggleFollow(id, on); if (r) { b.className = 'follow' + (on ? ' on' : '') + (small ? ' sm' : ''); b.textContent = on ? '★ Following' : '☆ Follow'; if (!small) render(); } } catch (err) { say(err.message); }
+    } }, following(id) ? '★ Following' : '☆ Follow');
+    return b;
+  }
+  const teamLogo = (t, cls = 'tlogo') => (t.logo ? el('img', { class: cls, src: img(t.logo), alt: '' }) : el('span', { class: cls + ' ph', style: { background: t.color || '#555' } }, String(t.name || '?').slice(0, 1)));
+  function teamCard(t) {
+    const go = (e) => { if (e.target.closest('button')) return; history.pushState(null, '', '/team/' + encodeURIComponent(t.id)); window.scrollTo(0, 0); render(); };
+    return el('div', { class: 'tcard', role: 'link', tabindex: '0', onclick: go, onkeydown: (e) => { if (e.key === 'Enter') go(e); } }, teamLogo(t),
+      el('div', { class: 'grow' }, el('b', {}, t.name), el('div', { class: 'sub' }, t.kind === 'club' ? ['Club', t.company].filter(Boolean).join(' · ') : [t.clubName && t.clubName !== t.name ? t.clubName : '', t.sport, t.gender].filter(Boolean).join(' · '))),
+      followBtn(t.id, { small: true }));
+  }
+  function teamsPage() {
+    const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
+    get('/api/public/teams').then((c) => {
+      const q = query, f = (list) => list.filter((t) => match(q, t.name, t.clubName, t.sport, t.company));
+      const clubs = f(c.clubs), teams = f(c.teams);
+      box.replaceChildren(el('p', { class: 'sub', style: { margin: '0 0 8px' } }, 'Follow a club (all its teams) or one team to get its line-ups, kick-off, scores, half time and full time on your phone.'),
+        section('Clubs', clubs.length ? el('div', { class: 'tgrid' }, clubs.map(teamCard)) : null, clubs.length),
+        section('Teams', teams.length ? el('div', { class: 'tgrid' }, teams.map(teamCard)) : null, teams.length),
+        !clubs.length && !teams.length ? el('div', { class: 'empty' }, q ? 'No team matches your search.' : 'No teams to follow yet.') : null);
+    }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
+    return [el('h2', { class: 'sec' }, 'Teams & clubs'), box];
+  }
+  function alertsEditor(id, kinds, alerts) {
+    const cur = { ...alerts };
+    return el('div', { class: 'alerts' }, el('span', { class: 'sub' }, 'Tell me about:'), kinds.map((k) => el('label', {}, el('input', { type: 'checkbox', checked: cur[k.key] !== false ? '' : null, onchange: async (e) => {
+      cur[k.key] = e.target.checked; try { await post('/api/public/follow', { id, follow: true, alerts: cur }); } catch (err) { say(err.message); }
+    } }), k.label)));
+  }
+  function teamPage(id) {
+    const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
+    get('/api/public/team/' + encodeURIComponent(id)).then((t) => {
+      document.title = `${t.name} – ${D.site || 'RegemarkFP'}`;
+      const M = t.matches;
+      box.replaceChildren(
+        el('div', { class: 'thead' }, teamLogo(t, 'tlogo big'), el('div', { class: 'grow' }, el('h1', {}, t.name),
+          el('div', { class: 'sub' }, [t.kind === 'club' ? 'Club' : t.clubName && t.clubName !== t.name ? t.clubName : '', t.sport, t.company, `${t.followers} follower${t.followers === 1 ? '' : 's'}`].filter(Boolean).join(' · '),
+            t.kind === 'team' && t.club ? [' · ', el('a', { href: '/team/' + encodeURIComponent(t.club), 'data-nav': '' }, 'Club page')] : null)), followBtn(t.id)),
+        t.following ? alertsEditor(t.id, t.alertKinds, t.alerts) : null,
+        section('Live', M.live.length ? el('div', { class: 'matches' }, M.live.map(matchCard)) : null),
+        section('Fixtures', M.upcoming.length ? el('div', { class: 'matches' }, M.upcoming.map(matchCard)) : null),
+        section('Results', M.results.length ? el('div', { class: 'matches' }, M.results.map(matchCard)) : null),
+        t.teams && t.teams.length ? section('Teams', el('div', { class: 'tgrid' }, t.teams.map(teamCard)), t.teams.length) : null,
+        !M.live.length && !M.upcoming.length && !M.results.length ? el('div', { class: 'empty' }, 'No matches yet.') : null);
+    }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.status === 404 ? 'This team is not on the website.' : e.message)));
+    return [el('div', { class: 'match-head' }, el('a', { href: '/teams', 'data-nav': '' }, '‹ Teams & clubs')), box];
+  }
+  function followingPage() {
+    if (!D.me) return el('div', { class: 'signin-box' }, el('h2', {}, 'Following'), el('p', {}, 'Sign in to follow teams and clubs and get their line-ups, kick-off, scores, half time and full time.'), signInButton());
+    const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
+    const pushBox = el('div', {});
+    if (window.RFPNotifyUI && !window.RFPNotifyUI.native) window.RFPNotifyUI.webState().then((st) => pushBox.replaceChildren(st === 'on' ? null : el('div', { class: 'push-inline' },
+      el('span', {}, st === 'blocked' ? 'Notifications are blocked in this browser: allow them in the site settings.' : st === 'unsupported' ? 'This browser cannot show notifications (on an iPhone, add the site to your home screen first).' : 'Turn on notifications to get the updates on this device.'),
+      st === 'off' ? el('button', { class: 'primary', onclick: async () => { if (await window.RFPNotifyUI.enableWeb().catch((e) => { say(e.message); return false; })) { say('Notifications are on'); pushBox.replaceChildren(); } } }, 'Turn on') : null))).catch(() => {});
+    get('/api/public/follows').then((r) => {
+      box.replaceChildren(r.list.length ? r.list.map((t) => el('div', { class: 'frow' }, teamCard(t), alertsEditor(t.id, r.alertKinds, t.alerts)))
+        : el('div', { class: 'empty' }, 'You do not follow any team yet. ', el('a', { href: '/teams', 'data-nav': '' }, 'Find your teams'), '.'));
+    }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
+    return [el('div', { class: 'spread' }, el('h2', { class: 'sec' }, 'Following'), el('a', { href: '/teams', 'data-nav': '' }, el('button', {}, '+ Find teams'))), pushBox, box,
+      el('p', { class: 'sub' }, 'Quiet hours and the rest of your notifications: ', el('a', { href: '/notifications', 'data-nav': '' }, 'Notifications'), '.')];
+  }
+
   // ---- the match centre (/match/<id>): score, what happened, team stats, players or the cricket scorecard
   let centre = null;
   function matchPage(id) {
@@ -71,9 +161,10 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const m = [...(D.matches.live || []), ...(D.matches.upcoming || []), ...(D.matches.results || [])].find((x) => x.id === id);
     const head = el('div', { class: 'match-head' }, el('a', { href: '/matches', 'data-nav': '' }, '‹ Matches'),
       m && m.watch ? el('a', { class: 'watch-btn' + (m.watch.live ? ' live' : ''), href: m.watch.href }, m.watch.live ? '● Watch live' : '▶ Watch the match') : null);
+    const fol = m && (m.teamIds || []).some(Boolean) ? el('div', { class: 'follow-row' }, (m.teamIds || []).map((tid, i) => (tid ? el('span', { class: 'fchip' }, el('a', { href: '/team/' + encodeURIComponent(tid), 'data-nav': '' }, (m.teams[i] || {}).name || 'Team'), followBtn(tid, { small: true })) : null))) : null;
     if (centre) centre.stop();
     centre = window.MatchStats ? window.MatchStats.mount(box, id, { onMissing: () => box.replaceChildren(el('div', { class: 'empty' }, 'This match is not on the website.')), onData: (x) => { document.title = `${x.teams.map((t) => t.name).join(' v ')} – ${D.site || 'RegemarkFP'}`; } }) : null;
-    return [head, box];
+    return [head, box, fol];
   }
   // the channel's next stream (live now, or the next one coming up)
   const nextOf = (c) => {
@@ -259,7 +350,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   }
 
   // ---- data and routing
-  async function get(url) { const r = await fetch(url, { credentials: 'same-origin' }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Something went wrong'); return j; }
+  async function get(url) { const r = await fetch(url, { credentials: 'same-origin' }); const j = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(j.error || 'Something went wrong'), { status: r.status }); return j; }
   async function post(url, body) { const r = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-rfp': '1' }, body: JSON.stringify(body) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Something went wrong'); return j; }
 
   // notifications: the inbox and what to get (lib/push.js); live now for channels you subscribe to, match moments …
@@ -273,7 +364,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const p = location.pathname;
     const link = (href, label, icon) => el('a', { href, 'data-nav': '', class: p === href ? 'on' : '' }, el('span', {}, icon), label);
     const subs = D && D.me ? D.channels.filter((c) => (D.me.subscriptions || []).includes(c.id)) : [];
-    $('side').replaceChildren(link('/', 'Home', '⌂'), link('/browse', 'Browse', '▦'), link('/book', 'Book services', '✉'), link('/matches', 'Matches', '◎'), link('/videos', 'Videos', '▶'), link('/subscriptions', 'Subscriptions', '★'), link('/channels', 'Channels', '◉'),
+    $('side').replaceChildren(link('/', 'Home', '⌂'), link('/browse', 'Browse', '▦'), link('/book', 'Book services', '✉'), link('/matches', 'Matches', '◎'), link('/teams', 'Teams', '⚑'), D && D.me ? link('/following', 'Following' + ((D.me.follows || []).length ? ` (${D.me.follows.length})` : ''), '♥') : null, link('/videos', 'Videos', '▶'), link('/subscriptions', 'Subscriptions', '★'), link('/channels', 'Channels', '◉'),
       subs.length ? [el('hr'), el('h4', {}, 'Subscriptions'), subs.map((c) => el('a', { href: '/c/' + c.slug, 'data-nav': '', class: p === '/c/' + c.slug ? 'on' : '' }, c.logo ? el('img', { class: 'chip-logo', src: img(c.logo), alt: '' }) : el('span', { class: 'chip-logo' }), c.name))] : null,
       D && D.me && D.me.teams ? [el('hr'), el('a', { href: '/app', class: 'studio-link' }, el('span', {}, '⚙'), 'Studio (your production team)')] : null,
       D && !D.me ? [el('hr'), el('a', { href: '#', class: 'studio-link', onclick: (e) => { e.preventDefault(); signIn('Production team members: sign in to open your Studio.'); } }, el('span', {}, '⚙'), 'Production teams: sign in')] : null);
@@ -295,7 +386,10 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     document.title = D.site || 'RegemarkFP';
     let view;
     if (centre && !p.startsWith('/match/')) { centre.stop(); centre = null; }
-    if (p.startsWith('/match/')) view = matchPage(decodeURIComponent(p.slice(7).replace(/\/$/, '')));
+    if (p === '/teams') view = teamsPage();
+    else if (p.startsWith('/team/')) view = teamPage(decodeURIComponent(p.slice(6).replace(/\/$/, '')));
+    else if (p === '/following') view = followingPage();
+    else if (p.startsWith('/match/')) view = matchPage(decodeURIComponent(p.slice(7).replace(/\/$/, '')));
     else if (p.startsWith('/c/')) view = await channelPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')), params.get('tab'));
     else if (p === '/videos') view = videosPage();
     else if (p === '/matches') view = matchesPage();
@@ -315,7 +409,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   });
   window.addEventListener('popstate', render);
   $('menu').addEventListener('click', () => document.body.classList.toggle('side-open'));
-  $('search').addEventListener('submit', (e) => { e.preventDefault(); query = e.target.querySelector('input').value.trim().toLowerCase(); if (!['/browse', '/videos', '/matches', '/channels'].includes(location.pathname)) history.pushState(null, '', '/browse'); render(); });
+  $('search').addEventListener('submit', (e) => { e.preventDefault(); query = e.target.querySelector('input').value.trim().toLowerCase(); if (!['/browse', '/videos', '/matches', '/channels', '/teams'].includes(location.pathname)) history.pushState(null, '', '/browse'); render(); });
   $('search').querySelector('input').addEventListener('input', (e) => { if (!e.target.value) { query = ''; render(); } });
 
   async function load() {
@@ -329,5 +423,5 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     render();
   }
   load();
-  setInterval(async () => { try { D = await get('/api/public/home'); if (!location.pathname.startsWith('/c/') && !['/', '/book'].includes(location.pathname)) render(); } catch (e) { /* next time */ } }, 30000);   // live now / viewers
+  setInterval(async () => { try { D = await get('/api/public/home'); if (!/^\/(c|match|team)\//.test(location.pathname) && !['/', '/book', '/teams', '/following', '/notifications'].includes(location.pathname)) render(); } catch (e) { /* next time */ } }, 30000);   // live now / viewers
 })();
