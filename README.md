@@ -251,6 +251,13 @@ has Copy buttons:
 
 **Switched off** on a channel hides it and blocks streaming and watching.
 
+**Who can watch one stream, and for how long.** On the production, under Live stream: *Who can watch this stream* is
+empty (as the channel), **Public** (anyone, listed on the website and the channel), **Unlisted** (anyone with the
+watch link, not listed anywhere) or **Private** (only your production team, signed in). *Public for (days after the
+stream)* closes the recording to viewers that many days after the stream ended (End stream, or its last recording);
+after that only the production team can watch it and it leaves the website's lists. A channel's *Streams public for*
+is the default for its streams; a stream's own number wins; empty means always.
+
 **Setting up the server** (once; Oracle Cloud, Hetzner or any Ubuntu 22.04 / 24.04 VM, arm64 or x64):
 
 1. Where the website runs now (Render → Environment), add `SITE_ADMINS` = your email, so you get
