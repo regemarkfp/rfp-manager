@@ -205,6 +205,34 @@
     paint();
     return box;
   }
+  // ---- PayFast: one merchant account for the website (tickets and passes, invoices, booking deposits, software)
+  function payfastCard() {
+    const box = h('div', { class: 'card' }, h('h2', {}, 'PayFast (payments)'), h('div', { class: 'dim' }, 'Loading…'));
+    const paint = async () => {
+      let c;
+      try { c = await api('GET', '/api/pay/config'); } catch (e) { box.replaceChildren(h('h2', {}, 'PayFast'), h('p', { class: 'dim' }, e.message)); return; }
+      const inp = (v, attrs = {}) => h('input', { value: v || '', ...attrs });
+      const f = { merchantId: inp(c.merchantId, { placeholder: 'e.g. 10000100', inputmode: 'numeric' }), merchantKey: inp('', { type: 'password', autocomplete: 'off', placeholder: c.hasKey ? '•••••• saved (type a new one to replace it)' : 'Merchant key' }),
+        passphrase: inp('', { type: 'password', autocomplete: 'off', placeholder: c.hasPassphrase ? '•••••• saved' : 'The passphrase you set on PayFast (Security)' }), sandbox: h('input', { type: 'checkbox', checked: c.sandbox }) };
+      const field = (label, el, help) => h('label', { class: 'fld', style: { display: 'block', marginBottom: '10px' } }, h('div', { class: 'dim small' }, label), el, help ? h('div', { class: 'dim small' }, help) : null);
+      box.replaceChildren(h('h2', {}, 'PayFast (payments)'),
+        h('p', {}, h('span', { class: 'led ' + (c.on ? 'ok' : 'bad') }), ' ', c.on ? `On${c.sandbox ? ' – SANDBOX (test payments, no real money)' : ''}. Tickets and passes, invoices (Pay now), booking deposits and paid software are paid through PayFast.` : 'Not set up: nothing can be paid online yet.'),
+        h('details', { open: !c.on ? '' : null }, h('summary', {}, 'How to set it up'),
+          h('ol', { style: { margin: '8px 0 10px 18px', padding: 0, lineHeight: 1.7 } },
+            h('li', {}, 'payfast.io → sign up for a business account (RegemarkFP (Pty) Ltd) and finish its verification: company documents and the bank account money is paid into.'),
+            h('li', {}, 'PayFast → Settings → Developer settings: copy the Merchant ID and Merchant Key below.'),
+            h('li', {}, 'On the same page, set a Passphrase (Security) and type the same one below. Paste the key and passphrase yourself: they are secrets.'),
+            h('li', {}, 'To try it first: a sandbox account at sandbox.payfast.co.za, its own ID and key, and tick Sandbox below. Untick it with your real details to take real money.'))),
+        field('Merchant ID', f.merchantId), field('Merchant key', f.merchantKey), field('Passphrase', f.passphrase),
+        h('label', { class: 'row', style: { gap: '8px', marginBottom: '10px' } }, f.sandbox, 'Sandbox (test payments only)'),
+        h('p', { class: 'dim small' }, 'PayFast confirms each payment to ', h('code', {}, c.notifyUrl), '; nothing to set for that on PayFast.'),
+        h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } },
+          h('button', { class: 'primary', onclick: async () => { try { const r = await api('POST', '/api/pay/config', { merchantId: f.merchantId.value, merchantKey: f.merchantKey.value, passphrase: f.passphrase.value, sandbox: f.sandbox.checked }); App.cfg.payments = r.on; toast('Saved'); paint(); } catch (e) { oops(e); } } }, 'Save'),
+          c.on ? h('button', { class: 'danger sm', onclick: async () => { if (!confirm('Switch payments off? The merchant details are removed from this website.')) return; try { await api('POST', '/api/pay/config', { off: true }); App.cfg.payments = false; paint(); } catch (e) { oops(e); } } }, 'Switch off') : null));
+    };
+    paint();
+    return box;
+  }
   // ---- WhatsApp for booking messages: the business's own WhatsApp linked like WhatsApp Web, or Meta's Cloud API
   function whatsappCard() {
     const box = h('div', { class: 'card' }, h('h2', {}, 'WhatsApp (booking messages)'), h('div', { class: 'dim' }, 'Loading…'));
@@ -215,7 +243,7 @@
       box.dataset.shown = '1';
       let c;
       try { c = await api('GET', '/api/whatsapp/config'); } catch (e) { box.replaceChildren(h('h2', {}, 'WhatsApp'), h('p', { class: 'dim' }, e.message)); return; }
-      const mode = box.dataset.mode || c.mode;
+      const mode = box.dataset.mode || (c.mode === 'cloud' && !c.hasToken ? 'linked' : c.mode);
       const L = c.linked || {};
       const setMode = async (m) => { box.dataset.mode = m; try { await api('POST', '/api/whatsapp/config', { mode: m }); App.cfg.whatsapp = m === 'linked' ? L.state === 'open' : !!c.hasToken; } catch (e) { oops(e); } paint(); };
       const tab = (m, label) => h('button', { class: 'sm' + (mode === m ? ' primary' : ''), onclick: () => setMode(m) }, label);
@@ -312,6 +340,7 @@
             s.expires ? h('button', { class: 'ghost', onclick: async () => { try { await api('DELETE', '/api/server/setup'); toast('Setup link stopped'); paint(); } catch (e) { oops(e); } } }, 'Stop the setup link') : null)),
         pushCard(),
         whatsappCard(),
+        payfastCard(),
         h('div', { class: 'card' }, h('h2', {}, 'After it has run'),
           h('ol', { style: { margin: '0 0 0 18px', padding: 0, lineHeight: 1.8 } },
             h('li', {}, 'Open the server\'s firewall in the cloud console: TCP 80, 443, 1935, 8189 and UDP 443, 8189, 8890.'),

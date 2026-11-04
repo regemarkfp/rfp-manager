@@ -67,6 +67,29 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   // ---- following teams and clubs: match updates in the app, the browser and the inbox
   const following = (id) => !!(D && D.me && (D.me.follows || []).includes(id));
   const say = (t) => { const n = el('div', { class: 'toast' }, t); document.body.append(n); setTimeout(() => n.remove(), 3500); };
+  // PayFast: start a payment (the server makes the signed form) and go there
+  async function payGo(url, body = {}) {
+    const r = await post(url, body);
+    const f = el('form', { method: 'POST', action: r.url, style: 'display:none' });
+    for (const [k, v] of r.fields) f.append(el('input', { type: 'hidden', name: k, value: v }));
+    document.body.append(f); f.submit();
+  }
+  // back from PayFast (?paid=<id>): wait for PayFast's confirmation, then say so and show the page again
+  function paidNotice(onPaid) {
+    const id = new URLSearchParams(location.search).get('paid');
+    if (!id) return null;
+    const box = el('div', { class: 'push-inline' }, el('span', {}, '⏳ Waiting for PayFast to confirm your payment…'));
+    let n = 0;
+    const tick = async () => {
+      let s = null;
+      try { s = await get('/api/pay/status/' + encodeURIComponent(id)); } catch { s = null; }
+      if (s && s.status === 'Paid') { box.replaceChildren(el('span', {}, `✓ Payment received${s.item ? ': ' + s.item : ''}. A receipt is on its way by email. Thank you!`)); history.replaceState(null, '', location.pathname); if (onPaid) setTimeout(onPaid, 1500); return; }
+      if (s && ['Failed', 'Cancelled'].includes(s.status)) { box.replaceChildren(el('span', {}, 'The payment did not go through. Nothing was charged; you can try again.')); return; }
+      if (++n < 40) setTimeout(tick, 3000); else box.replaceChildren(el('span', {}, 'PayFast has not confirmed it yet. If you paid, it will show here shortly (refresh the page).'));
+    };
+    tick();
+    return box;
+  }
   // after the first follow: offer notifications in this browser (the app registers itself)
   async function offerPush() {
     const N = window.RFPNotifyUI;
@@ -216,11 +239,12 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       const mine = r ? r.assets.filter((a) => a.platform === os) : [];
       const dl = (a, primary) => p.canDownload ? el('a', { class: 'dl' + (primary ? ' primary' : ''), href: a.url }, `⬇ ${OS[a.platform]}${a.arch ? ' (' + a.arch + ')' : ''} · .${a.kind}`, el('span', { class: 'sub' }, ' ' + mb(a.size)))
         : el('span', { class: 'dl off' }, `${OS[a.platform]} · .${a.kind}`);
-      box.replaceChildren(
+      box.replaceChildren(paidNotice(() => render()) || '',
         el('div', { class: 'thead' }, p.logo ? el('img', { class: 'tlogo big', src: img(p.logo), alt: '' }) : el('span', { class: 'tlogo big ph', style: { background: 'var(--accent)', color: '#111' } }, p.name.slice(0, 1)),
           el('div', { class: 'grow' }, el('h1', {}, p.name), el('div', { class: 'sub' }, [p.tagline, r ? `Version ${r.version} · ${new Date(r.publishedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : '', p.price ? 'R ' + p.price : 'Free'].filter(Boolean).join(' · ')))),
         !r ? el('div', { class: 'empty' }, 'The first release is coming soon.') : [
-          !p.canDownload ? el('div', { class: 'push-inline' }, el('span', {}, `${p.name} is a paid app. Buying it here is coming soon.`)) : null,
+          !p.canDownload ? el('div', { class: 'push-inline' }, el('span', {}, `${p.name} costs R ${Number(p.price).toFixed(2)}. Buy it once and download it on your account any time.`),
+            p.payments ? el('button', { class: 'primary', onclick: async (e) => { if (!D.me) return signIn(`Sign in to buy ${p.name}: it is kept on your account.`); e.target.disabled = true; try { await payGo(`/api/public/software/${encodeURIComponent(slug)}/buy`); } catch (x) { say(x.message); e.target.disabled = false; } } }, `Buy · R ${Number(p.price).toFixed(2)}`) : el('span', { class: 'sub' }, ' Buying it here is coming soon.')) : null,
           el('div', { class: 'dls' }, mine.length ? mine.map((a, i) => dl(a, i === 0)) : null, r.assets.filter((a) => a.platform !== os).map((a) => dl(a, !mine.length && false))),
           os && !mine.length ? el('p', { class: 'sub' }, `No ${OS[os]} version yet.`) : null],
         p.description ? el('div', { class: 'desc-box' }, p.description) : null,
@@ -236,15 +260,24 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   function clientPage(key) {
     const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
     const zar = (n) => 'R ' + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
+    const want = new URLSearchParams(location.search).get('pay');
+    const payInvoice = async (x, btn, c) => {
+      let email = c.clientEmail;
+      if (!email) { email = prompt('Your email address (for the PayFast receipt):', '') || ''; if (!email) return; }
+      btn.disabled = true;
+      try { await payGo(x.pay, { email }); } catch (e) { say(e.message); btn.disabled = false; }
+    };
     get('/api/client/' + encodeURIComponent(key)).then((c) => {
       document.title = `${c.name} – ${c.company}`;
-      box.replaceChildren(el('div', { class: 'thead' }, c.logo ? el('img', { class: 'tlogo big', src: img(c.logo), alt: '' }) : null, el('div', { class: 'grow' }, el('div', { class: 'sub' }, c.company), el('h1', {}, c.name),
+      box.replaceChildren(paidNotice(() => render()) || '',el('div', { class: 'thead' }, c.logo ? el('img', { class: 'tlogo big', src: img(c.logo), alt: '' }) : null, el('div', { class: 'grow' }, el('div', { class: 'sub' }, c.company), el('h1', {}, c.name),
         el('div', { class: 'sub' }, [c.number, c.date + (c.days > 1 ? ` (${c.days} days)` : ''), c.txTime && 'TX ' + c.txTime, c.venue, c.status].filter(Boolean).join(' · ')))),
         c.description ? el('div', { class: 'desc-box' }, c.description) : null,
         el('div', { class: 'dls' }, el('a', { class: 'dl', href: c.callsheet, target: '_blank', rel: 'noopener' }, 'Call sheet (PDF)'), c.report ? el('a', { class: 'dl', href: c.report, target: '_blank', rel: 'noopener' }, 'Production report (PDF)') : null, c.watch ? el('a', { class: 'dl primary', href: c.watch }, '● Live stream') : null),
         c.matches.length ? section('Matches', el('div', { class: 'up-list' }, c.matches.map((m) => el('a', { class: 'up-row', href: '/match/' + m.id }, el('div', { class: 'what' }, el('b', {}, m.name), el('span', { class: 'sub' }, [m.date, m.status].filter(Boolean).join(' · '))))))) : null,
         c.videos.length ? section('Recordings', el('div', { class: 'up-list' }, c.videos.map((v) => el('a', { class: 'up-row', href: v.url }, el('div', { class: 'what' }, el('b', {}, new Date(v.start).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })), el('span', { class: 'sub' }, dur(v.duration))), el('span', { class: 'go' }, '▶'))))) : null,
-        c.invoices.length ? section('Quotes & invoices', el('div', { class: 'up-list' }, c.invoices.map((x) => el('a', { class: 'up-row', href: x.url, target: '_blank', rel: 'noopener' }, el('div', { class: 'what' }, el('b', {}, `${x.kind === 'quote' ? 'Quote' : 'Invoice'} ${x.number}`), el('span', { class: 'sub' }, `${x.date} · ${x.state} · ${zar(x.total)}`)), el('span', { class: 'go' }, 'PDF'))))) : null);
+        c.invoices.length ? section('Quotes & invoices', el('div', { class: 'up-list' }, c.invoices.map((x) => el('div', { class: 'up-row' + (want === x.number && x.pay ? ' hl' : '') },
+          el('a', { class: 'what', href: x.url, target: '_blank', rel: 'noopener', style: { color: 'inherit', textDecoration: 'none' } }, el('b', {}, `${x.kind === 'quote' ? 'Quote' : 'Invoice'} ${x.number}`), el('span', { class: 'sub' }, `${x.date} · ${x.state} · ${zar(x.total)}`)),
+          x.pay ? el('button', { class: 'primary sm', onclick: (e) => payInvoice(x, e.target, c) }, `Pay ${zar(x.total)}`) : el('a', { class: 'go', href: x.url, target: '_blank', rel: 'noopener' }, 'PDF'))))) : null);
     }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
     return box;
   }
@@ -253,9 +286,10 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const box = el('div', { class: 'track' }, el('div', { class: 'empty' }, 'Loading…'));
     const when = (t) => (t ? new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
     const fmt = (d) => { const t = new Date(String(d) + 'T12:00:00Z'); return isNaN(t) ? d : t.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }); };
-    let timer = null;
+    let timer = null, notice = null;
     const paint = (t) => {
       document.title = `Your booking – ${t.company}`;
+      notice = notice || paidNotice(() => load().catch(() => {}));
       const ta = el('textarea', { rows: 3, placeholder: 'Ask us anything or add something about your booking…', maxlength: 3000 });
       const err = el('p', { class: 'err' });
       const sendBtn = el('button', { class: 'primary' }, 'Send');
@@ -264,15 +298,19 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
         sendBtn.disabled = true; err.textContent = '';
         try { paint(await post(`/api/public/track/${encodeURIComponent(key)}/message`, { text: ta.value })); } catch (e) { err.textContent = e.message; sendBtn.disabled = false; }
       };
-      box.replaceChildren(
+      box.replaceChildren(notice || '',
         el('div', { class: 'thead' }, t.logo ? el('img', { class: 'tlogo big', src: img(t.logo), alt: '' }) : null,
           el('div', { class: 'grow' }, el('div', { class: 'sub' }, `${t.company} · booking ${t.ref}`), el('h1', {}, t.service || 'Your booking'),
             el('div', { class: 'sub' }, [t.date && fmt(t.date), t.venue].filter(Boolean).join(' · ')))),
         el('div', { class: 'track-now' + (t.ended ? ' ended' : '') }, el('b', {}, t.stage), el('span', {}, t.say)),
         el('ol', { class: 'track-steps' }, t.steps.map((s) => el('li', { class: (s.done ? 'done' : '') + (s.now ? ' now' : '') + (t.ended && s.now ? ' ended' : '') },
           el('span', { class: 'dot' }), el('div', {}, el('b', {}, s.stage), el('span', { class: 'sub' }, s.at ? when(s.at) : s.done ? '' : s.say))))),
+        t.deposit ? el('div', { class: 'track-now' + (t.deposit.paid ? '' : ' due'), style: { margin: '0 0 14px' } }, t.deposit.paid ? [el('b', { style: { fontSize: '17px' } }, `✓ Deposit of R ${t.deposit.amount.toFixed(2)} paid`), el('span', {}, when(t.deposit.at))]
+          : [el('b', { style: { fontSize: '17px' } }, `Deposit: R ${t.deposit.amount.toFixed(2)}`), el('span', {}, 'Pay it to confirm your booking.'),
+            t.deposit.pay ? el('div', {}, el('button', { class: 'primary pay-btn', onclick: async (e) => { e.target.disabled = true; try { await payGo(`/api/public/track/${encodeURIComponent(key)}/pay`); } catch (x) { say(x.message); e.target.disabled = false; } } }, `Pay R ${t.deposit.amount.toFixed(2)} with PayFast`)) : null]) : null,
         t.client || t.docs.length ? el('div', { class: 'dls' }, t.client ? el('a', { class: 'dl primary', href: t.client }, 'Your production page ›') : null,
-          t.docs.map((x) => el('a', { class: 'dl', href: x.url, target: '_blank', rel: 'noopener' }, `${x.kind === 'quote' ? 'Quote' : 'Invoice'} ${x.number} (PDF)`))) : null,
+          t.docs.map((x) => [el('a', { class: 'dl', href: x.url, target: '_blank', rel: 'noopener' }, `${x.kind === 'quote' ? 'Quote' : 'Invoice'} ${x.number} (PDF)${x.paid ? ' ✓ paid' : ''}`),
+            x.pay ? el('button', { class: 'dl primary', onclick: async (e) => { e.target.disabled = true; try { await payGo(x.pay, {}); } catch (err) { say(err.message); e.target.disabled = false; } } }, `Pay invoice ${x.number} · R ${Number(x.total).toFixed(2)}`) : null])) : null,
         section('Messages', el('div', { class: 'chat' }, t.messages.length ? t.messages.map((m) => el('div', { class: 'msg ' + (m.from === 'client' ? 'me' : 'them') + (m.stage ? ' step' : '') },
           el('div', { class: 'sub' }, `${m.by} · ${when(m.at)}`), el('div', { class: 'body' }, m.text))) : el('p', { class: 'sub' }, 'No messages yet. We will write to you here, by email and on WhatsApp.'),
           el('div', { class: 'chat-send' }, ta, el('div', { class: 'row' }, sendBtn, err)))));

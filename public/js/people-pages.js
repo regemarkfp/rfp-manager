@@ -273,6 +273,8 @@
           const hit = track.filter((t) => t.stage === s).pop(), on = ended || STAGES.indexOf(s) <= STAGES.indexOf(stage);
           return h('span', { class: 'pill' + (s === stage ? (ended ? ' warn' : ' ok') : ''), style: { opacity: on ? 1 : 0.45 }, title: hit ? when(hit.at) : '' }, s);
         })),
+        Number(d.deposit) > 0 ? h('p', { style: { margin: '6px 0' } }, h('span', { class: 'pill' + (d.depositPaidAt ? ' ok' : ' warn') }, d.depositPaidAt ? `Deposit R ${Number(d.depositPaid || d.deposit).toFixed(2)} paid ${when(d.depositPaidAt)}` : `Deposit R ${Number(d.deposit).toFixed(2)} not paid yet`),
+          d.depositPaidAt ? '' : App.cfg.payments ? h('span', { class: 'dim small' }, ' · the client pays it with PayFast on their tracking page') : h('span', { class: 'dim small' }, ' · switch PayFast on (Settings → Server) to let them pay online')) : null,
         h('div', { class: 'dim small' }, d.clientStage ? `Set by hand to "${d.clientStage}" (Client sees, below). ` : 'The step follows the work: Producer, quote sent, confirmed, crew booked, the date, completed. ',
           d.quiet ? 'Quiet: step changes are not sent to the client.' : 'Each new step is sent to the client by email and WhatsApp.'),
         h('div', { style: { display: 'grid', gap: '8px', margin: '14px 0' } }, (d.messages || []).length ? d.messages.map((m) => h('div', { style: { justifySelf: m.from === 'client' ? 'start' : 'end', maxWidth: '85%', padding: '8px 12px', borderRadius: '12px', background: m.from === 'client' ? 'var(--panel2, #2a2a2a)' : m.stage ? 'transparent' : 'rgba(0,255,130,.12)', border: m.stage ? '1px dashed var(--line, #444)' : 0 } },
