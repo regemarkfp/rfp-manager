@@ -308,7 +308,7 @@ Steps:
    VM off.
 
 Encoders on the tailnet send to the address the installer prints: `rtmp://<pi>.<tailnet>.ts.net/live` and
-`srt://<pi>.<tailnet>.ts.net:8890`. To update the Pi later, make a new setup command and run it again. It stays a
+`srt://<pi>.<tailnet>.ts.net:8890`. Updates install by themselves: every night at 04:30 the server asks the website it came from (Render) for a newer version and installs it, using its own update key (`--no-auto-update` turns this off; `sudo rfp-autoupdate` updates now). By hand: make a new setup command and run it again. It stays a
 home server, and the flags are not needed again. Logs: `journalctl -u rfp-manager -f`, `journalctl -u cloudflared -f`.
 
 #### An old PC as server, database and NAS
