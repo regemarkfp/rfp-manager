@@ -221,3 +221,11 @@ input.sermon-q { width: 100%; font: inherit; color: var(--text); background: var
 .chat-send textarea { width: 100%; box-sizing: border-box; background: #121212; color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: inherit; resize: vertical; }
 .chat-send .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .chat-send .primary { background: var(--accent); color: #0b0b0b; border: 0; border-radius: 20px; padding: 9px 22px; font-weight: 700; cursor: pointer; }
+/* paying online (PayFast) */
+.track-now.due { background: linear-gradient(135deg, #ffb30022, var(--panel)); border-color: #ffb30066; } .track-now.due b { color: #ffcf66; }
+.pay-btn { margin-top: 8px; }
+.up-row.hl { outline: 2px solid var(--accent); }
+.up-row .primary.sm, .dl.primary { cursor: pointer; }
+.up-row button.primary { background: var(--accent); color: #0b0b0b; border: 0; border-radius: 18px; padding: 7px 14px; font-weight: 700; }
+.push-inline button.primary, .track-now button.primary { background: var(--accent); color: #0b0b0b; border: 0; border-radius: 20px; padding: 9px 18px; font-weight: 700; cursor: pointer; margin-left: 8px; }
+button.dl { border: 0; font: inherit; cursor: pointer; }
