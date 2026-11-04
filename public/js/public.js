@@ -115,11 +115,44 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
     return [el('h2', { class: 'sec' }, 'Teams & clubs'), box];
   }
-  function alertsEditor(id, kinds, alerts) {
-    const cur = { ...alerts };
-    return el('div', { class: 'alerts' }, el('span', { class: 'sub' }, 'Tell me about:'), kinds.map((k) => el('label', {}, el('input', { type: 'checkbox', checked: cur[k.key] !== false ? '' : null, onchange: async (e) => {
-      cur[k.key] = e.target.checked; try { await post('/api/public/follow', { id, follow: true, alerts: cur }); } catch (err) { say(err.message); }
-    } }), k.label)));
+  // one followed team: what (the alerts), how often (live or digest only, how often scores come) — saved as it changes
+  function alertsEditor(id, ch, follow) {
+    const cur = { alerts: { ...(follow.alerts || {}) }, live: follow.live !== false, digest: follow.digest !== false, scoreRate: follow.scoreRate || 'every' };
+    const save = async () => { try { await post('/api/public/follow', { id, follow: true, ...cur }); } catch (err) { say(err.message); } };
+    const kinds = el('div', { class: 'alerts-kinds' });
+    const paint = () => kinds.replaceChildren(el('span', { class: 'sub' }, 'Tell me about:'), ch.alertKinds.map((k) => el('label', {}, el('input', { type: 'checkbox', disabled: !cur.live ? '' : null, checked: cur.alerts[k.key] !== false ? '' : null, onchange: (e) => { cur.alerts[k.key] = e.target.checked; rate.disabled = !cur.live || !cur.alerts.scores; save(); } }), k.label)));
+    const rate = el('select', { onchange: (e) => { cur.scoreRate = e.target.value; save(); } }, ch.scoreRates.map((r) => el('option', { value: r.key, selected: r.key === cur.scoreRate ? '' : null }, r.label)));
+    rate.disabled = !cur.live || cur.alerts.scores === false;
+    const mode = el('select', { onchange: (e) => { cur.live = e.target.value !== 'digest'; cur.digest = e.target.value !== 'live'; rate.disabled = !cur.live || cur.alerts.scores === false; paint(); save(); } },
+      [['both', 'As it happens + in my digest'], ['live', 'As it happens only'], ['digest', 'Only in my digest']].map(([v, l]) => el('option', { value: v, selected: (cur.live && cur.digest ? 'both' : cur.live ? 'live' : 'digest') === v ? '' : null }, l)));
+    paint();
+    return el('div', { class: 'alerts' }, el('div', { class: 'arow' }, el('label', {}, el('span', { class: 'sub' }, 'Updates'), mode), el('label', {}, el('span', { class: 'sub' }, 'Scores'), rate)), kinds);
+  }
+  // how often overall: the score digest (off / match days / daily / weekly, at a time, with fixtures, by push / email) and a pause
+  function rhythmCard(prefs, ch) {
+    const p = { ...prefs, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || '' };
+    const save = async () => { try { const r = await fetch('/api/public/follow-prefs', { method: 'PUT', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-rfp': '1' }, body: JSON.stringify(p) }); const j = await r.json(); if (!r.ok) throw new Error(j.error || 'Not saved'); Object.assign(p, j.prefs); paint(); } catch (e) { say(e.message); } };
+    const box = el('div', { class: 'alerts rhythm' });
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    function paint() {
+      const off = p.digest === 'off', paused = p.pausedUntil > Date.now();
+      box.replaceChildren(
+        el('div', { class: 'arow' }, el('b', {}, 'Score digest'), el('select', { onchange: (e) => { p.digest = e.target.value; save(); } }, ch.digests.map((d) => el('option', { value: d.key, selected: d.key === p.digest ? '' : null }, d.label))),
+          off ? null : [p.digest === 'weekly' ? el('select', { onchange: (e) => { p.day = Number(e.target.value); save(); } }, days.map((d, i) => el('option', { value: i, selected: i === p.day ? '' : null }, 'on ' + d))) : null,
+            el('label', {}, el('span', { class: 'sub' }, 'at'), el('input', { type: 'time', value: p.time, onchange: (e) => { if (e.target.value) { p.time = e.target.value; save(); } } }))]),
+        off ? el('div', { class: 'sub' }, 'A digest sums up your teams\' results (and what is coming up) once a day or week, at the time you choose.') : el('div', { class: 'arow' },
+          el('label', {}, el('input', { type: 'checkbox', checked: p.fixtures ? '' : null, onchange: (e) => { p.fixtures = e.target.checked; save(); } }), 'Include coming fixtures'),
+          el('label', {}, el('input', { type: 'checkbox', checked: p.push ? '' : null, onchange: (e) => { p.push = e.target.checked; save(); } }), 'As a notification'),
+          el('label', {}, el('input', { type: 'checkbox', checked: p.email ? '' : null, onchange: (e) => { p.email = e.target.checked; save(); } }), 'By email'),
+          el('button', { class: 'sm', onclick: async () => { try { const r = await post('/api/public/digest/now', {}); say(r.sent ? 'Digest sent' : 'Nothing to report for your teams right now'); } catch (e) { say(e.message); } } }, 'Send me one now')),
+        el('div', { class: 'arow' }, el('b', {}, 'Pause live updates'),
+          paused ? [el('span', {}, 'Paused until ' + new Date(p.pausedUntil).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })), el('button', { class: 'sm', onclick: () => { p.pausedUntil = 0; save(); } }, 'Resume')]
+            : [['1 hour', 3600e3], ['Until tomorrow', 'tomorrow'], ['1 week', 7 * 86400e3]].map(([l, ms]) => el('button', { class: 'sm', onclick: () => { const t = new Date(); if (ms === 'tomorrow') { t.setDate(t.getDate() + 1); t.setHours(7, 0, 0, 0); p.pausedUntil = t.getTime(); } else p.pausedUntil = Date.now() + ms; save(); } }, l))),
+        el('div', { class: 'sub' }, 'Digests go out on your device\'s time zone (' + (p.tz || 'not set') + '). Quiet hours under Notifications still apply.'));
+    }
+    paint();
+    if (!prefs.tz || prefs.tz !== p.tz) save();                 // keep the time zone of the device in use
+    return box;
   }
   function teamPage(id) {
     const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
@@ -130,7 +163,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
         el('div', { class: 'thead' }, teamLogo(t, 'tlogo big'), el('div', { class: 'grow' }, el('h1', {}, t.name),
           el('div', { class: 'sub' }, [t.kind === 'club' ? 'Club' : t.clubName && t.clubName !== t.name ? t.clubName : '', t.sport, t.company, `${t.followers} follower${t.followers === 1 ? '' : 's'}`].filter(Boolean).join(' · '),
             t.kind === 'team' && t.club ? [' · ', el('a', { href: '/team/' + encodeURIComponent(t.club), 'data-nav': '' }, 'Club page')] : null)), followBtn(t.id)),
-        t.following ? alertsEditor(t.id, t.alertKinds, t.alerts) : null,
+        t.following && t.follow ? alertsEditor(t.id, t, t.follow) : null,
         section('Live', M.live.length ? el('div', { class: 'matches' }, M.live.map(matchCard)) : null),
         section('Fixtures', M.upcoming.length ? el('div', { class: 'matches' }, M.upcoming.map(matchCard)) : null),
         section('Results', M.results.length ? el('div', { class: 'matches' }, M.results.map(matchCard)) : null),
@@ -147,8 +180,11 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       el('span', {}, st === 'blocked' ? 'Notifications are blocked in this browser: allow them in the site settings.' : st === 'unsupported' ? 'This browser cannot show notifications (on an iPhone, add the site to your home screen first).' : 'Turn on notifications to get the updates on this device.'),
       st === 'off' ? el('button', { class: 'primary', onclick: async () => { if (await window.RFPNotifyUI.enableWeb().catch((e) => { say(e.message); return false; })) { say('Notifications are on'); pushBox.replaceChildren(); } } }, 'Turn on') : null))).catch(() => {});
     get('/api/public/follows').then((r) => {
-      box.replaceChildren(r.list.length ? r.list.map((t) => el('div', { class: 'frow' }, teamCard(t), alertsEditor(t.id, r.alertKinds, t.alerts)))
-        : el('div', { class: 'empty' }, 'You do not follow any team yet. ', el('a', { href: '/teams', 'data-nav': '' }, 'Find your teams'), '.'));
+      box.replaceChildren(el('h3', { class: 'sec2' }, 'How often'), rhythmCard(r.prefs, r),
+        el('h3', { class: 'sec2' }, 'Your teams'),
+        r.list.length ? r.list.map((t) => el('div', { class: 'frow' }, teamCard(t), alertsEditor(t.id, r, t)))
+          : el('div', { class: 'empty' }, 'You do not follow any team yet. ', el('a', { href: '/teams', 'data-nav': '' }, 'Find your teams'), '.'),
+        r.muted.length ? el('p', { class: 'sub' }, `${r.muted.length} match${r.muted.length === 1 ? ' is' : 'es are'} muted (open a match to unmute it).`) : null);
     }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
     return [el('div', { class: 'spread' }, el('h2', { class: 'sec' }, 'Following'), el('a', { href: '/teams', 'data-nav': '' }, el('button', {}, '+ Find teams'))), pushBox, box,
       el('p', { class: 'sub' }, 'Quiet hours and the rest of your notifications: ', el('a', { href: '/notifications', 'data-nav': '' }, 'Notifications'), '.')];
@@ -161,7 +197,12 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const m = [...(D.matches.live || []), ...(D.matches.upcoming || []), ...(D.matches.results || [])].find((x) => x.id === id);
     const head = el('div', { class: 'match-head' }, el('a', { href: '/matches', 'data-nav': '' }, '‹ Matches'),
       m && m.watch ? el('a', { class: 'watch-btn' + (m.watch.live ? ' live' : ''), href: m.watch.href }, m.watch.live ? '● Watch live' : '▶ Watch the match') : null);
-    const fol = m && (m.teamIds || []).some(Boolean) ? el('div', { class: 'follow-row' }, (m.teamIds || []).map((tid, i) => (tid ? el('span', { class: 'fchip' }, el('a', { href: '/team/' + encodeURIComponent(tid), 'data-nav': '' }, (m.teams[i] || {}).name || 'Team'), followBtn(tid, { small: true })) : null))) : null;
+    const muted = () => !!(D.me && (D.me.muted || []).includes(id));
+    const muteBtn = D.me ? el('button', { class: 'follow sm' + (muted() ? '' : ' on'), title: 'Stop or start the updates of this match, whoever you follow', onclick: async (e) => {
+      try { const on = !muted(); await post('/api/public/mute', { fixture: id, mute: on }); D.me.muted = on ? [...(D.me.muted || []), id] : (D.me.muted || []).filter((x) => x !== id); e.target.textContent = on ? '🔕 Muted' : '🔔 Updates on'; e.target.className = 'follow sm' + (on ? '' : ' on'); say(on ? 'No more updates about this match' : 'Updates for this match are back on'); } catch (err) { say(err.message); }
+    } }, muted() ? '🔕 Muted' : '🔔 Updates on') : null;
+    const fol = m && (m.teamIds || []).some(Boolean) ? el('div', { class: 'follow-row' }, (m.teamIds || []).map((tid, i) => (tid ? el('span', { class: 'fchip' }, el('a', { href: '/team/' + encodeURIComponent(tid), 'data-nav': '' }, (m.teams[i] || {}).name || 'Team'), followBtn(tid, { small: true })) : null)),
+      D.me && (D.me.follows || []).length ? muteBtn : null) : null;
     if (centre) centre.stop();
     centre = window.MatchStats ? window.MatchStats.mount(box, id, { onMissing: () => box.replaceChildren(el('div', { class: 'empty' }, 'This match is not on the website.')), onData: (x) => { document.title = `${x.teams.map((t) => t.name).join(' v ')} – ${D.site || 'RegemarkFP'}`; } }) : null;
     return [head, box, fol];

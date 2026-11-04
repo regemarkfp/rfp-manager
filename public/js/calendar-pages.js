@@ -7,16 +7,36 @@
   const addDays = (s, n) => iso(new Date(Date.parse(s + 'T12:00:00Z') + n * 86400e3));
   const isCrew = () => App.role === 'Crew';
 
-  // ---- verse of the day
-  let verse = null;
+  // ---- verse of the day: each person's own (Settings → My account): on or off, a translation, and the time their
+  // day turns over on this computer (midnight unless they choose another time). The card turns over by itself.
+  const vp = () => ({ on: true, translation: '', time: '00:00', ...((App.me && App.me.versePrefs) || {}) });
+  // the person's day: today on this computer, or yesterday until their turn-over time
+  App.verseDay = (time, now = new Date()) => {
+    const [h, m] = String(time || '00:00').split(':').map(Number);
+    const d = new Date(now); if (now.getHours() * 60 + now.getMinutes() < (h || 0) * 60 + (m || 0)) d.setDate(d.getDate() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const nextTurn = (time, now = new Date()) => { const [h, m] = String(time || '00:00').split(':').map(Number); const t = new Date(now); t.setHours(h || 0, m || 0, 5, 0); if (t <= now) t.setDate(t.getDate() + 1); return t - now; };
+  const verses = new Map();
   App.verseCard = (small) => {
+    const p = vp();
+    if (!p.on) return h('div', { style: { display: 'none' } });
     const box = h('div', { class: 'card verse', style: { borderLeft: '4px solid var(--accent)', ...(small ? { padding: '10px 16px' } : {}) } });
     const paint = (v) => box.replaceChildren(h('div', { class: 'dim small', style: { textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: small ? '3px' : '6px', fontSize: small ? '11px' : null } }, 'Verse of the day'),
       v.text ? h('div', { style: { fontSize: small ? '14px' : '17px', lineHeight: 1.5, fontStyle: 'italic' } }, '“' + v.text + '”') : null,
       h('div', { style: { marginTop: small ? '3px' : '6px', fontWeight: 600, fontSize: small ? '13px' : null } }, v.ref, v.translation ? h('span', { class: 'dim small', style: { fontWeight: 400 } }, ' · ' + v.translation) : null));
-    if (verse) paint(verse); else api('GET', '/api/verse').then((v) => { verse = v; paint(v); }).catch(() => box.remove());
+    const load = () => {
+      const day = App.verseDay(p.time), key = day + ':' + p.translation;
+      if (verses.has(key)) return paint(verses.get(key));
+      api('GET', `/api/verse?date=${day}${p.translation ? '&t=' + encodeURIComponent(p.translation) : ''}`).then((v) => { if (v.text) verses.set(key, v); paint(v); }).catch(() => box.remove());
+    };
+    load();
+    // turn over at the person's time while the page stays open
+    const later = () => setTimeout(() => { if (!box.isConnected) return; load(); later(); }, Math.min(nextTurn(p.time), 6 * 3600e3));
+    later();
     return box;
   };
+  App.verseClear = () => verses.clear();
   const home0 = App.pages.dashboard;
   App.pages.dashboard = () => {
     if (isCrew()) return crewHome();

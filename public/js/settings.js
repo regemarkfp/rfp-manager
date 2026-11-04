@@ -132,6 +132,28 @@
         App.cfg.mode === 'cloud' ? h('button', { onclick: async (e) => { const b = e.target; b.disabled = true; try { const r = await api('POST', '/api/mail/test'); if (r.ok) toast('Test email sent to ' + App.me.email + ' – check your inbox (and spam)'); else oops(new Error('Email did not go out: ' + r.error)); } catch (x) { oops(x); } b.disabled = false; } }, 'Send me a test email') : null)));
   }
 
+  // verse of the day: on or off, the translation (language), and when the day turns over on this computer
+  function verseCard() {
+    const p = { on: true, translation: '', time: '00:00', ...(App.me.versePrefs || {}) };
+    const sel = h('select', { disabled: !p.on || null }, h('option', { value: '' }, 'Default (a Bible on this machine, else the King James Version)'));
+    const time = h('input', { type: 'time', value: p.time, disabled: !p.on || null });
+    const save = async () => {
+      try { await api('POST', '/api/me', { versePrefs: p }); App.me.versePrefs = { ...p }; if (App.verseClear) App.verseClear(); toast('Verse of the day saved'); } catch (e) { oops(e); }
+    };
+    api('GET', '/api/verse/translations').then((r) => {
+      const langs = [...new Set(r.list.map((t) => t.language || 'Other'))];
+      for (const l of langs) sel.append(h('optgroup', { label: l }, r.list.filter((t) => (t.language || 'Other') === l).map((t) => h('option', { value: t.id, selected: t.id === p.translation }, `${t.name}${t.where === 'this machine' ? ' (on this machine)' : ''}`))));
+    }).catch(() => {});
+    sel.onchange = () => { p.translation = sel.value; save(); };
+    time.onchange = () => { if (/^\d\d:\d\d$/.test(time.value)) { p.time = time.value; save(); } };
+    return h('div', { class: 'card' }, h('h2', {}, 'Verse of the day'),
+      App.machine.linked ? h('p', { class: 'dim' }, 'This machine is linked to the website: change this there and it syncs down.') : null,
+      h('label', { class: 'row', style: { gap: '8px' } }, h('input', { type: 'checkbox', checked: p.on, disabled: App.machine.linked || null, onchange: (e) => { p.on = e.target.checked; sel.disabled = time.disabled = !p.on; save(); } }), h('span', {}, 'Show the verse of the day on my home page')),
+      h('div', { class: 'form', style: { marginTop: '10px' } },
+        h('label', { class: 'f' }, h('span', {}, 'Translation / language'), sel, h('div', { class: 'help' }, 'Bibles imported on this machine (Worship → Bibles) are listed first; the others come from bible-api.com.')),
+        h('label', { class: 'f' }, h('span', {}, 'New verse at'), time, h('div', { class: 'help' }, 'Your computer\'s time. Midnight (00:00) unless you choose another time, for example 05:00 for your morning.'))));
+  }
+
   function machineTab() {
     const el = h('div', { class: 'stack' }, h('div', { class: 'card dim' }, 'Loading…'));
     api('GET', '/api/machine').then((m) => {
@@ -269,7 +291,7 @@
       if (window.RFPNotifyUI) window.RFPNotifyUI.settings(inner);
       return box;
     };
-    const body = { notifications: notificationsTab, team: teamTab, members: membersTab, account: accountTab, connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab, server: App.serverTab, website: websiteTab }[tab]();
+    const body = { notifications: notificationsTab, team: teamTab, members: membersTab, account: () => [accountTab(), verseCard()], connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab, server: App.serverTab, website: websiteTab }[tab]();
     return { el: h('div', {}, pageHead('Settings'), h('div', { class: 'tabs' }, tabs.map(([k, l]) => h('button', { class: k === tab ? 'on' : '', onclick: () => { tab = k; route(); } }, l))), body) };
   };
 })();
