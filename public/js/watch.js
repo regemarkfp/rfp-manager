@@ -136,6 +136,9 @@
     bar(video, { live: false, onUnmute: () => unmute.remove() });
     playing = true;
     // with the viewer's sound settings; muted only when the browser will not start it with sound (then: tap for sound)
+    // a replay of one moment (?at=<seconds>, from the match centre): start there
+    const at = Number(new URLSearchParams(location.search).get('at')) || 0;
+    if (at > 0) video.addEventListener('loadedmetadata', () => { try { video.currentTime = Math.min(at, Math.max(0, (video.duration || at) - 1)); } catch { /* not seekable */ } }, { once: true });
     window.RFPPlayer.playWithSound(video, () => blocked(video));
     beats(video, matchId ? { kind: 'match', match: matchId, title: info.vod.title || '' } : { kind: 'vod', start: info.vod.start });
   }
@@ -272,10 +275,12 @@
     if (!info.payments) return message('This stream needs a ticket', 'Tickets are not on sale yet. Try again later.');
     const email = el('input', { type: 'email', placeholder: 'Your email address (the ticket is sent there)', autocomplete: 'email', value: info.email || '' });
     const name = el('input', { type: 'text', placeholder: 'Your name', autocomplete: 'name' });
+    const giftTo = el('input', { type: 'email', placeholder: 'Their email address (the ticket is sent to them)', style: 'display:none' });
+    const gift = el('label', { class: 'small', style: 'display:flex;gap:8px;align-items:center;justify-content:center' }, el('input', { type: 'checkbox', onchange: (e) => { giftTo.style.display = e.target.checked ? '' : 'none'; if (!e.target.checked) giftTo.value = ''; } }), 'Buy it as a gift for someone else');
     const go = async (kind, btn) => {
       btn.disabled = true;
       try {
-        const r = await fetch('/api/pay/start', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-rfp': '1' }, body: JSON.stringify({ slug, kind, email: email.value, name: name.value }) });
+        const r = await fetch('/api/pay/start', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-rfp': '1' }, body: JSON.stringify({ slug, kind, giftTo: giftTo.value, email: email.value, name: name.value }) });
         const out = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(out.error || 'Could not start the payment');
         const f = el('form', { method: 'POST', action: out.url, style: 'display:none' });
@@ -288,6 +293,7 @@
     message('This stream needs a ticket', pr.pass ? 'A ticket is for this stream, live and its recordings. A pass covers every paid stream on this channel.' : 'Your ticket is for this stream, live and its recordings afterwards.',
       problem ? el('p', { class: 'err' }, problem) : null,
       info.signedIn ? el('p', { class: 'dim small' }, 'Signed in as ' + info.email + ': the ticket is kept on your account.') : el('div', { class: 'col' }, name, email, el('p', { class: 'dim small' }, el('a', { href: '/?signin=1&next=' + encodeURIComponent(location.pathname) }, 'Sign in'), ' to keep it on your account instead.')),
+      el('div', { class: 'col' }, gift, giftTo),
       el('div', { class: 'row' }, tBtn, pBtn), el('p', { class: 'dim small' }, 'Paid safely with PayFast (card, Instant EFT, SnapScan and more).'));
   }
   async function waitForPayment(tries = 0) {

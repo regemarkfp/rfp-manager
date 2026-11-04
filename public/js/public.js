@@ -100,15 +100,16 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   function teamCard(t) {
     const go = (e) => { if (e.target.closest('button')) return; history.pushState(null, '', '/team/' + encodeURIComponent(t.id)); window.scrollTo(0, 0); render(); };
     return el('div', { class: 'tcard', role: 'link', tabindex: '0', onclick: go, onkeydown: (e) => { if (e.key === 'Enter') go(e); } }, teamLogo(t),
-      el('div', { class: 'grow' }, el('b', {}, t.name), el('div', { class: 'sub' }, t.kind === 'club' ? ['Club', t.company].filter(Boolean).join(' · ') : [t.clubName && t.clubName !== t.name ? t.clubName : '', t.sport, t.gender].filter(Boolean).join(' · '))),
+      el('div', { class: 'grow' }, el('b', {}, t.name), el('div', { class: 'sub' }, t.kind === 'competition' ? ['Competition', t.sport, t.company].filter(Boolean).join(' · ') : t.kind === 'club' ? ['Club', t.company].filter(Boolean).join(' · ') : [t.clubName && t.clubName !== t.name ? t.clubName : '', t.sport, t.gender].filter(Boolean).join(' · '))),
       followBtn(t.id, { small: true }));
   }
   function teamsPage() {
     const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
     get('/api/public/teams').then((c) => {
       const q = query, f = (list) => list.filter((t) => match(q, t.name, t.clubName, t.sport, t.company));
-      const clubs = f(c.clubs), teams = f(c.teams);
+      const clubs = f(c.clubs), teams = f(c.teams), comps = f(c.competitions || []);
       box.replaceChildren(el('p', { class: 'sub', style: { margin: '0 0 8px' } }, 'Follow a club (all its teams) or one team to get its line-ups, kick-off, scores, half time and full time on your phone.'),
+        section('Competitions', comps.length ? el('div', { class: 'tgrid' }, comps.map(teamCard)) : null, comps.length),
         section('Clubs', clubs.length ? el('div', { class: 'tgrid' }, clubs.map(teamCard)) : null, clubs.length),
         section('Teams', teams.length ? el('div', { class: 'tgrid' }, teams.map(teamCard)) : null, teams.length),
         !clubs.length && !teams.length ? el('div', { class: 'empty' }, q ? 'No team matches your search.' : 'No teams to follow yet.') : null);
@@ -161,9 +162,11 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       const M = t.matches;
       box.replaceChildren(
         el('div', { class: 'thead' }, teamLogo(t, 'tlogo big'), el('div', { class: 'grow' }, el('h1', {}, t.name),
-          el('div', { class: 'sub' }, [t.kind === 'club' ? 'Club' : t.clubName && t.clubName !== t.name ? t.clubName : '', t.sport, t.company, `${t.followers} follower${t.followers === 1 ? '' : 's'}`].filter(Boolean).join(' · '),
+          el('div', { class: 'sub' }, [t.kind === 'competition' ? 'Competition' : t.kind === 'club' ? 'Club' : t.clubName && t.clubName !== t.name ? t.clubName : '', t.sport, t.company, `${t.followers} follower${t.followers === 1 ? '' : 's'}`].filter(Boolean).join(' · '),
             t.kind === 'team' && t.club ? [' · ', el('a', { href: '/team/' + encodeURIComponent(t.club), 'data-nav': '' }, 'Club page')] : null)), followBtn(t.id)),
         t.following && t.follow ? alertsEditor(t.id, t, t.follow) : null,
+        t.table && t.table.length ? section('Log', el('div', { class: 'tablewrap' }, el('table', { class: 'log' }, el('thead', {}, el('tr', {}, ['#', 'Team', 'P', 'W', 'D', 'L', 'PD', 'Pts'].map((x) => el('th', {}, x)))),
+          el('tbody', {}, t.table.map((r, i) => el('tr', {}, el('td', {}, String(i + 1)), el('td', {}, el('a', { href: '/team/' + encodeURIComponent(r.id), 'data-nav': '' }, r.name)), ...[r.P, r.W, r.D, r.L, r.PD, r.Pts].map((x, j) => el('td', { class: j === 5 ? 'pts' : '' }, String(x))))))))) : null,
         section('Live', M.live.length ? el('div', { class: 'matches' }, M.live.map(matchCard)) : null),
         section('Fixtures', M.upcoming.length ? el('div', { class: 'matches' }, M.upcoming.map(matchCard)) : null),
         section('Results', M.results.length ? el('div', { class: 'matches' }, M.results.map(matchCard)) : null),
@@ -187,7 +190,95 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
         r.muted.length ? el('p', { class: 'sub' }, `${r.muted.length} match${r.muted.length === 1 ? ' is' : 'es are'} muted (open a match to unmute it).`) : null);
     }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
     return [el('div', { class: 'spread' }, el('h2', { class: 'sec' }, 'Following'), el('a', { href: '/teams', 'data-nav': '' }, el('button', {}, '+ Find teams'))), pushBox, box,
+      el('p', { class: 'sub' }, el('button', { class: 'sm', onclick: async () => { try { const r = await get('/api/public/ical-link'); window.location.href = r.webcal; setTimeout(() => { navigator.clipboard && navigator.clipboard.writeText(r.url).catch(() => {}); say('Calendar link copied too (for Google Calendar: Other calendars → From URL)'); }, 600); } catch (e) { say(e.message); } } }, '📅 Add my teams\' fixtures to my calendar')),
       el('p', { class: 'sub' }, 'Quiet hours and the rest of your notifications: ', el('a', { href: '/notifications', 'data-nav': '' }, 'Notifications'), '.')];
+  }
+
+  // ---- software (/software, /software/<app>): RegemarkFP's apps, downloads from this server
+  const myOs = () => { const u = navigator.userAgent; return /Windows/.test(u) ? 'windows' : /Mac OS X|Macintosh/.test(u) && !/iPhone|iPad/.test(u) ? 'mac' : /Linux|X11/.test(u) && !/Android/.test(u) ? 'linux' : ''; };
+  const OS = { windows: 'Windows', mac: 'macOS', linux: 'Linux', other: 'Other' };
+  const mb = (n) => (n >= 1073741824 ? (n / 1073741824).toFixed(1) + ' GB' : Math.max(0.1, n / 1048576).toFixed(1) + ' MB');
+  function appCard(p) {
+    const r = p.releases[0];
+    return el('a', { class: 'tcard app', href: '/software/' + p.slug, 'data-nav': '' }, p.logo ? el('img', { class: 'tlogo', src: img(p.logo), alt: '' }) : el('span', { class: 'tlogo ph', style: { background: 'var(--accent)', color: '#111' } }, p.name.slice(0, 1)),
+      el('div', { class: 'grow' }, el('b', {}, p.name), el('div', { class: 'sub' }, p.tagline || ''), el('div', { class: 'sub' }, [r ? 'Version ' + r.version : 'Coming soon', r ? [...new Set(r.assets.map((a) => OS[a.platform]))].join(' · ') : '', p.price ? 'R ' + p.price : 'Free'].filter(Boolean).join(' · '))));
+  }
+  function softwarePage() {
+    const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
+    get('/api/public/software').then((r) => box.replaceChildren(r.list.length ? el('div', { class: 'tgrid' }, r.list.map(appCard)) : el('div', { class: 'empty' }, 'No apps yet.'))).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
+    return [el('h2', { class: 'sec' }, 'Software'), el('p', { class: 'sub', style: { margin: '-4px 0 12px' } }, 'Our own broadcast and production tools.'), box];
+  }
+  function appPage(slug) {
+    const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
+    get('/api/public/software/' + encodeURIComponent(slug)).then((p) => {
+      document.title = `${p.name} – ${D.site || 'RegemarkFP'}`;
+      const r = p.releases[0], os = myOs();
+      const mine = r ? r.assets.filter((a) => a.platform === os) : [];
+      const dl = (a, primary) => p.canDownload ? el('a', { class: 'dl' + (primary ? ' primary' : ''), href: a.url }, `⬇ ${OS[a.platform]}${a.arch ? ' (' + a.arch + ')' : ''} · .${a.kind}`, el('span', { class: 'sub' }, ' ' + mb(a.size)))
+        : el('span', { class: 'dl off' }, `${OS[a.platform]} · .${a.kind}`);
+      box.replaceChildren(
+        el('div', { class: 'thead' }, p.logo ? el('img', { class: 'tlogo big', src: img(p.logo), alt: '' }) : el('span', { class: 'tlogo big ph', style: { background: 'var(--accent)', color: '#111' } }, p.name.slice(0, 1)),
+          el('div', { class: 'grow' }, el('h1', {}, p.name), el('div', { class: 'sub' }, [p.tagline, r ? `Version ${r.version} · ${new Date(r.publishedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : '', p.price ? 'R ' + p.price : 'Free'].filter(Boolean).join(' · ')))),
+        !r ? el('div', { class: 'empty' }, 'The first release is coming soon.') : [
+          !p.canDownload ? el('div', { class: 'push-inline' }, el('span', {}, `${p.name} is a paid app. Buying it here is coming soon.`)) : null,
+          el('div', { class: 'dls' }, mine.length ? mine.map((a, i) => dl(a, i === 0)) : null, r.assets.filter((a) => a.platform !== os).map((a) => dl(a, !mine.length && false))),
+          os && !mine.length ? el('p', { class: 'sub' }, `No ${OS[os]} version yet.`) : null],
+        p.description ? el('div', { class: 'desc-box' }, p.description) : null,
+        r && r.notes ? [el('h2', { class: 'sec' }, `What's new in ${r.version}`), el('div', { class: 'desc-box' }, r.notes)] : null,
+        p.releases.length > 1 ? [el('h2', { class: 'sec' }, 'Earlier versions'), el('div', {}, p.releases.slice(1).map((x) => el('details', { class: 'rel' }, el('summary', {}, `${x.version} · ${new Date(x.publishedAt).toLocaleDateString('en-GB')}`),
+          el('div', { class: 'dls' }, x.assets.map((a) => dl(a))), x.notes ? el('div', { class: 'desc-box' }, x.notes) : null)))] : null,
+        p.repo ? el('p', { class: 'sub' }, 'Also on GitHub: ', el('a', { href: `https://github.com/${p.repo}/releases`, target: '_blank', rel: 'noopener' }, p.repo)) : null);
+    }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.status === 404 ? 'No such app.' : e.message)));
+    return [el('div', { class: 'match-head' }, el('a', { href: '/software', 'data-nav': '' }, '‹ Software')), box];
+  }
+
+  // ---- a client's page (/client/<key>): one production, shared by the production company
+  function clientPage(key) {
+    const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
+    const zar = (n) => 'R ' + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
+    get('/api/client/' + encodeURIComponent(key)).then((c) => {
+      document.title = `${c.name} – ${c.company}`;
+      box.replaceChildren(el('div', { class: 'thead' }, c.logo ? el('img', { class: 'tlogo big', src: img(c.logo), alt: '' }) : null, el('div', { class: 'grow' }, el('div', { class: 'sub' }, c.company), el('h1', {}, c.name),
+        el('div', { class: 'sub' }, [c.number, c.date + (c.days > 1 ? ` (${c.days} days)` : ''), c.txTime && 'TX ' + c.txTime, c.venue, c.status].filter(Boolean).join(' · ')))),
+        c.description ? el('div', { class: 'desc-box' }, c.description) : null,
+        el('div', { class: 'dls' }, el('a', { class: 'dl', href: c.callsheet, target: '_blank', rel: 'noopener' }, 'Call sheet (PDF)'), c.report ? el('a', { class: 'dl', href: c.report, target: '_blank', rel: 'noopener' }, 'Production report (PDF)') : null, c.watch ? el('a', { class: 'dl primary', href: c.watch }, '● Live stream') : null),
+        c.matches.length ? section('Matches', el('div', { class: 'up-list' }, c.matches.map((m) => el('a', { class: 'up-row', href: '/match/' + m.id }, el('div', { class: 'what' }, el('b', {}, m.name), el('span', { class: 'sub' }, [m.date, m.status].filter(Boolean).join(' · '))))))) : null,
+        c.videos.length ? section('Recordings', el('div', { class: 'up-list' }, c.videos.map((v) => el('a', { class: 'up-row', href: v.url }, el('div', { class: 'what' }, el('b', {}, new Date(v.start).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })), el('span', { class: 'sub' }, dur(v.duration))), el('span', { class: 'go' }, '▶'))))) : null,
+        c.invoices.length ? section('Quotes & invoices', el('div', { class: 'up-list' }, c.invoices.map((x) => el('a', { class: 'up-row', href: x.url, target: '_blank', rel: 'noopener' }, el('div', { class: 'what' }, el('b', {}, `${x.kind === 'quote' ? 'Quote' : 'Invoice'} ${x.number}`), el('span', { class: 'sub' }, `${x.date} · ${x.state} · ${zar(x.total)}`)), el('span', { class: 'go' }, 'PDF'))))) : null);
+    }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
+    return box;
+  }
+  // ---- a player's profile (/player/<id>), for teams that switch them on
+  function playerPage(id) {
+    const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
+    get('/api/public/player/' + encodeURIComponent(id)).then((p) => {
+      document.title = `${p.name} – ${D.site || 'RegemarkFP'}`;
+      const st = Object.entries(p.stats || {});
+      box.replaceChildren(el('div', { class: 'thead' }, p.image ? el('img', { class: 'tlogo big', src: img(p.image), alt: '', style: { borderRadius: '50%', objectFit: 'cover' } }) : el('span', { class: 'tlogo big ph', style: { background: '#444', borderRadius: '50%' } }, p.name.slice(0, 1)),
+        el('div', { class: 'grow' }, el('h1', {}, p.name), el('div', { class: 'sub' }, [p.position, ...p.teams.map((t) => `${t.name}${t.number ? ' #' + t.number : ''}`)].filter(Boolean).join(' · ')))),
+        el('div', { class: 'tgrid' }, el('div', { class: 'tcard' }, el('div', {}, el('div', { class: 'sub' }, 'Matches'), el('b', { style: { fontSize: '26px' } }, String(p.matches)))),
+          st.map(([k, v]) => el('div', { class: 'tcard' }, el('div', {}, el('div', { class: 'sub' }, k), el('b', { style: { fontSize: '26px' } }, String(v)))))),
+        p.recent.length ? section('Recent matches', el('div', { class: 'up-list' }, p.recent.map((m) => el('a', { class: 'up-row', href: '/match/' + m.id, 'data-nav': '' }, el('div', { class: 'what' }, el('b', {}, m.name), el('span', { class: 'sub' }, [m.date, m.score].filter(Boolean).join(' · '))))))) : null);
+    }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.status === 404 ? 'This player has no public profile.' : e.message)));
+    return box;
+  }
+  // ---- the fans' corner under a match: predictions before kick-off, player of the match from the start of play
+  function fanZone(id) {
+    const box = el('div', { class: 'fanzone' });
+    const pct = (n, t) => (t ? Math.round((n / t) * 100) : 0);
+    const load = () => get(`/api/public/match/${encodeURIComponent(id)}/fans`).then(paint).catch(() => box.replaceChildren());
+    const vote = async (b) => { if (!D.me) return signIn('Sign in to have your say.'); try { paint(await post(`/api/public/match/${encodeURIComponent(id)}/fans`, b)); } catch (e) { say(e.message); } };
+    function paint(f) {
+      const P = f.predict, Q = f.potm;
+      const opt = (k, label) => el('button', { class: 'vote' + (P.mine === k ? ' on' : ''), disabled: !P.open ? '' : null, onclick: () => vote({ predict: k }) }, el('b', {}, label), P.total ? el('span', { class: 'sub' }, ` ${pct(P.counts[k], P.total)}%`) : null);
+      box.replaceChildren(el('h2', { class: 'sec' }, 'Fans'),
+        el('div', { class: 'fz-row' }, el('div', { class: 'sub' }, P.open ? 'Who wins? (closes at kick-off)' : `Fans predicted (${P.total})`), el('div', { class: 'votes' }, opt('A', f.teams[0] || 'Home'), opt('D', 'Draw'), opt('B', f.teams[1] || 'Away'))),
+        Q.open || Q.total ? el('div', { class: 'fz-row' }, el('div', { class: 'sub' }, Q.open ? `Player of the match: your vote${Q.total ? ` · ${Q.total} so far` : ''}` : `Fans' player of the match (${Q.total} votes)`),
+          Q.leader ? el('p', {}, '🏅 ', el('b', {}, (Q.options.find((o) => o.key === Q.leader[0]) || {}).name || ''), ` · ${pct(Q.leader[1], Q.total)}%`) : null,
+          Q.open ? el('select', { onchange: (e) => { if (e.target.value) vote({ potm: e.target.value }); } }, el('option', { value: '' }, Q.mine ? 'Change your vote…' : 'Pick a player…'), Q.options.map((o) => el('option', { value: o.key, selected: o.key === Q.mine ? '' : null }, `${o.name} (${o.team})`))) : null) : null);
+    }
+    load();
+    return box;
   }
 
   // ---- the match centre (/match/<id>): score, what happened, team stats, players or the cricket scorecard
@@ -205,7 +296,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       D.me && (D.me.follows || []).length ? muteBtn : null) : null;
     if (centre) centre.stop();
     centre = window.MatchStats ? window.MatchStats.mount(box, id, { onMissing: () => box.replaceChildren(el('div', { class: 'empty' }, 'This match is not on the website.')), onData: (x) => { document.title = `${x.teams.map((t) => t.name).join(' v ')} – ${D.site || 'RegemarkFP'}`; } }) : null;
-    return [head, box, fol];
+    return [head, box, fol, fanZone(id)];
   }
   // the channel's next stream (live now, or the next one coming up)
   const nextOf = (c) => {
@@ -289,7 +380,18 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const tabLink = (k, label) => el('a', { href: `/c/${ch.slug}${k === 'home' ? '' : '?tab=' + k}`, 'data-nav': '', class: t === k ? 'on' : '' }, label);
     const upRow = (s) => el('a', { class: 'up-row', href: '/watch/' + s.slug }, el('div', { class: 'when' }, el('b', {}, s.date ? day(s.date, '') : 'Date to follow'), el('span', {}, s.time || '')),
       el('div', { class: 'what' }, el('b', {}, s.title), el('span', { class: 'sub' }, s.price && s.price.ticket ? 'Ticket R ' + Number(s.price.ticket).toFixed(2).replace(/\.00$/, '') : 'Free to watch')), el('span', { class: 'go' }, 'Watch page ›'));
-    const body = t === 'upcoming' ? (up.length ? [el('div', { class: 'up-list' }, up.map(upRow)), c.subscribed ? null : el('p', { class: 'sub' }, 'Subscribe to get an email when a stream starts.')] : el('div', { class: 'empty' }, 'Nothing scheduled yet.'))
+    const sermonsBox = () => {
+      const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
+      let q = '';
+      const load = () => get(`/api/public/c/${encodeURIComponent(ch.slug)}/sermons?q=${encodeURIComponent(q)}`).then((r) => box.replaceChildren(
+        el('input', { class: 'sermon-q', type: 'search', placeholder: 'Search title, preacher, scripture or series', value: q, onchange: (e) => { q = e.target.value; load(); } }),
+        r.list.length ? el('div', { class: 'up-list' }, r.list.map((x) => el('a', { class: 'up-row', href: x.url }, el('div', { class: 'when' }, el('b', {}, x.date ? day(x.date, '') : ''), el('span', {}, x.duration ? dur(x.duration) : '')),
+          el('div', { class: 'what' }, el('b', {}, x.title), el('span', { class: 'sub' }, [x.preacher, x.scripture, x.series].filter(Boolean).join(' · ')), x.notes ? el('span', { class: 'sub', style: { display: 'block', whiteSpace: 'pre-wrap' } }, x.notes.slice(0, 220)) : null), el('span', { class: 'go' }, '▶ Watch'))))
+          : el('div', { class: 'empty' }, q ? 'No sermon matches.' : 'No sermons yet. Services with a recording show up here.'))).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
+      load();
+      return box;
+    };
+    const body = t === 'sermons' ? sermonsBox() : t === 'upcoming' ? (up.length ? [el('div', { class: 'up-list' }, up.map(upRow)), c.subscribed ? null : el('p', { class: 'sub' }, 'Subscribe to get an email when a stream starts.')] : el('div', { class: 'empty' }, 'Nothing scheduled yet.'))
       : t === 'about' ? el('div', { class: 'about' }, ch.description || 'No description yet.', el('p', {}, `${c.subscribers} subscriber${c.subscribers === 1 ? '' : 's'} · ${ch.owner === 'Production company' ? 'by ' + ch.company : ch.owner + ' channel · ' + ch.company}`))
       : t === 'videos' ? (vids.length ? el('div', { class: 'grid' }, vids.map((s) => streamCard(s, { noChannel: true }))) : el('div', { class: 'empty' }, 'No videos yet.'))
         : [section('Live now', live.length ? el('div', { class: 'grid' }, live.map((s) => streamCard(s, { noChannel: true }))) : null), section('Coming up', up.length ? el('div', { class: 'grid' }, up.slice(0, 8).map((s) => streamCard(s, { noChannel: true }))) : null),
@@ -297,7 +399,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     return [el('div', { class: 'banner', style: { backgroundImage: ch.banner ? `url("${img(ch.banner)}")` : `linear-gradient(120deg, ${ch.color}, #151515 75%)` } }),
       el('div', { class: 'chead' }, ch.logo ? el('img', { class: 'big', src: img(ch.logo), alt: '' }) : el('span', { class: 'big avatar', style: { fontSize: '44px' } }, ch.name.slice(0, 1)),
         el('div', { style: { flex: 1, minWidth: '200px' } }, el('h1', {}, ch.name), el('div', { class: 'sub' }, `/c/${ch.slug} · ${c.subscribers} subscriber${c.subscribers === 1 ? '' : 's'} · ${vids.length} video${vids.length === 1 ? '' : 's'}`)), sub),
-      el('div', { class: 'tabs' }, tabLink('home', 'Home'), tabLink('upcoming', 'Upcoming' + (up.length ? ` (${up.length})` : '')), tabLink('videos', 'Videos'), tabLink('about', 'About')), body];
+      el('div', { class: 'tabs' }, tabLink('home', 'Home'), tabLink('upcoming', 'Upcoming' + (up.length ? ` (${up.length})` : '')), tabLink('videos', 'Videos'), ch.owner === 'Church' || /church|kerk|gemeente|ministr/i.test(ch.name + ' ' + (ch.company || '')) || t === 'sermons' ? tabLink('sermons', 'Sermons') : null, tabLink('about', 'About')), body];
   }
 
   // ---- the landing page: about us, Browse content, Book services, sign in as a production team
@@ -405,7 +507,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const p = location.pathname;
     const link = (href, label, icon) => el('a', { href, 'data-nav': '', class: p === href ? 'on' : '' }, el('span', {}, icon), label);
     const subs = D && D.me ? D.channels.filter((c) => (D.me.subscriptions || []).includes(c.id)) : [];
-    $('side').replaceChildren(link('/', 'Home', '⌂'), link('/browse', 'Browse', '▦'), link('/book', 'Book services', '✉'), link('/matches', 'Matches', '◎'), link('/teams', 'Teams', '⚑'), D && D.me ? link('/following', 'Following' + ((D.me.follows || []).length ? ` (${D.me.follows.length})` : ''), '♥') : null, link('/videos', 'Videos', '▶'), link('/subscriptions', 'Subscriptions', '★'), link('/channels', 'Channels', '◉'),
+    $('side').replaceChildren(link('/', 'Home', '⌂'), link('/browse', 'Browse', '▦'), link('/book', 'Book services', '✉'), link('/matches', 'Matches', '◎'), link('/teams', 'Teams', '⚑'), link('/software', 'Software', '⬇'), D && D.me ? link('/following', 'Following' + ((D.me.follows || []).length ? ` (${D.me.follows.length})` : ''), '♥') : null, link('/videos', 'Videos', '▶'), link('/subscriptions', 'Subscriptions', '★'), link('/channels', 'Channels', '◉'),
       subs.length ? [el('hr'), el('h4', {}, 'Subscriptions'), subs.map((c) => el('a', { href: '/c/' + c.slug, 'data-nav': '', class: p === '/c/' + c.slug ? 'on' : '' }, c.logo ? el('img', { class: 'chip-logo', src: img(c.logo), alt: '' }) : el('span', { class: 'chip-logo' }), c.name))] : null,
       D && D.me && D.me.teams ? [el('hr'), el('a', { href: '/app', class: 'studio-link' }, el('span', {}, '⚙'), 'Studio (your production team)')] : null,
       D && !D.me ? [el('hr'), el('a', { href: '#', class: 'studio-link', onclick: (e) => { e.preventDefault(); signIn('Production team members: sign in to open your Studio.'); } }, el('span', {}, '⚙'), 'Production teams: sign in')] : null);
@@ -427,7 +529,11 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     document.title = D.site || 'RegemarkFP';
     let view;
     if (centre && !p.startsWith('/match/')) { centre.stop(); centre = null; }
-    if (p === '/teams') view = teamsPage();
+    if (p.startsWith('/client/')) view = clientPage(decodeURIComponent(p.slice(8).replace(/\/$/, '')));
+    else if (p.startsWith('/player/')) view = playerPage(decodeURIComponent(p.slice(8).replace(/\/$/, '')));
+    else if (p === '/software') view = softwarePage();
+    else if (p.startsWith('/software/')) view = appPage(decodeURIComponent(p.slice(10).replace(/\/$/, '')));
+    else if (p === '/teams') view = teamsPage();
     else if (p.startsWith('/team/')) view = teamPage(decodeURIComponent(p.slice(6).replace(/\/$/, '')));
     else if (p === '/following') view = followingPage();
     else if (p.startsWith('/match/')) view = matchPage(decodeURIComponent(p.slice(7).replace(/\/$/, '')));
@@ -464,5 +570,5 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     render();
   }
   load();
-  setInterval(async () => { try { D = await get('/api/public/home'); if (!/^\/(c|match|team)\//.test(location.pathname) && !['/', '/book', '/teams', '/following', '/notifications'].includes(location.pathname)) render(); } catch (e) { /* next time */ } }, 30000);   // live now / viewers
+  setInterval(async () => { try { D = await get('/api/public/home'); if (!/^\/(c|match|team|software|client|player)\//.test(location.pathname) && !['/', '/book', '/teams', '/following', '/notifications', '/software'].includes(location.pathname)) render(); } catch (e) { /* next time */ } }, 30000);   // live now / viewers
 })();

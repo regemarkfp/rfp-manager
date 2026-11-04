@@ -29,6 +29,7 @@
   .ms .ev { display: grid; grid-template-columns: 52px 1fr; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--ms-line); align-items: center; }
   .ms .ev .t { color: var(--ms-dim); font-variant-numeric: tabular-nums; font-size: 13px; }
   .ms .ev.B .x { text-align: right; } .ms .ev.status { color: var(--ms-dim); font-size: 13px; } .ms .ev.status .x { text-align: center; text-transform: uppercase; letter-spacing: .05em; }
+  .ms .replay { display: inline-grid; place-items: center; width: 22px; height: 22px; margin: 0 6px; border-radius: 50%; background: var(--ms-accent); color: #111; text-decoration: none; font-size: 10px; vertical-align: middle; }
   .ms .ev .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 6px; vertical-align: middle; }
   .ms .bars { display: grid; gap: 10px; }
   .ms .bar { display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; align-items: center; font-variant-numeric: tabular-nums; }
@@ -83,7 +84,8 @@
       return el('div', { class: 'tl' }, list.map((e) => {
         const side = e.team === 'B' ? 'B' : e.team === 'A' ? 'A' : '';
         const dot = side ? el('span', { class: 'dot', style: { background: colour(side) } }) : null;
-        return el('div', { class: 'ev ' + side + (side ? '' : ' status') }, el('span', { class: 't' }, e.ct || ''), el('span', { class: 'x' }, side === 'B' ? [e.text, dot] : [dot, e.text]));
+        const rp = e.replay ? el('a', { class: 'replay', href: e.replay, title: 'Watch this moment' }, '▶') : null;
+        return el('div', { class: 'ev ' + side + (side ? '' : ' status') }, el('span', { class: 't' }, e.ct || ''), el('span', { class: 'x' }, side === 'B' ? [rp, e.text, dot] : [dot, e.text, rp]));
       }));
     }
     function teamStats() {
@@ -105,7 +107,7 @@
         const list = (data.players && data.players[k]) || [];
         if (!list.length) return el('div', {}, el('h4', {}, t.name), el('div', { class: 'empty' }, 'No line-up.'));
         const starters = list.filter((p) => p.lineup !== 'bench'), bench = list.filter((p) => p.lineup === 'bench');
-        const row = (p) => el('tr', {}, el('td', { class: 'n', style: { width: '34px' } }, p.number), el('td', {}, p.name, p.position ? el('div', { class: 'small' }, p.position) : null),
+        const row = (p) => el('tr', {}, el('td', { class: 'n', style: { width: '34px' } }, p.number), el('td', {}, data.players_public && p.id ? el('a', { href: '/player/' + encodeURIComponent(p.id), style: { color: 'inherit' } }, p.name) : p.name, p.position ? el('div', { class: 'small' }, p.position) : null),
           el('td', { class: 'small' }, p.statsText || p.stats.map(([l, n]) => `${n} ${l.toLowerCase()}`).join(', ')));
         return el('div', {}, el('h4', {}, t.name), el('table', {}, el('tbody', {}, starters.map(row), bench.length ? [el('tr', {}, el('td', { colspan: '3', class: 'small' }, 'Replacements')), bench.map(row)] : null)));
       };

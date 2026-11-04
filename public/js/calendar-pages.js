@@ -24,7 +24,8 @@
     const box = h('div', { class: 'card verse', style: { borderLeft: '4px solid var(--accent)', ...(small ? { padding: '10px 16px' } : {}) } });
     const paint = (v) => box.replaceChildren(h('div', { class: 'dim small', style: { textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: small ? '3px' : '6px', fontSize: small ? '11px' : null } }, 'Verse of the day'),
       v.text ? h('div', { style: { fontSize: small ? '14px' : '17px', lineHeight: 1.5, fontStyle: 'italic' } }, '“' + v.text + '”') : null,
-      h('div', { style: { marginTop: small ? '3px' : '6px', fontWeight: 600, fontSize: small ? '13px' : null } }, v.ref, v.translation ? h('span', { class: 'dim small', style: { fontWeight: 400 } }, ' · ' + v.translation) : null));
+      h('div', { style: { marginTop: small ? '3px' : '6px', fontWeight: 600, fontSize: small ? '13px' : null } }, v.ref, v.translation ? h('span', { class: 'dim small', style: { fontWeight: 400 } }, ' · ' + v.translation) : null),
+      v.copyright ? h('div', { class: 'dim', style: { fontSize: '11px', marginTop: '2px' } }, v.copyright) : null);
     const load = () => {
       const day = App.verseDay(p.time), key = day + ':' + p.translation;
       if (verses.has(key)) return paint(verses.get(key));

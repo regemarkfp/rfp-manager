@@ -9,7 +9,7 @@
     { k: 'image', l: 'Logo (dashboard and call sheets)', t: 'image' }, { k: 'address', l: 'Company address', t: 'text' }, { k: 'phone', l: 'Company phone', t: 'text' }, { k: 'email', l: 'Company email', t: 'text' }, { k: 'website', l: 'Website', t: 'text' },
     { k: 'defaultTheme', l: 'Default theme', t: 'ref', ref: 'theme', help: 'Used for every match unless its competition has its own theme, or another is chosen in Graphics control.' },
     { k: 'templateFolder', l: 'Default CasparCG template folder', t: 'text', ph: 'rfp', help: 'Used when a competition has no theme. Themes can point at their own folder.' },
-    { k: 'publicMatches', l: 'Show our matches on the public website', t: 'bool', help: 'Fixtures, live scores and results of this team appear on the website\'s front page. Public channels and their streams always do.' },
+    { k: 'publicMatches', l: 'Show our matches on the public website', t: 'bool', help: 'Fixtures, live scores and results of this team appear on the website\'s front page. Public channels and their streams always do.' }, { k: 'publicPlayers', l: 'Show player profiles on the public website', t: 'bool', help: 'A page per player with their teams and season numbers from completed matches. Off for school sport unless the school agrees.' },
     CUSTOM_FIELDS];
 
   function teamTab() {
@@ -142,7 +142,7 @@
     };
     api('GET', '/api/verse/translations').then((r) => {
       const langs = [...new Set(r.list.map((t) => t.language || 'Other'))];
-      for (const l of langs) sel.append(h('optgroup', { label: l }, r.list.filter((t) => (t.language || 'Other') === l).map((t) => h('option', { value: t.id, selected: t.id === p.translation }, `${t.name}${t.where === 'this machine' ? ' (on this machine)' : ''}`))));
+      for (const l of langs) sel.append(h('optgroup', { label: l }, r.list.filter((t) => (t.language || 'Other') === l).map((t) => h('option', { value: t.id, selected: t.id === p.translation }, `${t.name}${t.where === 'this machine' ? ' (on this machine)' : t.where === 'online' ? ' (bible-api.com)' : ''}`))));
     }).catch(() => {});
     sel.onchange = () => { p.translation = sel.value; save(); };
     time.onchange = () => { if (/^\d\d:\d\d$/.test(time.value)) { p.time = time.value; save(); } };
@@ -150,7 +150,7 @@
       App.machine.linked ? h('p', { class: 'dim' }, 'This machine is linked to the website: change this there and it syncs down.') : null,
       h('label', { class: 'row', style: { gap: '8px' } }, h('input', { type: 'checkbox', checked: p.on, disabled: App.machine.linked || null, onchange: (e) => { p.on = e.target.checked; sel.disabled = time.disabled = !p.on; save(); } }), h('span', {}, 'Show the verse of the day on my home page')),
       h('div', { class: 'form', style: { marginTop: '10px' } },
-        h('label', { class: 'f' }, h('span', {}, 'Translation / language'), sel, h('div', { class: 'help' }, 'Bibles imported on this machine (Worship → Bibles) are listed first; the others come from bible-api.com.')),
+        h('label', { class: 'f' }, h('span', {}, 'Translation / language'), sel, h('div', { class: 'help' }, 'The website\'s Bibles first (a site admin adds them under Settings → Website), then Bibles imported on this machine, then free ones from bible-api.com.')),
         h('label', { class: 'f' }, h('span', {}, 'New verse at'), time, h('div', { class: 'help' }, 'Your computer\'s time. Midnight (00:00) unless you choose another time, for example 05:00 for your morning.'))));
   }
 
@@ -235,6 +235,86 @@
   }
 
   // ---- the public website's home page (site admins): about us, services, contact, who gets booking requests
+  // the website's Bibles: from the Beblia collection (1000+ translations, 200+ languages) or a file; for everyone's verse
+  function siteBiblesCard() {
+    const box = h('div', { class: 'card' }, h('h2', {}, 'Bibles on the website'), h('p', { class: 'dim' }, 'Loading…'));
+    let q = '', cat = null, picked = null, ok = false;
+    const sizeMb = (n) => (n / 1048576).toFixed(1) + ' MB';
+    async function paint() {
+      let mine = [];
+      try { mine = (await api('GET', '/api/bibles/site')).list; } catch (e) { box.replaceChildren(h('h2', {}, 'Bibles on the website'), h('p', { class: 'dim' }, e.message)); return; }
+      const have = new Set(mine.map((b) => b.source));
+      const results = h('div', { class: 'bible-results' });
+      const showResults = () => {
+        if (!cat) { results.replaceChildren(h('p', { class: 'dim small' }, 'Search a language, e.g. Afrikaans, Zulu, Xhosa, Sesotho, English.')); return; }
+        const w = q.trim().toLowerCase();
+        const list = w.length < 2 ? [] : cat.filter((c) => `${c.language} ${c.version} ${c.file}`.toLowerCase().includes(w)).slice(0, 60);
+        results.replaceChildren(w.length < 2 ? h('p', { class: 'dim small' }, `${cat.length} Bibles in the collection. Type at least two letters.`) : !list.length ? h('p', { class: 'dim small' }, 'Nothing found.')
+          : h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {}, list.map((c) => h('tr', { class: picked === c.file ? 'sel' : '' },
+            h('td', {}, h('b', {}, c.language), c.version ? ' ' + c.version : '', h('div', { class: 'dim small' }, c.file)), h('td', { class: 'dim small nowrap' }, sizeMb(c.size)),
+            h('td', { class: 'right' }, [...have].some((x) => x.includes(`(${c.file})`)) ? h('span', { class: 'pill ok' }, 'Added') : h('button', { class: 'sm' + (picked === c.file ? ' primary' : ''), onclick: () => { picked = c.file; ok = false; showResults(); paintAdd(); } }, picked === c.file ? 'Picked' : 'Pick'))))))));
+      };
+      const add = h('div', {});
+      const paintAdd = () => add.replaceChildren(!picked ? null : h('div', { class: 'card', style: { background: 'var(--panel2)', margin: '10px 0 0' } },
+        h('p', { style: { marginTop: 0 } }, 'Add ', h('b', {}, picked), ' to the website?'),
+        h('label', { class: 'row', style: { gap: '8px', alignItems: 'flex-start' } }, h('input', { type: 'checkbox', checked: ok, onchange: (e) => { ok = e.target.checked; btn.disabled = !ok; } }),
+          h('span', {}, 'This translation is in the public domain, or we have permission to use it. Most modern translations are under copyright (for example by the Bible Society); its copyright line is shown with every verse.')),
+        h('div', { class: 'row', style: { marginTop: '8px' } }, btn, h('button', { onclick: () => { picked = null; paintAdd(); showResults(); } }, 'Cancel'))));
+      const btn = h('button', { class: 'primary', disabled: true, onclick: async () => {
+        btn.disabled = true; btn.textContent = 'Downloading…';
+        try { const r = await api('POST', '/api/bibles/site', { file: picked, confirm: true }); toast(`${r.bible.name} added (${r.bible.verses} verses)`); picked = null; paint(); } catch (e) { oops(e); btn.disabled = false; btn.textContent = 'Add to the website'; }
+      } }, 'Add to the website');
+      const search = h('input', { type: 'search', placeholder: 'Search the collection: language or version', value: q, oninput: async (e) => {
+        q = e.target.value;
+        if (!cat) { try { cat = (await api('GET', '/api/bibles/catalog')).list; } catch (err) { oops(err); return; } }
+        showResults();
+      } });
+      box.replaceChildren(h('h2', {}, 'Bibles on the website'),
+        h('p', { class: 'dim', style: { marginTop: 0 } }, 'Kept by the website (database and NAS), so everyone can pick them for their verse of the day, on the website and on production PCs.'),
+        mine.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {}, mine.map((b) => h('tr', {},
+          h('td', {}, h('b', {}, b.name), h('div', { class: 'dim small' }, [b.language, `${b.books} books`, `${b.verses} verses`].filter(Boolean).join(' · ')), b.copyright ? h('div', { class: 'dim small' }, b.copyright) : null),
+          h('td', { class: 'dim small' }, b.source), h('td', { class: 'right' }, h('button', { class: 'sm ghost danger', onclick: async () => { if (await confirmBox(`Remove ${b.name} from the website? People who picked it get the default verse.`, 'Remove')) { try { await api('DELETE', '/api/bibles/site/' + b.id); paint(); } catch (e) { oops(e); } } } }, 'Remove')))))))
+          : h('p', { class: 'dim' }, 'None yet.'),
+        h('h3', {}, 'Add from the Beblia collection'), h('p', { class: 'dim small', style: { marginTop: 0 } }, 'github.com/Beblia/Holy-Bible-XML-Format: 1000+ translations in 200+ languages.'),
+        search, results, add);
+      showResults(); paintAdd();
+    }
+    paint();
+    return box;
+  }
+
+  // RegemarkFP's apps on the website: each names its GitHub repository; releases are copied to this server
+  function softwareCard() {
+    const box = h('div', { class: 'card' }, h('h2', {}, 'Software on the website'), h('p', { class: 'dim' }, 'Loading…'));
+    const when = (t) => (t ? new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'never');
+    function edit(p) {
+      const f = { name: '', slug: '', tagline: '', repo: '', description: '', price: 0, visible: true, prerelease: false, access: [], ...(p || {}) };
+      const form = h('div', { class: 'form' },
+        ...[['name', 'Name', 'Regemark Replay'], ['slug', 'Web address (/software/…)', 'regemark-replay'], ['tagline', 'One line', 'Replay and ISO recording for live sport'], ['repo', 'GitHub repository (owner/name)', 'regemarkfp/regemark-replay']]
+          .map(([k, l, ph]) => h('label', { class: 'f' }, h('span', {}, l), h('input', { value: f[k] || '', placeholder: ph, oninput: (e) => { f[k] = e.target.value; } }))),
+        h('label', { class: 'f wide' }, h('span', {}, 'Description'), h('textarea', { rows: 5, oninput: (e) => { f.description = e.target.value; } }, f.description || '')),
+        h('label', { class: 'f' }, h('span', {}, 'Price (ZAR, 0 = free)'), h('input', { type: 'number', min: 0, value: f.price || 0, oninput: (e) => { f.price = Number(e.target.value) || 0; } }), h('div', { class: 'help' }, 'Paid apps cannot be downloaded until buying is switched on, except by the emails below.')),
+        h('label', { class: 'f' }, h('span', {}, 'Who may download a paid app now (emails)'), h('textarea', { rows: 2, oninput: (e) => { f.access = e.target.value.split(/[\s,;]+/).filter(Boolean); } }, (f.access || []).join('\n'))),
+        h('label', { class: 'row', style: { gap: '8px' } }, h('input', { type: 'checkbox', checked: f.visible !== false, onchange: (e) => { f.visible = e.target.checked; } }), 'Show on the website'),
+        h('label', { class: 'row', style: { gap: '8px' } }, h('input', { type: 'checkbox', checked: !!f.prerelease, onchange: (e) => { f.prerelease = e.target.checked; } }), 'Include pre-releases (betas)'));
+      UI.modal({ title: p ? 'Edit ' + p.name : 'Add an app', wide: true, body: form, actions: [{ label: 'Cancel' }, { label: 'Save', primary: true, onClick: async () => { await api('POST', '/api/software', f); toast('Saved: its GitHub releases are being copied'); paint(); } }] });
+    }
+    async function paint() {
+      let r; try { r = await api('GET', '/api/software'); } catch (e) { box.replaceChildren(h('h2', {}, 'Software on the website'), h('p', { class: 'dim' }, e.message)); return; }
+      box.replaceChildren(h('div', { class: 'spread' }, h('h2', {}, 'Software on the website'), h('button', { class: 'primary', onclick: () => edit(null) }, '+ Add an app')),
+        h('p', { class: 'dim', style: { marginTop: 0 } }, `Publish a release on GitHub as usual: the website copies its installers (.exe, .msi, .dmg, .pkg, .AppImage, .deb, .rpm …) to ${r.folder} every 6 hours (or now, with Sync) and serves them at /software.`),
+        r.list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {}, r.list.map((p) => { const rel = p.releases[0]; return h('tr', {},
+          h('td', {}, h('b', {}, p.name), p.visible === false ? h('span', { class: 'pill', style: { marginLeft: '6px' } }, 'hidden') : null, h('div', { class: 'dim small' }, p.repo || 'no repository'), h('div', { class: 'dim small' }, `/software/${p.slug}`)),
+          h('td', { class: 'small' }, rel ? `v${rel.version} · ${rel.assets.length} file${rel.assets.length === 1 ? '' : 's'}` : 'no release yet', h('div', { class: 'dim small' }, `synced ${when(p.synced)} · ${p.downloads} download${p.downloads === 1 ? '' : 's'}`)),
+          h('td', { class: 'small' }, p.price ? 'R ' + p.price : 'Free'),
+          h('td', { class: 'right nowrap' }, h('button', { class: 'sm', onclick: async (e) => { e.target.disabled = true; try { const x = await api('POST', `/api/software/${p.slug}/sync`); toast(`${x.releases} release${x.releases === 1 ? '' : 's'}, ${x.copied} new file${x.copied === 1 ? '' : 's'}`); paint(); } catch (err) { oops(err); e.target.disabled = false; } } }, 'Sync'),
+            ' ', h('button', { class: 'sm', onclick: () => edit(p) }, 'Edit'), ' ', h('a', { class: 'btn sm', href: (App.cfg.siteUrl || '') + '/software/' + p.slug, target: '_blank', rel: 'noopener' }, 'View ↗'),
+            ' ', h('button', { class: 'sm ghost danger', onclick: async () => { if (await confirmBox(`Take ${p.name} off the website? The copied files stay until the next clean-up.`, 'Remove')) { await api('DELETE', '/api/software/' + p.id).catch(oops); paint(); } } }, '✕'))); })))) : h('p', { class: 'dim' }, 'No apps yet.'));
+    }
+    paint();
+    return box;
+  }
+
   function websiteTab() {
     const box = h('div', { class: 'card dim' }, 'Loading…');
     api('GET', '/api/site/landing').then((l) => {
@@ -291,7 +371,7 @@
       if (window.RFPNotifyUI) window.RFPNotifyUI.settings(inner);
       return box;
     };
-    const body = { notifications: notificationsTab, team: teamTab, members: membersTab, account: () => [accountTab(), verseCard()], connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab, server: App.serverTab, website: websiteTab }[tab]();
+    const body = { notifications: notificationsTab, team: teamTab, members: membersTab, account: () => [accountTab(), verseCard()], connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab, server: App.serverTab, website: () => [websiteTab(), softwareCard(), siteBiblesCard()] }[tab]();
     return { el: h('div', {}, pageHead('Settings'), h('div', { class: 'tabs' }, tabs.map(([k, l]) => h('button', { class: k === tab ? 'on' : '', onclick: () => { tab = k; route(); } }, l))), body) };
   };
 })();
