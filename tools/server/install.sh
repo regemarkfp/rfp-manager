@@ -28,10 +28,12 @@
 #                             RFP Manager as a file), templates/, shared/ and backups/. Set your Samba password
 #                             once with:  sudo smbpasswd -a <your user>
 #   --no-recordings           streams are relayed but not recorded.
+#   --stream-host stream.example.com   the public name encoders send SRT / RTMP to (home server with UDP 8890 and
+#                             TCP 1935 forwarded on the router). Default at home: this machine's Tailscale name.
 set -euo pipefail
 
 FROM=""; TOKEN=""; DOMAIN=""; ADMIN=""; EMAIL=""; KEEP_DAYS=90; TUNNEL=""; HOME_MODE=""; RECDIR=/var/lib/mediamtx/recordings
-LOCALDB=""; NAS=""; RECORD=true
+LOCALDB=""; NAS=""; RECORD=true; SHOST=""; RECORD_SET=
 while [ $# -gt 0 ]; do
   case "$1" in
     --from) FROM="${2%/}"; shift 2 ;;
@@ -45,7 +47,9 @@ while [ $# -gt 0 ]; do
     --recordings) RECDIR="${2%/}"; shift 2 ;;
     --local-db) LOCALDB=1; shift ;;
     --nas) NAS="${2%/}"; shift 2 ;;
-    --no-recordings) RECORD=false; shift ;;
+    --no-recordings) RECORD=false; RECORD_SET=1; shift ;;
+    --recordings-on) RECORD=true; RECORD_SET=1; shift ;;
+    --stream-host) SHOST="$2"; shift 2 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -61,7 +65,8 @@ APP=/opt/rfp-manager; DATA=/var/lib/rfp-manager; ETC=/etc/rfp-manager
 # and keeps its own database, NAS and recording choice
 [ -z "$LOCALDB" ] && [ -f "$ETC/localdb" ] && LOCALDB=1
 [ -z "$NAS" ] && [ -f "$ETC/nas" ] && NAS="$(cat "$ETC/nas")"
-[ "$RECORD" = true ] && [ -f "$ETC/no-recordings" ] && RECORD=false
+[ -z "$RECORD_SET" ] && [ -f "$ETC/no-recordings" ] && RECORD=false
+[ -z "$SHOST" ] && [ -f "$ETC/stream-host" ] && SHOST="$(cat "$ETC/stream-host")"
 
 case "$(uname -m)" in
   aarch64|arm64) NODE_ARCH=arm64; MTX_ARCH='linux_arm64(v8)?' ;;
@@ -227,7 +232,8 @@ chown -R root:root "$APP"; chown -R "$SVC:$SVC" "$DATA"
 
 # where encoders send SRT / RTMP: at home, this machine's Tailscale name (Cloudflare carries the website only)
 STREAM_HOST="$DOMAIN"
-if [ -n "$HOME_MODE" ]; then
+if [ -n "$SHOST" ]; then STREAM_HOST="$SHOST"; mkdir -p "$ETC"; echo "$SHOST" > "$ETC/stream-host"
+elif [ -n "$HOME_MODE" ]; then
   TS="$(tailscale status --json 2>/dev/null | jq -r '.Self.DNSName // empty' | sed 's/\.$//' || true)"
   [ -n "$TS" ] && STREAM_HOST="$TS"
 fi
@@ -412,7 +418,7 @@ systemctl is-active --quiet mediamtx || { echo "MediaMTX did not start:"; journa
 if [ -n "$HOME_MODE" ]; then
   TUN="not installed yet (run again with --tunnel <token>)"; systemctl is-active --quiet cloudflared 2>/dev/null && TUN="running"
   NASLINE=""; [ -n "$NAS" ] && NASLINE="NAS: \\\\$(hostname)\\NAS  (images in assets\\images). Set your password once: sudo smbpasswd -a ${SUDO_USER:-<user>}"
-  TSNOTE=""; [ "$STREAM_HOST" = "$DOMAIN" ] && TSNOTE="Tailscale is not signed in yet: run  sudo tailscale up  and then this command again."
+  TSNOTE=""; [ -z "$SHOST" ] && [ "$STREAM_HOST" = "$DOMAIN" ] && TSNOTE="Tailscale is not signed in yet: run  sudo tailscale up  and then this command again."
   cat <<EOF
 
 ────────────────────────────────────────────────────────────────
@@ -424,7 +430,7 @@ if [ -n "$HOME_MODE" ]; then
   Cloudflare Tunnel: $TUN
      Public hostnames (Cloudflare → Zero Trust → Networks → Tunnels → your tunnel):
        $DOMAIN${ADMIN:+ and $ADMIN}  →  HTTP  localhost:8080
-  Streams in (over Tailscale)
+  Streams in $([ -n "$SHOST" ] && echo "(router: UDP 8890 + TCP 1935 forwarded to this machine)" || echo "(over Tailscale)")
      RTMP     rtmp://$STREAM_HOST/live
      SRT      srt://$STREAM_HOST:8890
      $TSNOTE
