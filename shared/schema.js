@@ -41,6 +41,11 @@
   // music rights: how a track was used (as on a SAMRO / broadcaster cue sheet) and where it may be used
   const MUSIC_USAGE = ['Theme', 'Opening titles', 'Closing titles', 'Bumper / sting', 'Background', 'Featured', 'Signature', 'Source (live at venue)'];
   const MUSIC_SOURCES = ['Commercial release (SAMRO / NORM)', 'Production music library', 'Royalty-free', 'Commissioned', 'Own composition', 'Public domain'];
+  // the post-production report: what is rated (1–5 stars) when a production is completed, and how bad an issue was
+  const REPORT_ASPECTS = [['overall', 'Overall'], ['vision', 'Cameras & vision'], ['audio', 'Audio'], ['graphics', 'Graphics'], ['stream', 'Stream / transmission'], ['crew', 'Crew & teamwork'],
+    ['timing', 'Timing & punctuality'], ['equipment', 'Equipment'], ['client', 'Client satisfaction']];
+  const ISSUE_SEVERITY = ['Minor', 'Moderate', 'Major', 'Critical'];
+  const PRODUCTION_STATUS = ['Planned', 'Confirmed', 'Completed', 'Cancelled'];
   const MUSIC_MEDIA = ['TV broadcast', 'Live stream', 'Social media', 'Venue / PA', 'Radio'];
   const STATUSES = ['Upcoming', 'Live', 'Completed', 'Postponed', 'Cancelled'];
   const SOURCES = ['CAMS', 'EVS', 'VT', 'GFX', 'PRESENTATION', 'REMOTE', 'BREAK'];
@@ -127,8 +132,10 @@
       ...MATCH_SETTINGS('Match settings (empty = from the competition)').map((f) => Object.assign({}, f, { def: undefined, opts: f.t === 'select' ? ['', ...f.opts] : f.opts, t: f.t === 'bool' ? 'select' : f.t }, f.t === 'bool' ? { opts: ['', 'Yes', 'No'] } : {})),
       RUNDOWN] },
 
-    production: { label: 'Production', plural: 'Productions', group: 'Productions', title: (d) => d.name, cols: ['date', 'name', 'type', 'venue', 'client'], fields: [
+    production: { label: 'Production', plural: 'Productions', group: 'Productions', title: (d) => (d.number ? d.number + ' · ' : '') + (d.name || ''), cols: ['number', 'date', 'name', 'type', 'status', 'venue', 'client'], fields: [
+      { k: 'number', l: 'Production no.', t: 'text', readonly: true, ph: 'Given when saved', w: 130, help: 'Given by the website in order (P + year + number) and never reused, so every production can be told apart and found again.' },
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'type', l: 'Type', t: 'combo', opts: PRODUCTION_TYPES, def: 'Sport' },
+      { k: 'status', l: 'Status', t: 'select', opts: PRODUCTION_STATUS, def: 'Planned', help: 'Complete a production with the "Complete production" button: it asks for the report (ratings and issues).' },
       { k: 'date', l: 'Date', t: 'date' }, { k: 'days', l: 'Days', t: 'number', ph: '1' }, { k: 'venue', l: 'Venue', t: 'ref', ref: 'venue' },
       { k: 'event', l: 'Event', t: 'text', ph: 'From the competition unless you type one', help: 'Shown on the call sheet and rundown.' },
       { k: 'txTime', l: 'TX / kick-off time', t: 'time', help: 'Default TX time for the crew and the start line of the rundown.' },
@@ -151,8 +158,9 @@
         { k: 'track', l: 'Track', t: 'ref', ref: 'track' }, { k: 'usage', l: 'Used as', t: 'combo', opts: MUSIC_USAGE, w: 170 }] },
       { k: 'broadcaster', l: 'Broadcaster / channel', t: 'text', ph: 'SuperSport, YouTube …', group: 'Music & report', help: 'Printed on the music cue sheet and the report.' },
       { k: 'programmeTitle', l: 'Programme title', t: 'text', ph: 'The production name', group: 'Music & report' },
-      { k: 'incidents', l: 'Incidents & notes', t: 'list', group: 'Music & report', help: 'Faults, delays and anything else for the post-production report.', fields: [
-        { k: 'time', l: 'Time', t: 'time', w: 100 }, { k: 'category', l: 'Kind', t: 'combo', opts: ['Technical', 'Delay', 'Graphics', 'Audio', 'Stream', 'Crew', 'Weather', 'Other'], w: 130 }, { k: 'text', l: 'What happened', t: 'text' }] },
+      { k: 'incidents', l: 'Issues & incidents', t: 'list', group: 'Music & report', help: 'Faults, delays and anything else for the post-production report.', fields: [
+        { k: 'time', l: 'Time', t: 'time', w: 100 }, { k: 'category', l: 'Kind', t: 'combo', opts: ['Technical', 'Delay', 'Graphics', 'Audio', 'Vision', 'Stream', 'Crew', 'Equipment', 'Client', 'Weather', 'Other'], w: 130 },
+        { k: 'severity', l: 'Severity', t: 'select', opts: ISSUE_SEVERITY, def: 'Minor', w: 120 }, { k: 'text', l: 'What happened', t: 'text' }, { k: 'action', l: 'What was done / to do', t: 'text' }, { k: 'resolved', l: 'Resolved', t: 'bool', w: 80 }] },
       { k: 'reportNotes', l: 'Report summary', t: 'textarea', group: 'Music & report' },
       { k: 'musicLog', l: 'Music used (added by hand)', t: 'list', group: 'Music & report', help: 'Music that was not played from RFP Manager (a DJ, the stadium PA, a band, a vMix input without a track). Pick a track from the library, or type the title and its writers. Plays from CasparCG, vMix and stream slates are logged by themselves.', fields: [
         { k: 'track', l: 'Track', t: 'ref', ref: 'track' }, { k: 'title', l: 'or title', t: 'text' }, { k: 'composers', l: 'Composer(s)', t: 'text' }, { k: 'publisher', l: 'Publisher', t: 'text' },
@@ -417,6 +425,6 @@
     read: (role) => ROLES.includes(role),
   };
 
-  return { ENTITIES: E, MUSIC_USAGE, MUSIC_SOURCES, MUSIC_MEDIA, GENDERS, AGE_GROUPS, DIVISIONS, POSITION_TYPES, matchSettings, LINE_COLORS, ROLES, STATUSES, PRODUCTION_TYPES, SOURCES, EQUIP_CATS, SYSTEM_TYPES, ALL_TYPES, PC_EDIT, ROLE_SEES, EXPENSE_CATS, EXPENSE_STATUS, BOOKING_STATUS, officiates, sees, resolveSquad, snapshotTeam, fieldsFor, age,
+  return { ENTITIES: E, REPORT_ASPECTS, ISSUE_SEVERITY, PRODUCTION_STATUS, MUSIC_USAGE, MUSIC_SOURCES, MUSIC_MEDIA, GENDERS, AGE_GROUPS, DIVISIONS, POSITION_TYPES, matchSettings, LINE_COLORS, ROLES, STATUSES, PRODUCTION_TYPES, SOURCES, EQUIP_CATS, SYSTEM_TYPES, ALL_TYPES, PC_EDIT, ROLE_SEES, EXPENSE_CATS, EXPENSE_STATUS, BOOKING_STATUS, officiates, sees, resolveSquad, snapshotTeam, fieldsFor, age,
     parseDuration, fmtDuration, rundownTimes, costing, CAN };
 });
