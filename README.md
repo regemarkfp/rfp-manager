@@ -887,6 +887,13 @@ Cancel puts the colour back. A colour without transparency is stored as `#rrggbb
 
 Click a match on regemarkfp.com (Matches, or Live matches on the home page) for its match centre at /match/<id>: the score and running clock, what happened (scores, cards, substitutions), team statistics, players and line-ups, match officials; the full scorecard for cricket. It updates every few seconds while the match is live. The same live stats show under the video on a watch page when the stream has a match (the picture covers them in full screen). Matches show when the team has "Show matches on the website" on, or when they are in a production that streams.
 
+### Following teams and clubs (match updates, like Google)
+
+- On regemarkfp.com, **Teams** lists every club and team of production teams that show their matches on the website. A fan signs in and presses **Follow** on a club (all its teams) or one team: on the Teams page, a club's or team's page (/team/<id>), or under a match.
+- They choose what they hear about, per team: line-ups, kick-off, every score, half time and full time, red cards and big moments (cricket: wickets, fifties and hundreds, end of the innings, the result). **Following** (/following) lists their teams with these choices.
+- The updates go to the RFP Manager app for Android (Firebase push, once the site admin has added the Firebase files under Settings → Server), to the browser (Chrome, Edge, Firefox on phone or PC; on an iPhone after "Add to Home Screen") and to the inbox. After the first follow the site offers to turn on notifications in that browser; Notifications → "Turn on" does it too. Quiet hours apply.
+- The website works them out from the match as the scorer saves it (it reaches the website by sync), so it does not matter which PC or phone scores. Matches more than two days old are not announced.
+
 ### Production teams
 
 Each production team has its own name on the website: a second team with the same name is refused. Two teams that
