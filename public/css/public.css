@@ -183,3 +183,18 @@ button.follow.sm { padding: 6px 12px; font-size: 13px; }
 .alerts button.sm { padding: 5px 12px; font-size: 13px; }
 h3.sec2 { font-size: 15px; margin: 16px 0 6px; color: var(--dim); text-transform: uppercase; letter-spacing: .05em; }
 .alerts input[type=time] { min-width: 110px; }
+
+/* software */
+a.tcard.app { color: var(--text); text-decoration: none; }
+.dls { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 14px; }
+.dl { display: inline-flex; align-items: center; gap: 4px; background: var(--panel2); color: var(--text); text-decoration: none; border-radius: 22px; padding: 10px 18px; font-weight: 600; }
+.dl.primary { background: var(--accent); color: #111; } .dl.primary .sub { color: #222; } .dl.off { opacity: .5; font-weight: 400; }
+.desc-box { white-space: pre-wrap; background: var(--panel); border-radius: var(--radius); padding: 14px 16px; line-height: 1.55; }
+details.rel { background: var(--panel); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 8px; } details.rel summary { cursor: pointer; font-weight: 600; }
+
+/* fans' corner, log tables, sermons */
+.fanzone .fz-row { background: var(--panel); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; }
+.votes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; } button.vote { flex: 1; min-width: 90px; } button.vote.on { background: var(--accent); color: #111; } button.vote.on .sub { color: #222; }
+.fanzone select { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; margin-top: 6px; max-width: 100%; }
+table.log { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: var(--radius); overflow: hidden; } table.log th, table.log td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); } table.log td:nth-child(2), table.log th:nth-child(2) { text-align: left; } table.log a { color: var(--text); } table.log .pts { font-weight: 800; }
+input.sermon-q { width: 100%; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 9px 14px; margin-bottom: 10px; }
