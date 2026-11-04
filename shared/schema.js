@@ -295,6 +295,7 @@
       { k: 'service', l: 'Service', t: 'text' }, { k: 'date', l: 'Date of the event', t: 'date' }, { k: 'venue', l: 'Where', t: 'text' },
       { k: 'details', l: 'What they asked', t: 'textarea' }, { k: 'notes', l: 'Our notes', t: 'textarea' }, { k: 'received', l: 'Received', t: 'text', help: 'When the request came in from the website.' },
       { k: 'production', l: 'Production', t: 'ref', ref: 'production', help: 'The production made for this booking.' },
+      { k: 'deposit', l: 'Deposit (ZAR)', t: 'money', help: 'Optional. The client can pay it with PayFast on their tracking page; once paid the booking is Booked.' },
       { k: 'clientStage', l: 'Client sees', t: 'select', opts: ['', ...BOOKING_STAGES], help: 'Empty: the step follows the work (producer, quote sent, confirmed, crew booked, the date, completed). Choose one to set it by hand.' },
       { k: 'quiet', l: 'Quiet', t: 'bool', help: 'On: the client is not sent a message when the step changes (replies still go).' }] },
     expense: { label: 'Expense', plural: 'Expenses', group: 'Productions', title: (d) => [d.description, d.amount ? Number(d.amount).toFixed(2) : ''].filter(Boolean).join(' · '), cols: ['date', 'production', 'description', 'category', 'amount', 'status'], fields: [
