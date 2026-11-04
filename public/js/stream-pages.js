@@ -205,12 +205,57 @@
     paint();
     return box;
   }
-  // ---- WhatsApp Business (Meta's Cloud API): replies on bookings go by WhatsApp as well as email
+  // ---- WhatsApp for booking messages: the business's own WhatsApp linked like WhatsApp Web, or Meta's Cloud API
   function whatsappCard() {
     const box = h('div', { class: 'card' }, h('h2', {}, 'WhatsApp (booking messages)'), h('div', { class: 'dim' }, 'Loading…'));
+    let timer = null;
     const paint = async () => {
+      clearTimeout(timer);
+      if (!document.body.contains(box) && box.dataset.shown) return;
+      box.dataset.shown = '1';
       let c;
       try { c = await api('GET', '/api/whatsapp/config'); } catch (e) { box.replaceChildren(h('h2', {}, 'WhatsApp'), h('p', { class: 'dim' }, e.message)); return; }
+      const mode = box.dataset.mode || c.mode;
+      const L = c.linked || {};
+      const setMode = async (m) => { box.dataset.mode = m; try { await api('POST', '/api/whatsapp/config', { mode: m }); App.cfg.whatsapp = m === 'linked' ? L.state === 'open' : !!c.hasToken; } catch (e) { oops(e); } paint(); };
+      const tab = (m, label) => h('button', { class: 'sm' + (mode === m ? ' primary' : ''), onclick: () => setMode(m) }, label);
+      const on = mode === 'linked' ? L.state === 'open' : c.on && c.mode === 'cloud';
+      box.replaceChildren(h('h2', {}, 'WhatsApp (booking messages)'),
+        h('p', {}, h('span', { class: 'led ' + (on ? 'ok' : 'bad') }), ' ', on ? (mode === 'linked' ? `On – sending from your WhatsApp +${L.me}${L.name ? ' (' + L.name + ')' : ''}.` : `On${c.number ? ' – sending from ' + c.number : ''} (Meta Business API).`) + ' Replies on booking requests and their step updates go by WhatsApp as well as email.' : 'Not set up yet: booking messages go by email only.'),
+        h('div', { class: 'row', style: { gap: '6px', marginBottom: '12px' } }, tab('linked', 'Link my WhatsApp (phone)'), tab('cloud', 'Meta Business API')),
+        ...(mode === 'linked' ? linkedPart(c, L, paint) : metaPart(c, paint)));
+      if (mode === 'linked' && ['installing', 'connecting', 'waiting'].includes(L.state)) timer = setTimeout(paint, 2500);
+    };
+    function linkedPart(c, L, paint) {
+      const phone = h('input', { type: 'tel', placeholder: 'Your WhatsApp number, e.g. 082 …', style: { maxWidth: '260px' } });
+      const go = async (withCode) => { try { if (withCode && !phone.value.trim()) return toast('Type the WhatsApp number first'); await api('POST', '/api/whatsapp/link', { phone: withCode ? phone.value : '' }); paint(); } catch (e) { oops(e); } };
+      const warn = h('div', { class: 'dim small', style: { border: '1px solid var(--warn, #b8860b)', borderRadius: '8px', padding: '8px 10px', margin: '0 0 12px' } },
+        h('b', {}, 'Unofficial. '), 'This links your WhatsApp the way WhatsApp Web does, so messages go from your own number by themselves. WhatsApp does not allow it in its terms and can ban a number that uses it. To keep the risk low the website only writes to people who sent a booking request, one message at a time with a pause between them, at most 60 an hour. Use a WhatsApp Business number you can afford to lose rather than your personal one.');
+      const s = L.state;
+      if (s === 'open') return [warn,
+        h('p', {}, `Linked as +${L.me}. It shows on your phone under WhatsApp → Settings → Linked devices. Keep the phone on the internet now and then (WhatsApp unlinks devices after about two weeks without the phone).`),
+        h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } }, testRow(), h('button', { class: 'danger sm', onclick: async () => { if (!confirm('Unlink WhatsApp from this website?')) return; try { await api('DELETE', '/api/whatsapp/link'); App.cfg.whatsapp = false; paint(); } catch (e) { oops(e); } } }, 'Unlink'))];
+      if (s === 'installing') return [warn, h('p', {}, '⏳ Installing WhatsApp support on the server (the first time only, up to a few minutes)…')];
+      if (s === 'connecting') return [warn, h('p', {}, '⏳ Connecting to WhatsApp…'), h('button', { class: 'sm', onclick: async () => { try { await api('DELETE', '/api/whatsapp/link'); paint(); } catch (e) { oops(e); } } }, 'Cancel')];
+      if (s === 'waiting') return [warn,
+        L.code ? h('div', {}, h('p', {}, 'On your phone: WhatsApp → Settings (or ⋮) → Linked devices → Link a device → ', h('b', {}, 'Link with phone number instead'), ', and type this code:'),
+          h('div', { style: { fontSize: '34px', fontWeight: 800, letterSpacing: '6px', fontFamily: 'monospace', margin: '6px 0 10px' } }, String(L.code).replace(/^(.{4})(.{4})$/, '$1-$2')))
+          : h('div', {}, h('p', {}, 'On your phone: WhatsApp → Settings (or ⋮) → Linked devices → Link a device, and scan this:'),
+            L.qr ? h('img', { src: L.qr, alt: 'QR code', style: { width: '260px', height: '260px', background: '#fff', padding: '8px', borderRadius: '8px' } }) : h('p', { class: 'dim' }, L.qrText ? 'The QR picture could not be made: use "Link with a code" instead.' : 'Waiting for the code…'),
+            h('p', { class: 'dim small' }, 'The code changes every 20 seconds or so; this page follows it.')),
+        h('button', { class: 'sm', onclick: async () => { try { await api('DELETE', '/api/whatsapp/link'); paint(); } catch (e) { oops(e); } } }, 'Cancel')];
+      return [warn, L.error ? h('p', { class: 'err' }, L.error) : null,
+        h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap', alignItems: 'center' } }, h('button', { class: 'primary', onclick: () => go(false) }, 'Link with a QR code')),
+        h('p', { class: 'dim small', style: { margin: '10px 0 4px' } }, 'On this phone itself (can\'t scan your own screen)? Link with a code instead:'),
+        h('div', { class: 'row', style: { gap: '8px', flexWrap: 'nowrap' } }, phone, h('button', { onclick: () => go(true) }, 'Link with a code'))];
+    }
+    function testRow() {
+      const testTo = h('input', { type: 'tel', placeholder: 'Send a test to, e.g. 082 …', style: { maxWidth: '220px' } });
+      return h('div', { class: 'row', style: { gap: '8px', flexWrap: 'nowrap' } }, testTo, h('button', { onclick: async () => {
+        try { const r = await api('POST', '/api/whatsapp/test', { phone: testTo.value }); if (r.ok) toast(r.kind === 'template' ? 'Sent with the template – check WhatsApp' : 'Sent – check WhatsApp'); else UI.modal({ title: 'WhatsApp did not send it', body: h('p', {}, r.error || 'Unknown error'), actions: [{ label: 'OK', primary: true }] }); } catch (e) { oops(e); }
+      } }, 'Send a test'));
+    }
+    function metaPart(c, paint) {
       const inp = (v, attrs = {}) => h('input', { value: v || '', ...attrs });
       const f = { phoneNumberId: inp(c.phoneNumberId, { placeholder: 'e.g. 123456789012345', inputmode: 'numeric' }), token: inp('', { type: 'password', placeholder: c.hasToken ? '•••••• saved (type a new one to replace it)' : 'Paste the permanent access token', autocomplete: 'off' }),
         appSecret: inp('', { type: 'password', placeholder: c.hasSecret ? '•••••• saved' : 'Optional: checks that messages really come from Meta', autocomplete: 'off' }),
@@ -218,9 +263,7 @@
       const field = (label, el, help) => h('label', { class: 'fld', style: { display: 'block', marginBottom: '10px' } }, h('div', { class: 'dim small' }, label), el, help ? h('div', { class: 'dim small' }, help) : null);
       const copyable = (v) => h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, h('input', { readonly: true, value: v, onfocus: (e) => e.target.select(), style: { flex: 1, minWidth: 0 } }), h('button', { class: 'sm', onclick: () => navigator.clipboard.writeText(v).then(() => toast('Copied')).catch(() => {}) }, 'Copy'));
       const testTo = inp('', { type: 'tel', placeholder: 'Your own number, e.g. 082 …' });
-      box.replaceChildren(h('h2', {}, 'WhatsApp (booking messages)'),
-        h('p', {}, h('span', { class: 'led ' + (c.on ? 'ok' : 'bad') }), ' ', c.on ? `On${c.number ? ' – sending from ' + c.number : ''}. Replies on booking requests and their step updates go by WhatsApp as well as email.` : 'Not set up yet: booking messages go by email only.'),
-        h('details', { open: !c.on ? '' : null }, h('summary', {}, 'How to set it up (Meta, once)'),
+      return [h('details', { open: !c.on ? '' : null }, h('summary', {}, 'How to set it up (Meta, once)'),
           h('ol', { style: { margin: '8px 0 10px 18px', padding: 0, lineHeight: 1.7 } },
             h('li', {}, 'developers.facebook.com → My apps → Create app → type Business → add the product WhatsApp. Link it to your Meta Business account (RegemarkFP).'),
             h('li', {}, 'WhatsApp → API setup: add your business phone number (a number not already on the WhatsApp app) and verify it. Copy its Phone number ID below.'),
@@ -238,8 +281,8 @@
           c.hasToken ? h('button', { class: 'danger sm', onclick: async () => { try { await api('POST', '/api/whatsapp/config', { clearToken: true }); toast('Token removed: WhatsApp is off'); App.cfg.whatsapp = false; paint(); } catch (e) { oops(e); } } }, 'Remove the token') : null),
         c.on ? h('div', { class: 'row', style: { gap: '8px', marginTop: '12px', flexWrap: 'nowrap' } }, testTo, h('button', { onclick: async () => {
           try { const r = await api('POST', '/api/whatsapp/test', { phone: testTo.value }); if (r.ok) toast(r.kind === 'template' ? 'Sent with the template – check your WhatsApp' : 'Sent – check your WhatsApp'); else UI.modal({ title: 'WhatsApp did not send it', body: h('p', {}, r.error || 'Unknown error'), actions: [{ label: 'OK', primary: true }] }); } catch (e) { oops(e); }
-        } }, 'Send a test')) : null);
-    };
+        } }, 'Send a test')) : null];
+    }
     paint();
     return box;
   }
