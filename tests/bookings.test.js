@@ -176,3 +176,87 @@ test('booking tracking, replies by email + WhatsApp, answers back', async (t) =>
   const sig = 'sha256=' + crypto.createHmac('sha256', 'test-secret').update(raw).digest('hex');
   assert.equal((await fetch(app.url + '/api/whatsapp/webhook', { method: 'POST', headers: { 'content-type': 'application/json', 'x-hub-signature-256': sig }, body: raw })).status, 200);
 });
+
+test('whatsapp linked like WhatsApp Web (Baileys, faked here): link, send, replies, ticks, logged out', async (t) => {
+  const { EventEmitter } = require('node:events');
+  const fs = require('node:fs'), path = require('node:path');
+  const sockets = [], sentMsgs = [];
+  const fakeLib = {
+    make: (opts) => {
+      const ev = new EventEmitter();
+      const s = { ev, opts, user: null, signalRepository: { lidMapping: { getPNForLID: async (lid) => (lid === '999@lid' ? '27820000000@s.whatsapp.net' : null) } },
+        end: () => {}, logout: async () => {},
+        requestPairingCode: async (n) => { s.paired = n; return 'ABCD1234'; },
+        onWhatsApp: async (jid) => [{ jid, exists: !jid.startsWith('27829999999') }],
+        sendMessage: async (jid, content) => { const id = 'LNK' + (sentMsgs.length + 1); sentMsgs.push({ jid, content, id }); return { key: { id, remoteJid: jid, fromMe: true } }; } };
+      sockets.push(s);
+      setTimeout(() => ev.emit('connection.update', { qr: '2@fake-qr' }), 5);
+      return s;
+    },
+    useMultiFileAuthState: async (dir) => ({ state: { creds: { registered: false } }, saveCreds: async () => { fs.writeFileSync(path.join(dir, 'creds.json'), '{}'); } }),
+    DisconnectReason: { loggedOut: 401, restartRequired: 515 },
+    Browsers: { ubuntu: (b) => ['Ubuntu', b, '22.04.4'] },
+    qrcode: { toDataURL: async (t) => 'data:image/png;base64,' + Buffer.from(t).toString('base64') }
+  };
+  const app = await boot({ mode: 'cloud', allowSignup: true, publicUrl: 'https://site.example', publicName: 'RegemarkFP', siteAdmins: ['admin@example.com'], mail: { provider: 'test', from: 'RFP <rfp@example.com>' },
+    whatsapp: { loadLib: async () => fakeLib, gapMs: 0 }, mongo: { uri: 'mongodb://fake-' + Math.random(), db: 'rfp' } }, { mongoDriver: fakeMongo });
+  t.after(() => app.stop());
+  const admin = client(app.url);
+  await admin.post('/api/auth/signup', { name: 'Test Admin', email: 'admin@example.com', password: 'correct horse' });
+  const team = (await admin.post('/api/orgs', { name: 'RegemarkFP' })).data.id;
+  const settle = async () => { await new Promise((r) => setTimeout(r, 400)); await app.bookings.idle(); await app.notify.idle(); };
+  const waitFor = async (fn) => { for (let i = 0; i < 100; i++) { const v = await fn(); if (v) return v; await new Promise((r) => setTimeout(r, 20)); } throw new Error('timed out'); };
+
+  assert.equal((await client(app.url).post('/api/whatsapp/link', {})).status, 401);
+  // link with a QR code
+  await admin.post('/api/whatsapp/link', {});
+  let L = await waitFor(async () => { const x = (await admin.get('/api/whatsapp/link')).data; return x.state === 'waiting' && x; });
+  assert.match(L.qr, /^data:image\/png;base64,/);
+  assert.equal((await admin.get('/api/whatsapp/config')).data.mode, 'linked');
+  assert.equal((await admin.get('/api/config')).data.whatsapp, false, 'not until the phone has linked');
+  const s = sockets.slice(-1)[0];
+  s.user = { id: '27831112222:7@s.whatsapp.net', name: 'RegemarkFP' };
+  s.ev.emit('connection.update', { connection: 'open' });
+  L = (await admin.get('/api/whatsapp/link')).data;
+  assert.deepEqual([L.state, L.me], ['open', '27831112222']);
+  assert.equal((await admin.get('/api/config')).data.whatsapp, true);
+
+  // a booking: the step update and a reply go from the linked phone, as plain text with the link
+  const sent = await client(app.url).post('/api/public/booking', { name: 'Sam Client', email: 'sam@example.com', phone: '082 000 0000', service: 'Streaming', date: '2099-01-10' });
+  const key = sent.data.track.slice(7);
+  const b = (await app.store.list(team, 'booking'))[0];
+  await admin.put(`/api/docs/booking/${b.id}?team=${team}`, { data: { ...(await app.store.get(b.id)).data, producer: 'admin@example.com' } });
+  await settle();
+  assert.equal(sentMsgs.length, 1);
+  assert.equal(sentMsgs[0].jid, '27820000000@s.whatsapp.net');
+  assert.equal(sentMsgs[0].content.text, 'A producer is looking at your request.\n\nFollow your booking: https://site.example/track/' + key);
+  const r = await admin.post(`/api/bookings/${b.id}/reply?team=${team}`, { text: 'Hi Sam' });
+  let m = r.data.doc.data.messages.slice(-1)[0];
+  assert.deepEqual([m.whatsapp.ok, m.whatsapp.kind, m.whatsapp.id], [true, 'linked', 'LNK2']);
+
+  // the client answers from a "@lid" address WhatsApp now uses: matched to the phone number, then to the booking
+  s.ev.emit('messages.upsert', { type: 'notify', messages: [{ key: { remoteJid: '999@lid', id: 'IN1', fromMe: false }, pushName: 'Sam', messageTimestamp: 1, message: { conversation: 'Hello back' } }] });
+  s.ev.emit('messages.upsert', { type: 'notify', messages: [{ key: { remoteJid: '123@g.us', id: 'G1', fromMe: false }, message: { conversation: 'group chatter' } }] });
+  s.ev.emit('messages.update', [{ key: { id: 'LNK2', fromMe: true, remoteJid: '999@lid' }, update: { status: 4 } }]);
+  await settle();
+  const d = (await app.store.get(b.id)).data;
+  assert.deepEqual(d.messages.filter((x) => x.from === 'client').map((x) => [x.text, x.via]), [['Hello back', 'whatsapp']]);
+  assert.equal(d.messages.find((x) => x.whatsapp && x.whatsapp.id === 'LNK2').whatsapp.status, 'read');
+
+  // a number not on WhatsApp: kept, with the reason
+  await app.save(team, 'booking', b.id, { ...d, phone: '082 999 9999' }, '');
+  m = (await admin.post(`/api/bookings/${b.id}/reply?team=${team}`, { text: 'Hello?' })).data.doc.data.messages.slice(-1)[0];
+  assert.deepEqual([m.whatsapp.ok, m.whatsapp.error], [false, 'This number is not on WhatsApp']);
+
+  // the phone unlinks the website: off, and it says so
+  s.ev.emit('connection.update', { connection: 'close', lastDisconnect: { error: { output: { statusCode: 401 } } } });
+  L = (await admin.get('/api/whatsapp/link')).data;
+  assert.equal(L.state, 'off'); assert.match(L.error, /unlinked/);
+  assert.equal((await admin.get('/api/config')).data.whatsapp, false);
+  // linking with a code instead of a QR
+  await admin.post('/api/whatsapp/link', { phone: '083 111 2222' });
+  L = await waitFor(async () => { const x = (await admin.get('/api/whatsapp/link')).data; return x.code && x; });
+  assert.equal(L.code, 'ABCD1234'); assert.equal(sockets.slice(-1)[0].paired, '27831112222');
+  assert.equal((await admin.del('/api/whatsapp/link')).status, 200);
+  assert.equal((await admin.get('/api/whatsapp/link')).data.state, 'off');
+});
