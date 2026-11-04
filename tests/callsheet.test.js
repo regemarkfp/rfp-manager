@@ -110,7 +110,7 @@ test('call sheets: PDF download, recipients, and emailing the crew (body + PDF)'
   assert.match(m.text, /Parking  ·  use gate 4/);
   assert.match(m.text, /Cameras  ·  3 × Camera kit \(with tripods\)/);
   assert.match(m.text, /RUNDOWN\n1  ·  00:14:30|RUNDOWN\n1  ·  14:30/);
-  assert.match(m.html, /font-weight:700">Camera operator/);
+  assert.match(m.html, /background:#e9fbf1;"><b>Camera operator<\/b>/, "their own row is highlighted");
   assert.equal(m.attachments.length, 1);
   assert.equal(m.attachments[0].filename, 'Call sheet - Saturday rugby - 2026-10-17.pdf');
   assert.ok(Buffer.from(m.attachments[0].content).subarray(0, 5).toString() === '%PDF-');

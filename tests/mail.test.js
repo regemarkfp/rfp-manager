@@ -57,7 +57,10 @@ test('email notifications: added to a team, booked, officiating, expenses, resul
   assert.match(hired.text, /CREW YOU WILL WORK WITH\n.*Camera operator.*\nDirector  ·  Second Person  ·  Gallery · call 08:00/);
   assert.match(hired.text, /Parking  ·  use gate 4/);
   assert.match(hired.text, /Test Hospital/);
-  assert.match(hired.html, /#\/callsheet\/prod_one/);
+  assert.doesNotMatch(hired.html, /#\/callsheet\//, 'no link: the details are in the mail');
+  assert.equal(hired.attachments.length, 1, 'the call sheet is attached');
+  assert.match(hired.attachments[0].filename, /^Call sheet - .*\.pdf$/);
+  assert.ok(Buffer.from(hired.attachments[0].content).toString('latin1').startsWith('%PDF'));
   assert.equal((await mails('two@example.com')).filter((m) => /Hired/.test(m.subject)).length, 0, 'the other person is not confirmed');
   await admin.put(`/api/docs/production/prod_one?team=${team}`, { data: { ...prod, notes: 'x' } });
   assert.equal((await mails('crew@example.com')).filter((m) => /Hired/.test(m.subject)).length, 1, 'only once');
