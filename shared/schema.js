@@ -38,6 +38,10 @@
     { k: 'lineupSize', l: 'Starting line-up size', t: 'number', ph: 'sport default', group: g },
     { k: 'benchSize', l: 'Max bench size', t: 'number', ph: 'sport default', group: g },
   ];
+  // music rights: how a track was used (as on a SAMRO / broadcaster cue sheet) and where it may be used
+  const MUSIC_USAGE = ['Theme', 'Opening titles', 'Closing titles', 'Bumper / sting', 'Background', 'Featured', 'Signature', 'Source (live at venue)'];
+  const MUSIC_SOURCES = ['Commercial release (SAMRO / NORM)', 'Production music library', 'Royalty-free', 'Commissioned', 'Own composition', 'Public domain'];
+  const MUSIC_MEDIA = ['TV broadcast', 'Live stream', 'Social media', 'Venue / PA', 'Radio'];
   const STATUSES = ['Upcoming', 'Live', 'Completed', 'Postponed', 'Cancelled'];
   const SOURCES = ['CAMS', 'EVS', 'VT', 'GFX', 'PRESENTATION', 'REMOTE', 'BREAK'];
   const EQUIP_CATS = ['Video', 'Audio', 'Grip', 'Lighting', 'Comms', 'Other'];
@@ -65,6 +69,8 @@
       { k: 'teams', l: 'Teams in this competition', t: 'list', fields: [{ k: 'team', l: 'Team', t: 'ref', ref: 'squad' }] },
       ...MATCH_SETTINGS('Match settings'),
       { k: 'fieldGoalPoints', l: 'Field / drop goal points', t: 'number', ph: 'sport default', group: 'Match settings' },
+      { k: 'music', l: 'Theme music', t: 'list', group: 'Theme music', help: 'Played from Graphics control → Music for every match of this competition. Admins and Producers set it.', fields: [
+        { k: 'track', l: 'Track', t: 'ref', ref: 'track' }, { k: 'usage', l: 'Used as', t: 'combo', opts: MUSIC_USAGE, w: 170 }] },
       { k: 'pointsWin', l: 'Log points: win', t: 'number', ph: '3', group: 'Log' }, { k: 'pointsDraw', l: 'Log points: draw', t: 'number', ph: '1', group: 'Log' }, { k: 'pointsLoss', l: 'Log points: loss', t: 'number', ph: '0', group: 'Log' },
       { k: 'archived', l: 'Archived (greyed out in lists, left out of pickers)', t: 'bool', group: 'Archive' }] },
 
@@ -141,6 +147,17 @@
       { k: 'equipment', l: 'Equipment', t: 'list', fields: [{ k: 'item', l: 'Item', t: 'ref', ref: 'equipment' }, { k: 'quantity', l: 'Qty', t: 'number', w: 80 }, { k: 'notes', l: 'Notes', t: 'text' }] },
       { k: 'extras', l: 'Other costs', t: 'list', fields: [{ k: 'description', l: 'Description', t: 'text' }, { k: 'cost', l: 'Cost', t: 'money' }, { k: 'invoice', l: 'Invoice', t: 'money' }] },
       { k: 'fixtures', l: 'Matches', t: 'list', hidden: true, fields: [{ k: 'fixture', l: 'Match', t: 'ref', ref: 'fixture' }] },
+      { k: 'music', l: 'Music (theme for this production)', t: 'list', group: 'Music & report', help: 'Extra or replacement theme music for this production; the competition\'s theme music is used as well.', fields: [
+        { k: 'track', l: 'Track', t: 'ref', ref: 'track' }, { k: 'usage', l: 'Used as', t: 'combo', opts: MUSIC_USAGE, w: 170 }] },
+      { k: 'broadcaster', l: 'Broadcaster / channel', t: 'text', ph: 'SuperSport, YouTube …', group: 'Music & report', help: 'Printed on the music cue sheet and the report.' },
+      { k: 'programmeTitle', l: 'Programme title', t: 'text', ph: 'The production name', group: 'Music & report' },
+      { k: 'incidents', l: 'Incidents & notes', t: 'list', group: 'Music & report', help: 'Faults, delays and anything else for the post-production report.', fields: [
+        { k: 'time', l: 'Time', t: 'time', w: 100 }, { k: 'category', l: 'Kind', t: 'combo', opts: ['Technical', 'Delay', 'Graphics', 'Audio', 'Stream', 'Crew', 'Weather', 'Other'], w: 130 }, { k: 'text', l: 'What happened', t: 'text' }] },
+      { k: 'reportNotes', l: 'Report summary', t: 'textarea', group: 'Music & report' },
+      { k: 'musicLog', l: 'Music used (added by hand)', t: 'list', group: 'Music & report', help: 'Music that was not played from RFP Manager (a DJ, the stadium PA, a band, a vMix input without a track). Pick a track from the library, or type the title and its writers. Plays from CasparCG, vMix and stream slates are logged by themselves.', fields: [
+        { k: 'track', l: 'Track', t: 'ref', ref: 'track' }, { k: 'title', l: 'or title', t: 'text' }, { k: 'composers', l: 'Composer(s)', t: 'text' }, { k: 'publisher', l: 'Publisher', t: 'text' },
+        { k: 'usage', l: 'Used as', t: 'combo', opts: MUSIC_USAGE, w: 150 }, { k: 'at', l: 'Time', t: 'time', w: 100 }, { k: 'duration', l: 'Duration', t: 'text', ph: '0:30', w: 90 },
+        { k: 'source', l: 'Played from', t: 'combo', opts: ['Manual', 'DJ / PA', 'Live band', 'vMix', 'ATEM', 'CasparCG', 'Other'], w: 130 }] },
       { k: 'streamChannel', l: 'Live stream on channel', t: 'ref', ref: 'channel', group: 'Live stream', help: 'Stream this production on a channel. The stream key is made for this production (shown below once saved).' },
       { k: 'streamTitle', l: 'Stream title', t: 'text', ph: 'The production name', group: 'Live stream' },
       { k: 'streamSlug', l: 'Stream web address', t: 'text', ph: 'Made from the name and date', group: 'Live stream', help: 'Viewers watch at /watch/<this>.' },
@@ -165,6 +182,19 @@
       { k: 'kind', l: 'Kind', t: 'select', opts: ['lt', 'fs', 'bug', 'wipe'], def: 'lt' }, { k: 'channel', l: 'Channel (0 = program)', t: 'number' }, { k: 'layer', l: 'Layer', t: 'number', def: 35 },
       { k: 'autoClear', l: 'Take off after (seconds)', t: 'number' }, { k: 'format', l: 'Data format', t: 'select', opts: ['', 'json', 'xml'] }, { k: 'description', l: 'Notes', t: 'text' },
       { k: 'fields', l: 'Fields', t: 'list', hidden: true, fields: [{ k: 'key', l: 'Key', t: 'text' }, { k: 'label', l: 'Label', t: 'text' }, { k: 'type', l: 'Type', t: 'text' }, { k: 'value', l: 'Value', t: 'text' }] }] },
+
+    track: { label: 'Music track', plural: 'Music library', group: 'Music', title: (d) => [d.title, d.artist].filter(Boolean).join(' – '), cols: ['title', 'artist', 'composers', 'source', 'cleared', 'validUntil'], fields: [
+      { k: 'title', l: 'Title', t: 'text', req: true }, { k: 'artist', l: 'Artist / performer', t: 'text' }, { k: 'composers', l: 'Composer(s)', t: 'text', ph: 'Name (share %), Name …', help: 'As they appear on the cue sheet.' },
+      { k: 'lyricists', l: 'Lyricist(s)', t: 'text' }, { k: 'publisher', l: 'Publisher(s)', t: 'text' }, { k: 'label', l: 'Record label', t: 'text' },
+      { k: 'iswc', l: 'ISWC', t: 'text', ph: 'T-123.456.789-0' }, { k: 'isrc', l: 'ISRC', t: 'text', ph: 'ZA-ABC-26-00001' }, { k: 'duration', l: 'Length', t: 'duration', w: 100 },
+      { k: 'source', l: 'Source', t: 'select', opts: ['', ...MUSIC_SOURCES], group: 'Rights' }, { k: 'library', l: 'Library / catalogue', t: 'text', ph: 'Audio Network, Epidemic …', group: 'Rights' }, { k: 'catalogueNo', l: 'Catalogue no.', t: 'text', group: 'Rights' },
+      { k: 'cleared', l: 'Clearance', t: 'select', opts: ['Cleared', 'Pending', 'Not cleared'], def: 'Pending', group: 'Rights', help: 'Only cleared tracks can be played from RFP Manager.' },
+      { k: 'clearedFor', l: 'Cleared for', t: 'multi', opts: MUSIC_MEDIA, group: 'Rights' }, { k: 'licenceRef', l: 'Licence / agreement ref', t: 'text', group: 'Rights' },
+      { k: 'validFrom', l: 'Licence from', t: 'date', group: 'Rights' }, { k: 'validUntil', l: 'Licence until', t: 'date', group: 'Rights' }, { k: 'rightsNotes', l: 'Rights notes', t: 'textarea', group: 'Rights' },
+      { k: 'usage', l: 'Usual use', t: 'select', opts: MUSIC_USAGE, def: 'Background', group: 'Playout' },
+      { k: 'casparClip', l: 'CasparCG media file', t: 'text', ph: 'MUSIC/CCC_THEME', group: 'Playout', help: 'The audio file in CasparCG\'s media folder. RFP Manager plays it from Graphics control → Music and logs every play.' },
+      { k: 'vmixInput', l: 'vMix input title', t: 'text', ph: 'CCC Theme.mp3', group: 'Playout', help: 'When a vMix input with this title plays, the use is logged by itself.' },
+      { k: 'volume', l: 'Volume %', t: 'number', ph: '100', group: 'Playout' }] },
 
     song: { label: 'Song', plural: 'Songs', group: 'Worship', title: (d) => d.title, cols: ['title', 'author', 'ccliNumber', 'key'], fields: [
       { k: 'title', l: 'Title', t: 'text', req: true }, { k: 'author', l: 'Writers', t: 'text' },
@@ -271,7 +301,7 @@
   // Everything else is managed on the website.
   const PC_EDIT = ['graphic', 'theme', 'dashboard', 'timeline', 'variable', 'gametrigger'];
 
-  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'songuse', 'user', 'machinekey', 'purchase', 'streamclip', 'comment', 'viewstat', 'streamvideo', 'mcr', 'videoad', 'adpreset', 'pushdevice', 'notification'];
+  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'musicuse', 'songuse', 'user', 'machinekey', 'purchase', 'streamclip', 'comment', 'viewstat', 'streamvideo', 'mcr', 'videoad', 'adpreset', 'pushdevice', 'notification'];
   const ALL_TYPES = [...Object.keys(E), ...SYSTEM_TYPES];
 
   const has = (v) => v !== undefined && v !== null && v !== '';
@@ -387,6 +417,6 @@
     read: (role) => ROLES.includes(role),
   };
 
-  return { ENTITIES: E, GENDERS, AGE_GROUPS, DIVISIONS, POSITION_TYPES, matchSettings, LINE_COLORS, ROLES, STATUSES, PRODUCTION_TYPES, SOURCES, EQUIP_CATS, SYSTEM_TYPES, ALL_TYPES, PC_EDIT, ROLE_SEES, EXPENSE_CATS, EXPENSE_STATUS, BOOKING_STATUS, officiates, sees, resolveSquad, snapshotTeam, fieldsFor, age,
+  return { ENTITIES: E, MUSIC_USAGE, MUSIC_SOURCES, MUSIC_MEDIA, GENDERS, AGE_GROUPS, DIVISIONS, POSITION_TYPES, matchSettings, LINE_COLORS, ROLES, STATUSES, PRODUCTION_TYPES, SOURCES, EQUIP_CATS, SYSTEM_TYPES, ALL_TYPES, PC_EDIT, ROLE_SEES, EXPENSE_CATS, EXPENSE_STATUS, BOOKING_STATUS, officiates, sees, resolveSquad, snapshotTeam, fieldsFor, age,
     parseDuration, fmtDuration, rundownTimes, costing, CAN };
 });
