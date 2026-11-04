@@ -46,6 +46,34 @@
     return box;
   };
 
+  // ---- on the production PC: link with the Google account (one button, no codes or keys)
+  // Google only signs in on http://localhost:<port>, so elsewhere (the house network, Tailscale) the code flow is used.
+  App.canGoogleLink = () => !!(App.cfg && App.cfg.googleClientId) && ['localhost', '127.0.0.1'].includes(location.hostname);
+  App.googleLink = (opts = {}) => {
+    const url = opts.url || (App.cfg && App.cfg.cloudUrl) || 'https://admin.regemarkfp.com';
+    const box = h('div', { class: 'stack' });
+    const id = App.cfg && App.cfg.googleClientId;
+    if (!App.canGoogleLink()) return null;
+    const btn = h('div');
+    const msg = h('p', { class: 'dim small', style: { margin: 0 } }, `Sign in with the Google account you use on ${url.replace(/^https?:\/\//, '')}. If you are an Admin there, this PC links and starts syncing straight away.`);
+    box.append(btn, msg);
+    const run = async (resp) => {
+      msg.textContent = 'Linking…';
+      try {
+        const r = await api('POST', '/api/link/google', { credential: resp.credential, url });
+        msg.textContent = 'Linked to ' + r.url.replace(/^https?:\/\//, '') + '. Bringing your data down…';
+        if (opts.onDone) opts.onDone(r); else setTimeout(() => location.reload(), 1500);
+      } catch (e) { msg.textContent = e.message; msg.className = 'toast error'; }
+    };
+    const paint = () => {
+      google.accounts.id.initialize({ client_id: id, callback: run });
+      google.accounts.id.renderButton(btn, { theme: 'filled_black', size: 'large', shape: 'pill', text: opts.relink ? 'continue_with' : 'signin_with', width: 320 });
+    };
+    if (window.google && window.google.accounts) paint();
+    else { const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true; sc.onload = paint; document.head.append(sc); }
+    return box;
+  };
+
   // ---- the website: production PCs
   App.pages.pcs = () => {
     const el = h('div', {}, pageHead('Production PCs'), h('div', { class: 'card dim' }, 'Loading…'));
