@@ -190,7 +190,7 @@ if [ -n "$NAS" ]; then
   say "NAS (Samba share)"
   apt-get install -y -q samba
   getent group nas >/dev/null || groupadd nas
-  mkdir -p "$NAS/assets/images" "$NAS/templates" "$NAS/shared" "$NAS/backups"
+  mkdir -p "$NAS/assets/images" "$NAS/templates" "$NAS/shared" "$NAS/backups" "$NAS/software"
   OWNER="${SUDO_USER:-}"; [ -n "$OWNER" ] && [ "$OWNER" != root ] && usermod -aG nas "$OWNER"
   chgrp -R nas "$NAS"; chmod -R g+rwX "$NAS"; find "$NAS" -type d -exec chmod g+s {} +
   if ! grep -q '^\[NAS\]' /etc/samba/smb.conf; then
@@ -275,6 +275,7 @@ SECRET=""
   echo "STREAM_HOOK_SECRET=$SECRET"
   if [ -n "$LOCALDB" ]; then echo "MONGODB_URI=mongodb://127.0.0.1:27017"; echo "MONGODB_DB=$DBNAME"; fi   # later lines win
   if [ -n "$NAS" ]; then echo "MEDIA_DIR=$NAS/assets/images"; fi
+  if [ -n "$NAS" ]; then echo "SOFTWARE_DIR=$NAS/software"; fi
 } > "$ETC/env.new"
 install -m 600 -o root -g root "$ETC/env.new" "$ETC/env"; rm -f "$ETC/env.new" /tmp/rfp-site.env
 
