@@ -28,16 +28,21 @@
 #                             RFP Manager as a file), templates/, shared/ and backups/. Set your Samba password
 #                             once with:  sudo smbpasswd -a <your user>
 #   --no-recordings           streams are relayed but not recorded.
+#   --no-auto-update          do not update by itself. Otherwise the server checks the website every night at 04:30
+#                             and installs a newer RFP Manager on its own (with its own update key, kept here).
 #   --stream-host stream.example.com   the public name encoders send SRT / RTMP to (home server with UDP 8890 and
 #                             TCP 1935 forwarded on the router). Default at home: this machine's Tailscale name.
 set -euo pipefail
 
 FROM=""; TOKEN=""; DOMAIN=""; ADMIN=""; EMAIL=""; KEEP_DAYS=90; TUNNEL=""; HOME_MODE=""; RECDIR=/var/lib/mediamtx/recordings
-LOCALDB=""; NAS=""; RECORD=true; SHOST=""; RECORD_SET=
+UKEY=""; AUTOUP=1; AUTOUP_SET=""; LOCALDB=""; NAS=""; RECORD=true; SHOST=""; RECORD_SET=
 while [ $# -gt 0 ]; do
   case "$1" in
     --from) FROM="${2%/}"; shift 2 ;;
     --token) TOKEN="$2"; shift 2 ;;
+    --update-key) UKEY="$2"; shift 2 ;;
+    --no-auto-update) AUTOUP=""; AUTOUP_SET=1; shift ;;
+    --auto-update) AUTOUP=1; AUTOUP_SET=1; shift ;;
     --domain) DOMAIN="${2#https://}"; DOMAIN="${DOMAIN%/}"; shift 2 ;;
     --admin-domain) ADMIN="${2#https://}"; ADMIN="${ADMIN%/}"; shift 2 ;;
     --email) EMAIL="$2"; shift 2 ;;
@@ -54,7 +59,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ "$(id -u)" = 0 ] || { echo "Run it with sudo."; exit 1; }
-[ -n "$FROM" ] && [ -n "$TOKEN" ] || { echo "Usage: install.sh --from https://<your-site> --token <token>   (the website's Settings → Server makes the command)"; exit 1; }
+[ -n "$FROM" ] && { [ -n "$TOKEN" ] || [ -n "$UKEY" ]; } || { echo "Usage: install.sh --from https://<your-site> --token <token>   (the website's Settings → Server makes the command)"; exit 1; }
 
 exec > >(tee -a /var/log/rfp-install.log) 2>&1
 say() { printf '\n== %s\n' "$*"; }
@@ -75,7 +80,8 @@ case "$(uname -m)" in
 esac
 
 say "Checking the setup link"
-curl -fsS "$FROM/api/server/env?t=$TOKEN" -o /tmp/rfp-site.env || { echo "The website did not accept this link. Make a new one: Settings → Server."; exit 1; }
+AUTH="t=$TOKEN"; [ -z "$TOKEN" ] && AUTH="u=$UKEY"
+curl -fsS --retry 3 --max-time 120 "$FROM/api/server/env?$AUTH" -o /tmp/rfp-site.env || { echo "The website did not accept this link. Make a new one: Settings → Server."; exit 1; }
 
 say "System packages"
 export DEBIAN_FRONTEND=noninteractive
@@ -217,7 +223,7 @@ if [ -n "$LOCALDB" ]; then touch "$ETC/localdb"; fi
 if [ -n "$NAS" ]; then echo "$NAS" > "$ETC/nas"; usermod -aG nas "$SVC"; fi
 if [ "$RECORD" = false ]; then touch "$ETC/no-recordings"; else rm -f "$ETC/no-recordings"; fi
 echo "$RECDIR" > "$ETC/recordings"
-curl -fsSL "$FROM/api/server/bundle.tgz?t=$TOKEN" -o /tmp/rfp.tgz
+curl -fsSL --retry 3 --max-time 300 "$FROM/api/server/bundle.tgz?$AUTH" -o /tmp/rfp.tgz
 rm -rf /tmp/rfp-new && mkdir -p /tmp/rfp-new && tar -xzf /tmp/rfp.tgz -C /tmp/rfp-new
 rm -rf "$APP.old"; [ -d "$APP" ] && mv "$APP" "$APP.old"
 mv /tmp/rfp-new/rfp-manager "$APP"
@@ -404,6 +410,57 @@ EOF
   systemctl daemon-reload; systemctl enable --now rfp-backup.timer >/dev/null 2>&1
 fi
 
+# ---- automatic updates: every night, if the website has a newer version, install it with this server's own key
+[ -z "$AUTOUP_SET" ] && [ -f "$ETC/no-auto-update" ] && AUTOUP=""      # stays off until --auto-update
+if [ -z "$AUTOUP" ]; then
+  touch "$ETC/no-auto-update"; systemctl disable --now rfp-autoupdate.timer >/dev/null 2>&1 || true
+else
+  rm -f "$ETC/no-auto-update"
+  if [ -n "$TOKEN" ] && { [ ! -s "$ETC/update-key" ] || [ "$(cat "$ETC/update-from" 2>/dev/null)" != "$FROM" ]; }; then
+    curl -fsS --max-time 120 "$FROM/api/server/update-key?t=$TOKEN" -o "$ETC/update-key.new" && mv "$ETC/update-key.new" "$ETC/update-key" || rm -f "$ETC/update-key.new"
+  fi
+  [ -n "$UKEY" ] && echo "$UKEY" > "$ETC/update-key"
+  chmod 600 "$ETC/update-key" 2>/dev/null || true
+  echo "$FROM" > "$ETC/update-from"
+  cat > /usr/local/bin/rfp-autoupdate <<'EOF'
+#!/bin/sh
+# RFP Manager: install a newer version from the website this server came from (install.sh writes this).
+set -e
+ETC=/etc/rfp-manager
+FROM="$(cat $ETC/update-from)"; KEY="$(cat $ETC/update-key)"
+[ -n "$FROM" ] && [ -n "$KEY" ] || { echo "No update key: run a setup command once."; exit 1; }
+REMOTE="$(curl -fsS --retry 3 --max-time 120 "$FROM/api/config" | jq -r .version)"
+LOCAL="$(jq -r .version /opt/rfp-manager/package.json)"
+[ -n "$REMOTE" ] && [ "$REMOTE" != null ] || { echo "Could not read the website's version"; exit 1; }
+if [ "$REMOTE" = "$LOCAL" ] || [ "$(printf '%s\n%s\n' "$REMOTE" "$LOCAL" | sort -V | tail -1)" = "$LOCAL" ]; then echo "Up to date ($LOCAL)"; exit 0; fi
+echo "Updating $LOCAL -> $REMOTE"
+curl -fsSL --retry 3 --max-time 120 "$FROM/server/install.sh" | bash -s -- --from "$FROM" --update-key "$KEY"
+EOF
+  chmod 755 /usr/local/bin/rfp-autoupdate
+  cat > /etc/systemd/system/rfp-autoupdate.service <<'EOF'
+[Unit]
+Description=RFP Manager: install a newer version from the website
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/rfp-autoupdate
+EOF
+  cat > /etc/systemd/system/rfp-autoupdate.timer <<'EOF'
+[Unit]
+Description=RFP Manager: check for a newer version every night
+[Timer]
+OnCalendar=*-*-* 04:30
+RandomizedDelaySec=15m
+Persistent=true
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl daemon-reload; systemctl enable rfp-autoupdate.timer >/dev/null 2>&1 || true
+  # an update started by the timer must not restart the timer's own job: start it only on a manual run
+  [ -n "$TOKEN" ] && systemctl start rfp-autoupdate.timer >/dev/null 2>&1 || true
+fi
+
 say "Starting"
 systemctl daemon-reload
 systemctl enable rfp-manager mediamtx caddy >/dev/null 2>&1
@@ -436,6 +493,7 @@ if [ -n "$HOME_MODE" ]; then
      $TSNOTE
   Viewers watch through Cloudflare (HLS). For big audiences, restream to YouTube / Facebook.
   Recordings: $([ "$RECORD" = true ] && echo "$RECDIR" || echo "off")
+  Updates: $([ -n "$AUTOUP" ] && echo "automatic, every night at 04:30 (now: sudo rfp-autoupdate)" || echo "manual (run a setup command)")
   Database: $([ -n "$LOCALDB" ] && echo "MongoDB on this machine, backed up every night to $BACKUPS" || echo "the website's (Atlas)")
   $NASLINE
 
