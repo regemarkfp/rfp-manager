@@ -248,6 +248,40 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
     return box;
   }
+  // ---- a booking followed by the client (/track/<key>): its steps, like a parcel, and the conversation
+  function trackPage(key) {
+    const box = el('div', { class: 'track' }, el('div', { class: 'empty' }, 'Loading…'));
+    const when = (t) => (t ? new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+    const fmt = (d) => { const t = new Date(String(d) + 'T12:00:00Z'); return isNaN(t) ? d : t.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }); };
+    let timer = null;
+    const paint = (t) => {
+      document.title = `Your booking – ${t.company}`;
+      const ta = el('textarea', { rows: 3, placeholder: 'Ask us anything or add something about your booking…', maxlength: 3000 });
+      const err = el('p', { class: 'err' });
+      const sendBtn = el('button', { class: 'primary' }, 'Send');
+      sendBtn.onclick = async () => {
+        if (!ta.value.trim()) return;
+        sendBtn.disabled = true; err.textContent = '';
+        try { paint(await post(`/api/public/track/${encodeURIComponent(key)}/message`, { text: ta.value })); } catch (e) { err.textContent = e.message; sendBtn.disabled = false; }
+      };
+      box.replaceChildren(
+        el('div', { class: 'thead' }, t.logo ? el('img', { class: 'tlogo big', src: img(t.logo), alt: '' }) : null,
+          el('div', { class: 'grow' }, el('div', { class: 'sub' }, `${t.company} · booking ${t.ref}`), el('h1', {}, t.service || 'Your booking'),
+            el('div', { class: 'sub' }, [t.date && fmt(t.date), t.venue].filter(Boolean).join(' · ')))),
+        el('div', { class: 'track-now' + (t.ended ? ' ended' : '') }, el('b', {}, t.stage), el('span', {}, t.say)),
+        el('ol', { class: 'track-steps' }, t.steps.map((s) => el('li', { class: (s.done ? 'done' : '') + (s.now ? ' now' : '') + (t.ended && s.now ? ' ended' : '') },
+          el('span', { class: 'dot' }), el('div', {}, el('b', {}, s.stage), el('span', { class: 'sub' }, s.at ? when(s.at) : s.done ? '' : s.say))))),
+        t.client || t.docs.length ? el('div', { class: 'dls' }, t.client ? el('a', { class: 'dl primary', href: t.client }, 'Your production page ›') : null,
+          t.docs.map((x) => el('a', { class: 'dl', href: x.url, target: '_blank', rel: 'noopener' }, `${x.kind === 'quote' ? 'Quote' : 'Invoice'} ${x.number} (PDF)`))) : null,
+        section('Messages', el('div', { class: 'chat' }, t.messages.length ? t.messages.map((m) => el('div', { class: 'msg ' + (m.from === 'client' ? 'me' : 'them') + (m.stage ? ' step' : '') },
+          el('div', { class: 'sub' }, `${m.by} · ${when(m.at)}`), el('div', { class: 'body' }, m.text))) : el('p', { class: 'sub' }, 'No messages yet. We will write to you here, by email and on WhatsApp.'),
+          el('div', { class: 'chat-send' }, ta, el('div', { class: 'row' }, sendBtn, err)))));
+    };
+    const load = () => get('/api/public/track/' + encodeURIComponent(key)).then(paint);
+    load().catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
+    timer = setInterval(() => { if (!document.body.contains(box)) return clearInterval(timer); if (!box.querySelector('textarea') || !box.querySelector('textarea').value) load().catch(() => {}); }, 60000);
+    return box;
+  }
   // ---- a player's profile (/player/<id>), for teams that switch them on
   function playerPage(id) {
     const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
@@ -434,12 +468,14 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const btn = el('button', { class: 'primary', type: 'submit' }, 'Send request');
     const form = el('form', { class: 'book-form', onsubmit: async (e) => {
       e.preventDefault(); btn.disabled = true; err.textContent = '';
-      try { if (form.querySelector('textarea')) f.details = form.querySelector('textarea').value; await post('/api/public/booking', f);
-        box.replaceChildren(el('h1', {}, 'Thank you'), el('p', { class: 'sub' }, 'We have your request and will be in touch soon.' + (f.email ? ' A copy is on its way to ' + f.email + '.' : '')), el('a', { class: 'btn-big', href: '/', 'data-nav': '' }, 'Back to the home page'));
+      try { if (form.querySelector('textarea')) f.details = form.querySelector('textarea').value; const r = await post('/api/public/booking', f);
+        box.replaceChildren(el('h1', {}, 'Thank you'), el('p', { class: 'sub' }, 'We have your request and will be in touch soon.' + (f.email ? ' A copy is on its way to ' + f.email + ', with the link to follow your booking.' : '')),
+          r && r.track ? el('p', {}, el('a', { class: 'btn-big', href: r.track, 'data-nav': '' }, 'Follow your booking ›'), ' ', el('span', { class: 'sub' }, 'Keep this link: it shows where your booking stands, and you can send us a message there.')) : null,
+          el('a', { class: 'btn-big', href: '/', 'data-nav': '' }, 'Back to the home page'));
       } catch (x) { err.textContent = x.message; btn.disabled = false; }
     } },
       input('name', 'Your name *', { required: '', autocomplete: 'name' }), input('organisation', 'Organisation / club / church', { autocomplete: 'organization' }),
-      input('email', 'Email', { type: 'email', autocomplete: 'email' }), input('phone', 'Phone', { type: 'tel', autocomplete: 'tel' }),
+      input('email', 'Email', { type: 'email', autocomplete: 'email' }), input('phone', 'Phone (WhatsApp)', { type: 'tel', autocomplete: 'tel' }),
       el('label', { class: 'fld' }, el('span', {}, 'Service'), sel), input('date', 'Date of the event', { type: 'date' }), input('venue', 'Where', {}),
       el('label', { class: 'fld wide' }, el('span', {}, 'Tell us about it'), el('textarea', { rows: 5, placeholder: 'What is the event, how many cameras or what you would like streamed, graphics, anything else…' })),
       el('input', { class: 'hp', name: 'website', tabindex: '-1', autocomplete: 'off', oninput: (e) => { f.website = e.target.value; } }),
@@ -530,6 +566,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     let view;
     if (centre && !p.startsWith('/match/')) { centre.stop(); centre = null; }
     if (p.startsWith('/client/')) view = clientPage(decodeURIComponent(p.slice(8).replace(/\/$/, '')));
+    else if (p.startsWith('/track/')) view = trackPage(decodeURIComponent(p.slice(7).replace(/\/$/, '')));
     else if (p.startsWith('/player/')) view = playerPage(decodeURIComponent(p.slice(8).replace(/\/$/, '')));
     else if (p === '/software') view = softwarePage();
     else if (p.startsWith('/software/')) view = appPage(decodeURIComponent(p.slice(10).replace(/\/$/, '')));
@@ -570,5 +607,5 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     render();
   }
   load();
-  setInterval(async () => { try { D = await get('/api/public/home'); if (!/^\/(c|match|team|software|client|player)\//.test(location.pathname) && !['/', '/book', '/teams', '/following', '/notifications', '/software'].includes(location.pathname)) render(); } catch (e) { /* next time */ } }, 30000);   // live now / viewers
+  setInterval(async () => { try { D = await get('/api/public/home'); if (!/^\/(c|match|team|software|client|player|track)\//.test(location.pathname) && !['/', '/book', '/teams', '/following', '/notifications', '/software'].includes(location.pathname)) render(); } catch (e) { /* next time */ } }, 30000);   // live now / viewers
 })();

@@ -205,6 +205,44 @@
     paint();
     return box;
   }
+  // ---- WhatsApp Business (Meta's Cloud API): replies on bookings go by WhatsApp as well as email
+  function whatsappCard() {
+    const box = h('div', { class: 'card' }, h('h2', {}, 'WhatsApp (booking messages)'), h('div', { class: 'dim' }, 'Loading…'));
+    const paint = async () => {
+      let c;
+      try { c = await api('GET', '/api/whatsapp/config'); } catch (e) { box.replaceChildren(h('h2', {}, 'WhatsApp'), h('p', { class: 'dim' }, e.message)); return; }
+      const inp = (v, attrs = {}) => h('input', { value: v || '', ...attrs });
+      const f = { phoneNumberId: inp(c.phoneNumberId, { placeholder: 'e.g. 123456789012345', inputmode: 'numeric' }), token: inp('', { type: 'password', placeholder: c.hasToken ? '•••••• saved (type a new one to replace it)' : 'Paste the permanent access token', autocomplete: 'off' }),
+        appSecret: inp('', { type: 'password', placeholder: c.hasSecret ? '•••••• saved' : 'Optional: checks that messages really come from Meta', autocomplete: 'off' }),
+        template: inp(c.template, { placeholder: 'booking_update' }), lang: inp(c.lang, { placeholder: 'en', style: { width: '80px' } }), country: inp(c.country, { placeholder: '27', style: { width: '80px' } }), number: inp(c.number, { placeholder: '+27 …' }) };
+      const field = (label, el, help) => h('label', { class: 'fld', style: { display: 'block', marginBottom: '10px' } }, h('div', { class: 'dim small' }, label), el, help ? h('div', { class: 'dim small' }, help) : null);
+      const copyable = (v) => h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, h('input', { readonly: true, value: v, onfocus: (e) => e.target.select(), style: { flex: 1, minWidth: 0 } }), h('button', { class: 'sm', onclick: () => navigator.clipboard.writeText(v).then(() => toast('Copied')).catch(() => {}) }, 'Copy'));
+      const testTo = inp('', { type: 'tel', placeholder: 'Your own number, e.g. 082 …' });
+      box.replaceChildren(h('h2', {}, 'WhatsApp (booking messages)'),
+        h('p', {}, h('span', { class: 'led ' + (c.on ? 'ok' : 'bad') }), ' ', c.on ? `On${c.number ? ' – sending from ' + c.number : ''}. Replies on booking requests and their step updates go by WhatsApp as well as email.` : 'Not set up yet: booking messages go by email only.'),
+        h('details', { open: !c.on ? '' : null }, h('summary', {}, 'How to set it up (Meta, once)'),
+          h('ol', { style: { margin: '8px 0 10px 18px', padding: 0, lineHeight: 1.7 } },
+            h('li', {}, 'developers.facebook.com → My apps → Create app → type Business → add the product WhatsApp. Link it to your Meta Business account (RegemarkFP).'),
+            h('li', {}, 'WhatsApp → API setup: add your business phone number (a number not already on the WhatsApp app) and verify it. Copy its Phone number ID below.'),
+            h('li', {}, 'business.facebook.com → Settings → Users → System users → Add (Admin) → Assign assets: the app and the WhatsApp account (full control) → Generate token with whatsapp_business_messaging and whatsapp_business_management, never expires. Paste it below yourself. It is a secret.'),
+            h('li', {}, 'WhatsApp Manager → Message templates → Create: category Utility, name ', h('code', {}, c.template || 'booking_update'), ', language English, body:', h('br'),
+              h('code', {}, 'Hi {{1}}, there is an update on {{2}}: {{3}} Follow your booking here: {{4}}'), h('br'), 'WhatsApp only lets us start a conversation with an approved template; once the client answers, replies go as normal messages for 24 hours.'),
+            h('li', {}, 'WhatsApp → Configuration → Webhook: Callback URL and Verify token below → Verify and save → subscribe to ', h('code', {}, 'messages'), '. Then the clients\' answers and the delivery ticks come back to the booking.'),
+            h('li', {}, 'Add a payment method in WhatsApp Manager: Meta charges per conversation (service replies to a client who wrote first are free).'))),
+        field('Phone number ID', f.phoneNumberId), field('Access token', f.token), field('Message template name and language', h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, f.template, f.lang)),
+        field('Country code for numbers starting with 0', f.country, 'Clients type 068 …; WhatsApp needs 2768 ….'), field('Your WhatsApp business number (shown here only)', f.number),
+        field('App secret (App settings → Basic)', f.appSecret),
+        field('Webhook callback URL', copyable(c.webhook)), field('Webhook verify token', copyable(c.verifyToken)),
+        h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } },
+          h('button', { class: 'primary', onclick: async () => { try { await api('POST', '/api/whatsapp/config', { phoneNumberId: f.phoneNumberId.value, token: f.token.value, appSecret: f.appSecret.value, template: f.template.value, lang: f.lang.value, country: f.country.value, number: f.number.value }); toast('Saved'); App.cfg.whatsapp = true; paint(); } catch (e) { oops(e); } } }, 'Save'),
+          c.hasToken ? h('button', { class: 'danger sm', onclick: async () => { try { await api('POST', '/api/whatsapp/config', { clearToken: true }); toast('Token removed: WhatsApp is off'); App.cfg.whatsapp = false; paint(); } catch (e) { oops(e); } } }, 'Remove the token') : null),
+        c.on ? h('div', { class: 'row', style: { gap: '8px', marginTop: '12px', flexWrap: 'nowrap' } }, testTo, h('button', { onclick: async () => {
+          try { const r = await api('POST', '/api/whatsapp/test', { phone: testTo.value }); if (r.ok) toast(r.kind === 'template' ? 'Sent with the template – check your WhatsApp' : 'Sent – check your WhatsApp'); else UI.modal({ title: 'WhatsApp did not send it', body: h('p', {}, r.error || 'Unknown error'), actions: [{ label: 'OK', primary: true }] }); } catch (e) { oops(e); }
+        } }, 'Send a test')) : null);
+    };
+    paint();
+    return box;
+  }
   // ---- Settings → Server (the online website, for its site admins) -------------------------------
   App.serverTab = () => {
     const box = h('div', {}, h('div', { class: 'card dim' }, 'Loading…'));
@@ -230,6 +268,7 @@
           h('div', { class: 'row' }, h('button', { class: 'primary', onclick: async () => { try { paint(await api('POST', '/api/server/setup')); } catch (e) { oops(e); } } }, made || s.expires ? 'Make a new setup command' : 'Make the setup command'),
             s.expires ? h('button', { class: 'ghost', onclick: async () => { try { await api('DELETE', '/api/server/setup'); toast('Setup link stopped'); paint(); } catch (e) { oops(e); } } }, 'Stop the setup link') : null)),
         pushCard(),
+        whatsappCard(),
         h('div', { class: 'card' }, h('h2', {}, 'After it has run'),
           h('ol', { style: { margin: '0 0 0 18px', padding: 0, lineHeight: 1.8 } },
             h('li', {}, 'Open the server\'s firewall in the cloud console: TCP 80, 443, 1935, 8189 and UDP 443, 8189, 8890.'),

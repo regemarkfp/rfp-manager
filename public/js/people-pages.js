@@ -226,13 +226,69 @@
     const who = (email) => { const m = App.list('member').find((x) => x.data.email === email); return m ? m.data.name || m.data.email : email; };
     const respond = (accept) => respondTo(doc.id, accept);
     const prod = d.production && App.docs.get(d.production);
-    return h('div', { class: 'card' }, h('div', { class: 'spread' },
+    return [h('div', { class: 'card' }, h('div', { class: 'spread' },
       h('div', {}, h('h2', { style: { margin: 0 } }, 'Booking request ', h('span', { class: 'pill' + (d.status === 'Accepted' || d.status === 'Booked' ? ' ok' : d.status === 'Declined by producer' ? ' warn' : '') }, d.status || 'New')),
         h('div', { class: 'dim small' }, d.producer ? 'Producer: ' + who(d.producer) : admin ? 'Not allocated yet: choose a Producer below and save. They get an email.' : '',
           d.response ? ' · "' + d.response + '"' : '')),
       h('div', { class: 'row' },
         (mine || (admin && d.producer)) && !['Accepted', 'Booked', 'Not going ahead'].includes(d.status) ? [h('button', { class: 'primary', onclick: () => respond(true) }, 'Accept'), h('button', { class: 'danger', onclick: () => respond(false) }, 'Decline')] : null,
         prod ? h('a', { class: 'btn primary', href: '#/edit/production/' + prod.id }, 'Open the production – crew & setup ›') : null)),
-      d.status === 'Accepted' && !prod && d.production ? h('p', { class: 'dim small' }, 'Production made: ' + d.production) : null);
+      d.status === 'Accepted' && !prod && d.production ? h('p', { class: 'dim small' }, 'Production made: ' + d.production) : null),
+    (admin || mine) && App.cfg.mode === 'cloud' ? conversation(doc) : null];
   };
+
+  // ---- the client's side of a booking: where it stands (as they see it on /track/<key>) and the conversation
+  const STAGES = ['Received', 'Being reviewed', 'Quote sent', 'Confirmed', 'Crew booked', 'Event day', 'Completed'];
+  function conversation(doc) {
+    const box = h('div', { class: 'card' });
+    const base = `/api/bookings/${encodeURIComponent(doc.id)}`;
+    const when = (t) => new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const tick = (w) => (!w ? '' : !w.ok ? '✕ WhatsApp: ' + (w.error || 'not sent') : { sent: '✓ WhatsApp', delivered: '✓✓ WhatsApp', read: '✓✓ WhatsApp (read)' }[w.status] || '✓ WhatsApp');
+    const mailMark = (e) => (!e ? '' : e.ok ? '✓ Email' : '✕ Email: ' + (e.error || 'not sent'));
+    const paint = () => {
+      const d = (App.docs.get(doc.id) || doc).data;
+      const track = d.track || [], stage = (track[track.length - 1] || {}).stage || 'Received';
+      const ended = ['Declined', 'Cancelled'].includes(stage);
+      const ta = h('textarea', { rows: 3, placeholder: `Write to ${String(d.name || 'the client').split(' ')[0]}…`, style: { width: '100%' } });
+      const viaMail = h('input', { type: 'checkbox', checked: !!d.email, disabled: !d.email });
+      const viaWa = h('input', { type: 'checkbox', checked: !!(d.phone && App.cfg.whatsapp), disabled: !(d.phone && App.cfg.whatsapp) });
+      const send = h('button', { class: 'primary', onclick: async () => {
+        if (!ta.value.trim()) return;
+        if (!viaMail.checked && !viaWa.checked) return toast('Tick email or WhatsApp');
+        send.disabled = true;
+        try {
+          const r = await api('POST', `${base}/reply?team=${App.team}`, { text: ta.value, email: viaMail.checked, whatsapp: viaWa.checked });
+          App.docs.set(r.doc.id, r.doc);
+          const m = (r.doc.data.messages || []).slice(-1)[0] || {};
+          const bad = [m.email && !m.email.ok && 'email', m.whatsapp && !m.whatsapp.ok && 'WhatsApp'].filter(Boolean);
+          toast(bad.length ? 'Kept on the booking, but the ' + bad.join(' and ') + ' did not go: see below' : 'Sent');
+          paint();
+        } catch (e) { oops(e); send.disabled = false; }
+      } }, 'Send');
+      const copy = async () => { try { const r = await api('POST', `${base}/track-link?team=${App.team}`); if (r.doc) App.docs.set(r.doc.id, r.doc); await navigator.clipboard.writeText(r.url).catch(() => {}); toast('Tracking link copied'); } catch (e) { oops(e); } };
+      box.replaceChildren(
+        h('div', { class: 'spread' }, h('h2', { style: { margin: 0 } }, 'Client & messages'),
+          h('div', { class: 'row' }, d.trackKey ? h('button', { class: 'sm', onclick: copy }, 'Copy tracking link') : null, d.trackKey && App.cfg.siteUrl !== undefined ? h('a', { class: 'btn sm', href: `${App.cfg.siteUrl || ''}/track/${d.trackKey}`, target: '_blank', rel: 'noopener' }, 'What the client sees ↗') : null)),
+        h('div', { class: 'row', style: { gap: '4px', flexWrap: 'wrap', margin: '10px 0' } }, (ended ? [stage] : STAGES).map((s) => {
+          const hit = track.filter((t) => t.stage === s).pop(), on = ended || STAGES.indexOf(s) <= STAGES.indexOf(stage);
+          return h('span', { class: 'pill' + (s === stage ? (ended ? ' warn' : ' ok') : ''), style: { opacity: on ? 1 : 0.45 }, title: hit ? when(hit.at) : '' }, s);
+        })),
+        h('div', { class: 'dim small' }, d.clientStage ? `Set by hand to "${d.clientStage}" (Client sees, below). ` : 'The step follows the work: Producer, quote sent, confirmed, crew booked, the date, completed. ',
+          d.quiet ? 'Quiet: step changes are not sent to the client.' : 'Each new step is sent to the client by email and WhatsApp.'),
+        h('div', { style: { display: 'grid', gap: '8px', margin: '14px 0' } }, (d.messages || []).length ? d.messages.map((m) => h('div', { style: { justifySelf: m.from === 'client' ? 'start' : 'end', maxWidth: '85%', padding: '8px 12px', borderRadius: '12px', background: m.from === 'client' ? 'var(--panel2, #2a2a2a)' : m.stage ? 'transparent' : 'rgba(0,255,130,.12)', border: m.stage ? '1px dashed var(--line, #444)' : 0 } },
+          h('div', { class: 'dim small' }, `${m.from === 'client' ? (d.name || 'Client') + (m.via === 'whatsapp' ? ' · WhatsApp' : ' · tracking page') : m.stage ? 'Step update' : m.by} · ${when(m.at)}`),
+          h('div', { style: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } }, m.text),
+          m.from === 'us' ? h('div', { class: 'dim small', style: { marginTop: '2px' } }, [mailMark(m.email), tick(m.whatsapp)].filter(Boolean).join('  ·  ') || 'Kept here only') : null))
+          : h('p', { class: 'dim' }, 'No messages yet.')),
+        ta,
+        h('div', { class: 'row', style: { marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' } },
+          h('label', { class: 'row', style: { gap: '6px' } }, viaMail, d.email ? 'Email ' + d.email : 'No email'),
+          h('label', { class: 'row', style: { gap: '6px' }, title: App.cfg.whatsapp ? '' : 'A site admin sets up WhatsApp under Settings → Server' }, viaWa, !d.phone ? 'No phone number' : App.cfg.whatsapp ? 'WhatsApp ' + d.phone : 'WhatsApp (not set up)'),
+          h('span', { style: { flex: 1 } }), send),
+        h('p', { class: 'dim small', style: { marginBottom: 0 } }, 'Sent at once by email and WhatsApp, with the link to follow the booking. Their answers come back here.'));
+    };
+    paint();
+    if ((App.docs.get(doc.id) || doc).data.unread) api('POST', `${base}/seen?team=${App.team}`).then((r) => { App.docs.set(r.doc.id, r.doc); }).catch(() => {});
+    return box;
+  }
 })();
