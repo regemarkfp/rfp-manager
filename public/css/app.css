@@ -62,7 +62,7 @@ label.f { display: block; } label.f > span, .flabel { display: block; font-size:
 .tile { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
 .tile b { display: block; font-size: 28px; line-height: 1.1; } .tile span { color: var(--dim); font-size: 13px; }
 .pill { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 20px; background: var(--panel2); color: var(--dim); white-space: nowrap; }
-.pill.live { background: var(--danger); color: #fff; } .pill.ok { background: var(--accent); color: var(--on-accent); } .pill.warn { background: var(--warn); color: #111; }
+.pill.live, .pill.bad { background: var(--danger); color: #fff; } .pill.ok { background: var(--accent); color: var(--on-accent); } .pill.warn { background: var(--warn); color: #111; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { border: 1px solid var(--line); background: #171717; border-radius: 20px; padding: 3px 11px; cursor: pointer; font-size: 13px; user-select: none; }
 .chip.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
@@ -288,3 +288,10 @@ table.cs-plain td { padding: 2px 26px 2px 0; }
 .mcr-thumb { display: inline-flex; align-items: center; gap: 2px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 3px; }
 .mcr-thumb img { height: 34px; width: auto; max-width: 90px; object-fit: contain; }
 .mcr-addlogo .imgbox, .mcr-addlogo img { max-height: 40px; }
+
+/* star ratings (completing a production) */
+.stars { display: inline-flex; gap: 2px; }
+.stars .star { background: none; border: 0; padding: 2px 3px; font-size: 24px; line-height: 1; color: var(--line, #444); cursor: pointer; }
+.stars .star.on { color: #f5b301; }
+.stars .star:hover { transform: scale(1.12); }
+table.rate input { width: 100%; }

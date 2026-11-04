@@ -66,6 +66,10 @@ h2.sec .count { color: var(--dim); font-weight: 400; font-size: 14px; }
 .match .row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .match .score { font-size: 18px; font-weight: 700; text-align: right; margin-top: 4px; }
 .match .foot { color: var(--dim); font-size: 12px; margin-top: 6px; }
+.match.clickable { cursor: pointer; transition: background .15s; } .match.clickable:hover { background: color-mix(in srgb, var(--panel) 85%, #fff); }
+.match .more { color: var(--accent); font-size: 12px; font-weight: 600; margin-top: 6px; text-align: right; }
+.match-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 4px 0 -4px; } .match-head a:not(.watch-btn) { color: var(--dim); text-decoration: none; }
+.match-head .watch-btn { font-weight: 600; color: var(--accent); text-decoration: none; } .match-head .watch-btn.live { color: var(--live); }
 .match .watch-btn { display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--accent); } .match .watch-btn.live { color: var(--live); }
 
 /* channels */
