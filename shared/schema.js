@@ -174,6 +174,8 @@
       { k: 'streamTitle', l: 'Stream title', t: 'text', ph: 'The production name', group: 'Live stream' },
       { k: 'streamSlug', l: 'Stream web address', t: 'text', ph: 'Made from the name and date', group: 'Live stream', help: 'Viewers watch at /watch/<this>.' },
       { k: 'streamPrice', l: 'Ticket price (ZAR)', t: 'money', group: 'Live stream', help: 'Empty or 0 = free to watch. Otherwise viewers buy a ticket (PayFast) to watch live and the recordings. Only on a Public channel.' },
+      { k: 'streamVisibility', l: 'Who can watch this stream', t: 'select', opts: ['', 'Public', 'Unlisted', 'Private'], group: 'Live stream', help: 'Empty: as the channel. Public: anyone, listed on the website. Unlisted: anyone with the watch link, but not listed anywhere. Private: only your production team, signed in.' },
+      { k: 'streamPublicDays', l: 'Public for (days after the stream)', t: 'number', ph: 'As the channel (empty = always)', group: 'Live stream', help: 'How long the recording stays open to viewers after the stream ends. After that only your production team can watch it. Empty or 0: the channel\'s setting, else always.' },
       { k: 'streamPoster', l: 'Stream picture', t: 'image', group: 'Live stream', help: 'Shown before it starts and on the video afterwards. The channel\'s banner if empty.' },
       { k: 'streamRecord', l: 'Record the stream', t: 'bool', def: true, group: 'Live stream' },
       { k: 'streamVod', l: 'Show the recording on the website afterwards', t: 'bool', def: true, group: 'Live stream' },
@@ -286,6 +288,7 @@
       { k: 'access', l: 'Who can watch', t: 'select', opts: ['Public', 'Team members', 'Password'], def: 'Public', help: 'Public channels are on the public website. Team members: people in this production team (signed in). Password: anyone who types the password below.' },
       { k: 'passPrice', l: 'Channel pass price (ZAR)', t: 'money', help: 'Optional. A pass lets a viewer watch every paid stream on this channel for the number of days below.' }, { k: 'passDays', l: 'Pass valid for (days)', t: 'number', ph: '30' },
       { k: 'viewerPassword', l: 'Viewer password', t: 'text', help: 'Only used when "Who can watch" is Password.' },
+      { k: 'publicDays', l: 'Streams public for (days after each stream)', t: 'number', ph: 'Empty = always', help: 'How long recordings on this channel stay open to viewers after their stream ends; after that only the production team can watch. A stream can set its own.' },
       { k: 'teamOnly', l: 'Only this production team', t: 'bool', help: 'Off: any production team can stream its productions on this channel. On: only this team\'s productions.' },
       { k: 'disabled', l: 'Switched off', t: 'bool', help: 'Hidden, and nobody can stream to it or watch it.' }] },
     booking: { label: 'Booking request', plural: 'Booking requests', group: 'Productions', title: (d) => [d.name, d.service].filter(Boolean).join(' · '), cols: ['received', 'name', 'service', 'date', 'producer', 'status'], fields: [
