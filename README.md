@@ -997,6 +997,41 @@ Render (Environment), or on your own server in `/etc/rfp-manager/env`:
 * **SMTP** (your own server only; Render's free plan blocks mail ports): `SMTP_URL=smtps://user:password@smtp.host:465`
   and `MAIL_FROM`. With Google Workspace use smtp.gmail.com with an app password.
 
+### Booking requests: tracking and messages (email + WhatsApp)
+
+Every booking request from the website gets its own private page, **/track/<key>**, like a parcel. The link is shown
+after sending the request and is in the thank-you email. The page shows the steps, each with the date it was reached:
+
+Received → Being reviewed → Quote sent → Confirmed → Crew booked → Event day → Completed (or Declined / Cancelled)
+
+* **The step follows the work.** A Producer is allocated: *Being reviewed*. A quote on its production is sent: *Quote
+  sent*. The booking is *Booked* or its production *Confirmed*: *Confirmed*. A crew member is ticked confirmed: *Crew
+  booked*. The date of the event: *Event day*. The production is *Completed*: *Completed*. *Not going ahead* or a
+  cancelled production: *Declined* (never confirmed) or *Cancelled*. **Client sees** on the booking sets a step by hand.
+* **Each new step is sent to the client** by email and WhatsApp, unless **Quiet** is ticked on the booking.
+* **Messages.** On the booking, under *Client & messages*, the Producer writes to the client: it goes by email and
+  WhatsApp at once (untick either), with the tracking link. Each message shows whether the email went and the WhatsApp
+  ticks (sent, delivered, read). The client answers on the tracking page or on WhatsApp; the answer appears on the
+  booking and the Producer (or the Admins when nobody is allocated) gets an email and a notification.
+* **Copy tracking link** and **What the client sees ↗** are on the booking.
+
+**WhatsApp (Settings → Server → WhatsApp, site admins).** Messages are sent by the website through Meta's WhatsApp
+Business Cloud API, from a business number (not one already on the WhatsApp app):
+
+1. developers.facebook.com → *Create app* (Business) → add **WhatsApp**, linked to your Meta Business account.
+2. *WhatsApp → API setup*: add and verify the business number; copy its **Phone number ID** into the settings.
+3. business.facebook.com → *Settings → System users*: add an Admin system user, assign it the app and the WhatsApp
+   account, and generate a token (never expires) with `whatsapp_business_messaging` and
+   `whatsapp_business_management`. Paste it into the settings yourself; it is a secret.
+4. *WhatsApp Manager → Message templates*: create **booking_update**, category *Utility*, English, body
+   `Hi {{1}}, there is an update on {{2}}: {{3}} Follow your booking here: {{4}}`. WhatsApp only lets a business start a
+   conversation with an approved template; once the client writes back, messages go as normal text for 24 hours.
+5. *WhatsApp → Configuration → Webhook*: the **callback URL** and **verify token** shown in the settings, then
+   subscribe to `messages`. The **App secret** (*App settings → Basic*) makes the website check that calls come from Meta.
+6. A payment method in WhatsApp Manager: Meta charges per conversation it starts with a template.
+
+Numbers people type with a leading 0 get the country code from the settings (27: 068 … → 2768 …).
+
 ### Android app
 
 The Android app is an APK that opens the website as an app (full screen, its own icon, Google sign-in, the camera
@@ -1117,6 +1152,8 @@ lib/store-sqlite.js  local database          lib/store-mongo.js   online databas
 lib/blobs.js         per-machine image folder
 lib/auth.js          Google sign-in, passwords, sessions, machine keys
 lib/api.js           HTTP API                lib/hub.js           WebSocket for the management app
+lib/bookings.js      booking tracking (/track/<key>) and client messages
+lib/whatsapp.js      WhatsApp Business Cloud API: send, webhook (replies, ticks)
 lib/live.js          live match sessions, scorer/control/monitor WebSocket, rundown monitor API
 lib/gfx.js           graphics catalog, CasparCG playout, adverts and playlists, play log, button actions
 lib/devices.js       vMix, ATEM, HyperDeck, OBS, Companion, OSC, Art-Net, MIDI, X-keys, Pi GPIO; input mappings
