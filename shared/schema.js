@@ -139,7 +139,7 @@
       { k: 'date', l: 'Date', t: 'date' }, { k: 'days', l: 'Days', t: 'number', ph: '1' }, { k: 'venue', l: 'Venue', t: 'ref', ref: 'venue' },
       { k: 'event', l: 'Event', t: 'text', ph: 'From the competition unless you type one', help: 'Shown on the call sheet and rundown.' },
       { k: 'txTime', l: 'TX / kick-off time', t: 'time', help: 'Default TX time for the crew and the start line of the rundown.' },
-      { k: 'client', l: 'Client', t: 'text' }, { k: 'producer', l: 'Producer', t: 'member', roles: ['Producer', 'Admin'] }, { k: 'description', l: 'Description', t: 'textarea' },
+      { k: 'client', l: 'Client', t: 'text' }, { k: 'clientEmail', l: 'Client email', t: 'text', help: 'Quotes, invoices and the client page go here.' }, { k: 'producer', l: 'Producer', t: 'member', roles: ['Producer', 'Admin'] }, { k: 'description', l: 'Description', t: 'textarea' },
       { k: 'booking', l: 'Booking request', t: 'ref', ref: 'booking', hidden: true },
       { k: 'remoteStudio', l: 'Remote studio / gallery', t: 'text', ph: 'OB van, studio name…' }, { k: 'remoteStudioAddress', l: 'Remote studio address', t: 'text' },
       { k: 'contacts', l: 'Key contacts', t: 'list', help: 'Stadium manager, production coordinator, technical manager… Pick a crew member or type a name and number.', fields: [
@@ -162,6 +162,9 @@
         { k: 'time', l: 'Time', t: 'time', w: 100 }, { k: 'category', l: 'Kind', t: 'combo', opts: ['Technical', 'Delay', 'Graphics', 'Audio', 'Vision', 'Stream', 'Crew', 'Equipment', 'Client', 'Weather', 'Other'], w: 130 },
         { k: 'severity', l: 'Severity', t: 'select', opts: ISSUE_SEVERITY, def: 'Minor', w: 120 }, { k: 'text', l: 'What happened', t: 'text' }, { k: 'action', l: 'What was done / to do', t: 'text' }, { k: 'resolved', l: 'Resolved', t: 'bool', w: 80 }] },
       { k: 'reportNotes', l: 'Report summary', t: 'textarea', group: 'Music & report' },
+      { k: 'sermonTitle', l: 'Sermon / message title', t: 'text', group: 'Sermon (church services)', help: 'Church services: shown in the channel\'s sermon archive with the recording.' },
+      { k: 'preacher', l: 'Preacher / speaker', t: 'text', group: 'Sermon (church services)' }, { k: 'scripture', l: 'Scripture', t: 'text', ph: 'John 3:16-21; Ps 23', group: 'Sermon (church services)' },
+      { k: 'series', l: 'Series', t: 'text', group: 'Sermon (church services)' }, { k: 'sermonNotes', l: 'Notes for viewers', t: 'textarea', group: 'Sermon (church services)' },
       { k: 'musicLog', l: 'Music used (added by hand)', t: 'list', group: 'Music & report', help: 'Music that was not played from RFP Manager (a DJ, the stadium PA, a band, a vMix input without a track). Pick a track from the library, or type the title and its writers. Plays from CasparCG, vMix and stream slates are logged by themselves.', fields: [
         { k: 'track', l: 'Track', t: 'ref', ref: 'track' }, { k: 'title', l: 'or title', t: 'text' }, { k: 'composers', l: 'Composer(s)', t: 'text' }, { k: 'publisher', l: 'Publisher', t: 'text' },
         { k: 'usage', l: 'Used as', t: 'combo', opts: MUSIC_USAGE, w: 150 }, { k: 'at', l: 'Time', t: 'time', w: 100 }, { k: 'duration', l: 'Duration', t: 'text', ph: '0:30', w: 90 },
@@ -220,19 +223,23 @@
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'surname', l: 'Surname', t: 'text' }, { k: 'dateOfBirth', l: 'Date of birth', t: 'date' },
       { k: 'idNumber', l: 'ID number', t: 'text', sensitive: true, help: 'Only Admins and Producers can see this.' },
       { k: 'phone', l: 'Phone', t: 'text' }, { k: 'email', l: 'Email', t: 'text' }, { k: 'image', l: 'Photo', t: 'image' },
-      { k: 'roles', l: 'Roles', t: 'multi', opts: 'crewRoles' }, { k: 'notes', l: 'Notes', t: 'textarea' }] },
+      { k: 'roles', l: 'Roles', t: 'multi', opts: 'crewRoles' }, { k: 'notes', l: 'Notes', t: 'textarea' },
+      { k: 'unavailable', l: 'Not available', t: 'list', help: 'Days this person cannot work. Crew set these themselves on their home page; booking them then shows a clash.', fields: [{ k: 'from', l: 'From', t: 'date' }, { k: 'to', l: 'To', t: 'date' }, { k: 'note', l: 'Note', t: 'text' }] }] },
 
     crewRole: { label: 'Crew role', plural: 'Crew roles', group: 'Productions', title: (d) => d.name, cols: ['name', 'maxQuantity', 'rate', 'invoiceRate'], fields: [
       { k: 'name', l: 'Role', t: 'text', req: true }, { k: 'maxQuantity', l: 'Maximum per production', t: 'number' },
       { k: 'rate', l: 'Day rate (what you pay)', t: 'money' }, { k: 'invoiceRate', l: 'Invoice rate (what you charge)', t: 'money' }] },
 
-    equipment: { label: 'Equipment', plural: 'Equipment', group: 'Productions', title: (d) => d.name, cols: ['name', 'category', 'quantity', 'rate', 'invoiceRate'], fields: [
+    equipment: { label: 'Equipment', plural: 'Equipment', group: 'Productions', title: (d) => d.name, cols: ['name', 'category', 'quantity', 'condition', 'serviceDue', 'rate'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'category', l: 'Category', t: 'combo', opts: EQUIP_CATS, def: 'Video' },
       { k: 'quantity', l: 'Quantity owned', t: 'number' }, { k: 'rate', l: 'Day cost', t: 'money' }, { k: 'invoiceRate', l: 'Day invoice rate', t: 'money' },
-      { k: 'serial', l: 'Serial / asset no.', t: 'text' }, { k: 'notes', l: 'Notes', t: 'textarea' }, { k: 'image', l: 'Image', t: 'image' }] },
+      { k: 'serial', l: 'Serial / asset no.', t: 'text' }, { k: 'barcode', l: 'Barcode / tag', t: 'text', help: 'Scanned (or typed) when the kit goes out and comes back.' },
+      { k: 'condition', l: 'Condition', t: 'select', opts: ['OK', 'Needs attention', 'In repair', 'Missing', 'Retired'], def: 'OK' },
+      { k: 'serviceDue', l: 'Service / test due', t: 'date' }, { k: 'insuranceUntil', l: 'Insured until', t: 'date' }, { k: 'value', l: 'Replacement value', t: 'money' },
+      { k: 'notes', l: 'Notes', t: 'textarea' }, { k: 'image', l: 'Image', t: 'image' }] },
 
     advert: { label: 'Advert', plural: 'Adverts', group: 'Advertising', title: (d) => [d.name, d.sponsor].filter(Boolean).join(' · '), cols: ['image', 'name', 'sponsor', 'layout', 'duration'], fields: [
-      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'sponsor', l: 'Sponsor / client', t: 'text' },
+      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'sponsor', l: 'Sponsor / client', t: 'text' }, { k: 'sponsorEmail', l: 'Sponsor email (proof of play)', t: 'text', ph: 'marketing@sponsor.example', help: 'Gets the monthly proof-of-play report (Advertising → Sponsor reports).' },
       { k: 'kind', l: 'Kind', t: 'select', opts: ['Image', 'CasparCG clip'], def: 'Image' },
       { k: 'image', l: 'Image', t: 'image' }, { k: 'clip', l: 'CasparCG clip name', t: 'text', ph: 'ADS/SPONSOR_30', help: 'A video in CasparCG\'s media folder. Used when Kind is "CasparCG clip".' },
       { k: 'layout', l: 'Layout', t: 'select', opts: ['Full screen', 'Lower banner', 'Corner bug', 'Side panel', 'Custom position'], def: 'Full screen' },
@@ -309,7 +316,7 @@
   // Everything else is managed on the website.
   const PC_EDIT = ['graphic', 'theme', 'dashboard', 'timeline', 'variable', 'gametrigger'];
 
-  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'musicuse', 'songuse', 'user', 'machinekey', 'purchase', 'streamclip', 'comment', 'viewstat', 'streamvideo', 'mcr', 'videoad', 'adpreset', 'pushdevice', 'notification'];
+  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'musicuse', 'songuse', 'bible', 'product', 'user', 'machinekey', 'purchase', 'streamclip', 'comment', 'viewstat', 'streamvideo', 'mcr', 'videoad', 'adpreset', 'pushdevice', 'notification'];
   const ALL_TYPES = [...Object.keys(E), ...SYSTEM_TYPES];
 
   const has = (v) => v !== undefined && v !== null && v !== '';
