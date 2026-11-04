@@ -390,7 +390,7 @@ function fieldInput(f, value, onChange, ctx = {}) {
     }
     case 'image': return imageField(value, onChange, f.k);
     case 'list': return listField(f, value, onChange, ctx);
-    default: return h('input', { value: value === undefined || value === null ? '' : value, placeholder: ph, oninput: (e) => onChange(e.target.value) });
+    default: return h('input', { value: value === undefined || value === null ? '' : value, placeholder: ph, readonly: f.readonly || null, oninput: (e) => onChange(e.target.value) });
   }
 }
 

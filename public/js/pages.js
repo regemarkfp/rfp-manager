@@ -208,7 +208,7 @@
         const fx = (p.fixtures || []).map((r) => App.docs.get(r.fixture)).filter(Boolean);
         box.replaceChildren(...[
           fx.length ? h('div', { class: 'card' }, h('h2', {}, 'Matches in this production'), fx.map((d) => App.fixtureRow(d))) : null,
-          h('div', { class: 'card' }, h('div', { class: 'spread' }, h('h2', {}, 'Costing'), h('div', { class: 'row no-print' }, h('a', { class: 'btn sm', href: '#/rundown/production/' + doc.id }, `Rundown (${(p.rundown || []).length})`), h('a', { class: 'btn sm', href: '#/callsheet/' + doc.id }, 'Call sheet'), h('a', { class: 'btn sm', href: '#/report/' + doc.id, title: 'Post-production report and music cue sheets' }, 'Report & cue sheet'), App.canEdit('production') ? h('button', { class: 'sm', onclick: (e) => { e.preventDefault(); App.sendCallsheet(doc.id); } }, 'Send call sheet') : null)),
+          h('div', { class: 'card' }, h('div', { class: 'spread' }, h('h2', {}, 'Costing'), h('div', { class: 'row no-print' }, h('a', { class: 'btn sm', href: '#/rundown/production/' + doc.id }, `Rundown (${(p.rundown || []).length})`), h('a', { class: 'btn sm', href: '#/callsheet/' + doc.id }, 'Call sheet'), h('a', { class: 'btn sm', href: '#/report/' + doc.id, title: 'Post-production report and music cue sheets' }, 'Report & cue sheet'), App.canEdit('production') ? h('a', { class: 'btn sm' + (p.status === 'Completed' ? '' : ' primary'), href: '#/complete/' + doc.id, title: 'Rate the production, list its issues and see its report' }, p.status === 'Completed' ? 'Edit report' : 'Complete production') : null, App.canEdit('production') ? h('button', { class: 'sm', onclick: (e) => { e.preventDefault(); App.sendCallsheet(doc.id); } }, 'Send call sheet') : null)),
             warn.concat(clash.length ? ['Booked twice: ' + [...new Set(clash)].join(', ')] : []).map((w) => h('div', { class: 'pill warn', style: { marginBottom: '8px', marginRight: '6px' } }, w)),
             c.lines.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' },
               h('thead', {}, h('tr', {}, h('th', {}, 'Item'), h('th', { class: 'r' }, 'Qty'), h('th', { class: 'r' }, 'Days'), h('th', { class: 'r' }, 'Cost'), h('th', { class: 'r' }, 'Invoice'))),
@@ -340,7 +340,7 @@
       h('div', { class: 'cs-box' },
         h('div', { class: 'cs-top' }, h('div', {},
           h('p', {}, h('b', {}, `${String(org.name || 'Production').toUpperCase()} CALL SHEET`)),
-          line('Date', date), line('Production', !fx.length || p.name !== `${venue.name} – ${p.date}` ? p.name : ''), line('Event', event), line('Fixture', fixtureLine, true),
+          line('Production no.', p.number), line('Date', date), line('Production', !fx.length || p.name !== `${venue.name} – ${p.date}` ? p.name : ''), line('Event', event), line('Fixture', fixtureLine, true),
           line('Venue', [venue.name, venue.city].filter(Boolean).join(', ')), line('Remote Studio', p.remoteStudio), p.remoteStudioAddress ? h('p', {}, h('i', {}, p.remoteStudioAddress)) : null,
           contacts.map((c) => h('p', {}, h('b', {}, c.title + ': '), [c.name, c.phone].filter(Boolean).join(' ')))),
         App.img(org.image) ? h('img', { class: 'cs-logo', src: App.img(org.image), alt: org.name || '' }) : h('div', { class: 'cs-name' }, org.name || '')),

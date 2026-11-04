@@ -55,12 +55,25 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   function matchCard(m) {
     const live = m.status === 'Live';
     const team = (t) => el('div', { class: 'row' }, t.logo ? el('img', { src: img(t.logo), alt: '' }) : el('span', { class: 'ph', style: { background: t.color || '#555' } }), el('span', {}, t.name));
-    return el('div', { class: 'match' },
+    const open = (e) => { if (e.target.closest('a')) return; history.pushState(null, '', '/match/' + encodeURIComponent(m.id)); window.scrollTo(0, 0); render(); };
+    return el('div', { class: 'match clickable', role: 'link', tabindex: '0', title: 'Match centre: score, stats and line-ups', onclick: open, onkeydown: (e) => { if (e.key === 'Enter') open(e); } },
       el('div', { class: 'top-line' }, el('span', {}, m.competition ? m.competition.name : m.sport), live ? el('span', { class: 'status-live' }, '● LIVE' + (m.period ? ' · ' + m.period : '')) : el('span', {}, m.status === 'Completed' ? 'Full time' : day(m.date, m.time))),
       team(m.teams[0] || { name: 'Home' }), team(m.teams[1] || { name: 'Away' }),
       m.score ? el('div', { class: 'score' }, m.score) : null,
       el('div', { class: 'foot' }, [m.venue, m.company].filter(Boolean).join(' · ')),
-      m.watch ? el('a', { class: 'watch-btn' + (m.watch.live ? ' live' : ''), href: m.watch.href }, m.watch.live ? '● Watch live' : '▶ Watch the match') : null);
+      m.watch ? el('a', { class: 'watch-btn' + (m.watch.live ? ' live' : ''), href: m.watch.href }, m.watch.live ? '● Watch live' : '▶ Watch the match') : null,
+      live || m.score ? el('div', { class: 'more' }, live ? 'Live stats ›' : 'Match stats ›') : null);
+  }
+  // ---- the match centre (/match/<id>): score, what happened, team stats, players or the cricket scorecard
+  let centre = null;
+  function matchPage(id) {
+    const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
+    const m = [...(D.matches.live || []), ...(D.matches.upcoming || []), ...(D.matches.results || [])].find((x) => x.id === id);
+    const head = el('div', { class: 'match-head' }, el('a', { href: '/matches', 'data-nav': '' }, '‹ Matches'),
+      m && m.watch ? el('a', { class: 'watch-btn' + (m.watch.live ? ' live' : ''), href: m.watch.href }, m.watch.live ? '● Watch live' : '▶ Watch the match') : null);
+    if (centre) centre.stop();
+    centre = window.MatchStats ? window.MatchStats.mount(box, id, { onMissing: () => box.replaceChildren(el('div', { class: 'empty' }, 'This match is not on the website.')), onData: (x) => { document.title = `${x.teams.map((t) => t.name).join(' v ')} – ${D.site || 'RegemarkFP'}`; } }) : null;
+    return [head, box];
   }
   // the channel's next stream (live now, or the next one coming up)
   const nextOf = (c) => {
@@ -281,7 +294,9 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     document.body.classList.toggle('landing', p === '/' || p === '');
     document.title = D.site || 'RegemarkFP';
     let view;
-    if (p.startsWith('/c/')) view = await channelPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')), params.get('tab'));
+    if (centre && !p.startsWith('/match/')) { centre.stop(); centre = null; }
+    if (p.startsWith('/match/')) view = matchPage(decodeURIComponent(p.slice(7).replace(/\/$/, '')));
+    else if (p.startsWith('/c/')) view = await channelPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')), params.get('tab'));
     else if (p === '/videos') view = videosPage();
     else if (p === '/matches') view = matchesPage();
     else if (p === '/channels') view = channelsPage();

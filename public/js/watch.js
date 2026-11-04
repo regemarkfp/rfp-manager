@@ -15,7 +15,7 @@
     for (const k of kids.flat()) if (k !== null && k !== undefined) e.append(k);
     return e;
   };
-  let info = null, pc = null, playing = false, password = null, retry = null;
+  let info = null, pc = null, playing = false, password = null, retry = null, statsBox = null, statsFor = '';
 
   // tickets bought without signing in: kept in this browser (and in the ticket email)
   const TKEY = 'rfp-tickets';
@@ -113,6 +113,9 @@
       el('span', { class: 'sp' }), pub ? el('button', { class: 'sub' + (subOn ? ' on' : ''), onclick: subscribe }, subOn ? 'Subscribed ✓' : 'Subscribe') : null);
     const vids = info.videos || [], mts = info.matches || [];
     const mList = mts.length ? [el('h3', {}, 'Matches'), el('div', { class: 'vids' }, mts.map((m) => el('a', { href: '?m=' + encodeURIComponent(m.fixture), class: m.fixture === matchId ? 'on' : '' }, el('b', {}, m.title), el('small', {}, (m.live ? 'so far · ' : '') + dur(m.duration)))))] : [];
+    // the match being streamed: live score and stats under the picture (the picture covers them in full screen)
+    const sm = !info.needs && info.statsMatch && window.MatchStats ? info.statsMatch : '';
+    if (sm !== statsFor) { if (statsBox) statsBox.stop(); statsBox = null; statsFor = sm; $('mstats').replaceChildren(); if (sm) statsBox = window.MatchStats.mount($('mstats'), sm, { onMissing: () => { $('mstats').replaceChildren(); } }); }
     $('vids').replaceChildren(...mList, ...(vids.length ? [el('h3', {}, mts.length ? 'Full stream' : 'Recordings'), el('div', { class: 'vids' }, info.live ? el('a', { href: location.pathname, class: vodStart ? '' : 'on' }, el('b', {}, '● Live now'), el('small', {}, `${info.viewers || 0} watching`)) : null,
       vids.map((v) => el('a', { href: '?v=' + encodeURIComponent(v.start), class: v.start === vodStart ? 'on' : '' }, el('b', {}, v.title || new Date(v.start).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })), el('small', {}, (v.title ? new Date(v.start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' · ' : '') + dur(v.duration)))))] : []));
   }
