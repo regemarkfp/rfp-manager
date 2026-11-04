@@ -889,7 +889,9 @@ Click a match on regemarkfp.com (Matches, or Live matches on the home page) for 
 
 ### Verse of the day (per person)
 
-Settings → My account → Verse of the day: switch it on or off for your home page, pick the translation (Bibles imported on that machine under Worship → Bibles, any language you are licensed for, then the free online ones: KJV, WEB, BBE, Open English Bible, Portuguese Almeida, Romanian, Latin Vulgate) and the time your day turns over (midnight unless you choose another, e.g. 05:00). The day is your computer's day, and the card turns over by itself at that time.
+Settings → My account → Verse of the day: switch it on or off for your home page, pick the translation (the website's Bibles first, then Bibles imported on that machine under Worship → Bibles, then the free online ones: KJV, WEB, BBE, Open English Bible, Portuguese Almeida, Romanian, Latin Vulgate) and the time your day turns over (midnight unless you choose another, e.g. 05:00). The day is your computer's day, and the card turns over by itself at that time.
+
+**Bibles on the website** (Settings → Website, site admins): search the Beblia collection (github.com/Beblia/Holy-Bible-XML-Format, 1000+ translations in 200+ languages, e.g. Afrikaans 1933/1953, 1983, 2020, NLV), pick one and add it. The website keeps it compressed in its database (and the NAS folder), so everyone can choose it for their verse of the day, on the website and on production PCs (they ask the website). Most modern translations are under copyright: you confirm the website may use it, and its copyright line shows with every verse.
 
 ### Following teams and clubs (match updates, like Google)
 
@@ -899,6 +901,23 @@ Settings → My account → Verse of the day: switch it on or off for your home 
 - **How often, per team**: updates as it happens and in the digest, as it happens only, or only in the digest; scores every time, only when the lead changes, or at most every 10 / 15 / 30 minutes; and which kinds of update.
 - **How often, overall** (Following → How often): a score digest (off, the evening of a match day, every day, or once a week on a chosen day) at the fan's time in their own time zone, with coming fixtures or not, as a notification and/or by email ("Send me one now" to try it); and a pause for all live updates (1 hour, until tomorrow, a week). One match can be muted from its page.
 - The website works them out from the match as the scorer saves it (it reaches the website by sync), so it does not matter which PC or phone scores. Matches more than two days old are not announced.
+
+### Software downloads (regemarkfp.com/software)
+
+Settings → Website → Software on the website (site admins): add an app with its GitHub repository (e.g. regemarkfp/Regemark-Replay). Publish releases on GitHub as usual; every 6 hours (or with Sync) the website copies the installers of the last five releases (.exe, .msi, .dmg, .pkg, .AppImage, .deb, .rpm, archives) to the NAS (`/srv/nas/software` on the home server) and serves them from there. Each app gets a page with download buttons for the visitor's system first, release notes and earlier versions; downloads are counted. A price makes an app paid: until buying is switched on only the emails you list can download it. Apps can check for updates at `/api/software/<app>/latest`. A private repository needs a GitHub token in the config (`"software": { "token": "…" }`).
+
+### Running the company
+
+- **Quotes & invoices** (Productions → Quotes & invoices, and on each production): made from the production's costing (crew by role, equipment, other costs, recharged expenses), numbered Q2026-001 / INV2026-001, with your billing details (registered name, VAT number and %, bank details, payment terms), as a PDF and emailed to the client. Draft → Sent → Paid (Overdue after the due date); quotes Accepted or Declined. The overview shows what is owed, what is overdue and which crew are still to be paid.
+- **Crew answers from the call sheet email**: "I'm in" / "Can't make it" buttons, no sign-in needed; the producer is told. Crew mark the days they cannot work (My availability); a production shows clashes (not available, booked twice the same day, declined).
+- **Kit out / in** per production: scan a barcode (or type a serial or name) as kit goes out and comes back; damaged and missing items; service and insurance dates on equipment.
+- **Client page**: a private link per production with its call sheet, stream, recordings, report and the quotes and invoices you have sent.
+- **Sponsor reports** (Advertising → Sponsor reports): proof of play per sponsor per month from the playout log, as a PDF and emailed to the sponsor email on their adverts.
+- **Health alerts** during a show: a weak stream for a minute, a live match with no scoring for 12 minutes, a production PC going offline on a production day.
+
+### For fans
+
+Competitions can be followed (with a log table), an hour-before-kick-off reminder, the fixtures of your teams as a calendar subscription (Following → Add to my calendar), predictions before kick-off and the fans' player of the match, ▶ replays of each moment from the stream recording, player profiles (only when the team switches on "Show player profiles"), the sermon archive on church channels (Sermon fields on a production), and gift tickets and passes.
 
 ### Production teams
 
