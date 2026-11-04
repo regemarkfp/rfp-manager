@@ -878,6 +878,15 @@ Cancel puts the colour back. A colour without transparency is stored as `#rrggbb
 - **After the production**: Production → Report & cue sheet. The report has the summary, matches and results, commentators and officials, crew and costs, the graphics and adverts that went to air, the music, the stream's viewers and recordings, and the incidents logged on the production (PDF or print). The music cue sheet comes in the SAMRO layout and a broadcaster layout, each as PDF or CSV, timed from the TX time.
 - **Rights holders**: Music → Music use report lists every use over a period for a composer, publisher or library (CSV to send them).
 
+### Production numbers, completing a production and its report
+
+- Every production gets a number when the website first saves it: **P + year + order**, e.g. P2026-014. Numbers are per production team, never reused and never changed by an edit; older productions were numbered oldest first. The number shows in lists, pickers, the call sheet, the report and the cue sheet.
+- **Complete production** (on the production, or on its report) opens the report form: 1–5 stars for Overall, Cameras & vision, Audio, Graphics, Stream, Crew, Timing, Equipment and Client satisfaction (each with a note; leave out what did not apply), the issues (kind, severity Minor → Critical, what was done, resolved or still open) and a summary. Completing sets the status to Completed and opens the report with the rating, issues, matches, crew and costs, what went to air, the music and the stream (PDF too). "Edit report" changes it later.
+
+### Match centre on the public website
+
+Click a match on regemarkfp.com (Matches, or Live matches on the home page) for its match centre at /match/<id>: the score and running clock, what happened (scores, cards, substitutions), team statistics, players and line-ups, match officials; the full scorecard for cricket. It updates every few seconds while the match is live. The same live stats show under the video on a watch page when the stream has a match (the picture covers them in full screen). Matches show when the team has "Show matches on the website" on, or when they are in a production that streams.
+
 ### Production teams
 
 Each production team has its own name on the website: a second team with the same name is refused. Two teams that
