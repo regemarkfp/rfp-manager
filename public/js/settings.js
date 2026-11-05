@@ -315,6 +315,80 @@
     return box;
   }
 
+  // ---- the booking form editor (Settings → Website): every field, the kinds of event, sections and questions
+  function bookingFormCard() {
+    const box = h('div', { class: 'card dim' }, 'Loading…');
+    const TYPE_NAMES = { text: 'Short text', long: 'Long text', number: 'Number', date: 'Date', one: 'Pick one', many: 'Tick any' };
+    let F = null, meta = null;
+    const lines = (a) => (a || []).join('\n');
+    const toList = (v) => String(v || '').split('\n').map((x) => x.trim()).filter(Boolean);
+    const move = (arr, i, d) => { const j = i + d; if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; paint(); };
+    const sm = (label, onclick, cls = '') => h('button', { class: 'sm ' + cls, type: 'button', onclick }, label);
+    const chipsOf = (all, chosen, onChange) => h('div', { class: 'row', style: { gap: '6px', flexWrap: 'wrap' } }, all.map((x) => {
+      const b = h('button', { type: 'button', class: 'sm' + (chosen.includes(x) ? ' primary' : ''), onclick: () => { const i = chosen.indexOf(x); if (i >= 0) chosen.splice(i, 1); else chosen.push(x); onChange(); b.className = 'sm' + (chosen.includes(x) ? ' primary' : ''); } }, x);
+      return b;
+    }));
+    const opener = new Set();        // sections open in the editor
+    function questionRow(g, x, i) {
+      const opts = h('textarea', { rows: Math.min(8, Math.max(2, (x.opts || []).length)), placeholder: 'One choice per line', style: { width: '100%', display: x.type === 'one' || x.type === 'many' ? '' : 'none' }, oninput: (e) => { x.opts = toList(e.target.value); } }, lines(x.opts));
+      return h('div', { style: { border: '1px solid var(--line, #3a3a3a)', borderRadius: '8px', padding: '8px 10px', display: 'grid', gap: '6px' } },
+        h('div', { class: 'row', style: { gap: '6px', flexWrap: 'wrap', alignItems: 'center' } },
+          h('input', { value: x.label, placeholder: 'Question', style: { flex: '2 1 220px' }, oninput: (e) => { x.label = e.target.value; } }),
+          h('select', { style: { flex: '0 1 130px' }, onchange: (e) => { x.type = e.target.value; opts.style.display = x.type === 'one' || x.type === 'many' ? '' : 'none'; } }, meta.types.map((t) => h('option', { value: t, selected: t === x.type }, TYPE_NAMES[t] || t))),
+          h('label', { class: 'row', style: { gap: '4px' } }, h('input', { type: 'checkbox', checked: x.req, onchange: (e) => { x.req = e.target.checked; } }), 'Required'),
+          h('label', { class: 'row', style: { gap: '4px' } }, h('input', { type: 'checkbox', checked: x.wide, onchange: (e) => { x.wide = e.target.checked; } }), 'Full width'),
+          h('span', { style: { flex: 1 } }), sm('↑', () => move(g.questions, i, -1)), sm('↓', () => move(g.questions, i, 1)), sm('✕', () => { g.questions.splice(i, 1); paint(); }, 'danger')),
+        h('input', { value: x.ph || '', placeholder: 'Hint inside the box (optional)', oninput: (e) => { x.ph = e.target.value; } }), opts);
+    }
+    function groupCard(g, i) {
+      const open = opener.has(g.id);
+      const when = h('div', { class: 'dim small' }, g.when.length ? 'Shows for: ' + g.when.join(', ') : 'Shows for every service');
+      return h('div', { class: 'card', style: { margin: '8px 0', padding: '10px 12px', background: 'var(--panel2, #262626)' } },
+        h('div', { class: 'row', style: { gap: '6px', alignItems: 'center', flexWrap: 'wrap' } },
+          sm(open ? '▾' : '▸', () => { if (open) opener.delete(g.id); else opener.add(g.id); paint(); }),
+          h('b', { style: { flex: 1, minWidth: '140px' } }, g.title || 'Section', h('span', { class: 'dim small' }, ` · ${g.questions.length} question${g.questions.length === 1 ? '' : 's'}`)),
+          sm('↑', () => move(F.groups, i, -1)), sm('↓', () => move(F.groups, i, 1)), sm('Remove', () => { if (confirm(`Remove the section "${g.title}"?`)) { F.groups.splice(i, 1); paint(); } }, 'danger')),
+        open ? h('div', { style: { display: 'grid', gap: '8px', marginTop: '8px' } },
+          h('label', { class: 'f' }, h('span', {}, 'Heading'), h('input', { value: g.title, oninput: (e) => { g.title = e.target.value; } })),
+          h('label', { class: 'f' }, h('span', {}, 'Line under the heading (optional)'), h('input', { value: g.sub || '', oninput: (e) => { g.sub = e.target.value; } })),
+          h('div', {}, h('div', { class: 'dim small', style: { marginBottom: '4px' } }, 'Show this section for (none chosen = every service):'),
+            chipsOf([...meta.services, ...F.kinds.list.filter((k) => !meta.services.includes(k))], g.when, () => { when.textContent = g.when.length ? 'Shows for: ' + g.when.join(', ') : 'Shows for every service'; }), when),
+          ...g.questions.map((x, j) => questionRow(g, x, j)),
+          h('div', {}, sm('+ Add a question', () => { g.questions.push({ label: '', type: 'text', opts: [], ph: '', req: false, wide: false }); paint(); }))) : null);
+    }
+    function paint() {
+      box.className = 'card';
+      const C = F.core;
+      box.replaceChildren(h('h2', {}, 'Booking form'),
+        h('p', { class: 'dim', style: { marginTop: 0 } }, 'Everything on regemarkfp.com/book: switch fields on or off, rename them, make them required, and add your own sections of questions that show for certain services or kinds of event. Name and service are always asked; people give an email or a phone number.'),
+        h('label', { class: 'f' }, h('span', {}, 'Line under "Book services"'), h('textarea', { rows: 2, oninput: (e) => { F.intro = e.target.value; } }, F.intro || '')),
+        h('h3', {}, 'Standard fields'),
+        h('div', { style: { display: 'grid', gap: '6px' } }, meta.fields.map(({ k, l }) => {
+          const c = C[k];
+          return h('div', { class: 'row', style: { gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
+            h('label', { class: 'row', style: { gap: '4px', minWidth: '90px' } }, h('input', { type: 'checkbox', checked: c.on, onchange: (e) => { c.on = e.target.checked; } }), 'Show'),
+            h('label', { class: 'row', style: { gap: '4px', minWidth: '100px' } }, h('input', { type: 'checkbox', checked: c.req, onchange: (e) => { c.req = e.target.checked; } }), 'Required'),
+            h('input', { value: c.label || '', placeholder: l, style: { flex: '1 1 220px' }, oninput: (e) => { c.label = e.target.value; } }),
+            c.opts ? h('details', { style: { flex: '1 1 100%' } }, h('summary', { class: 'dim small' }, `Choices (${c.opts.length})`), h('textarea', { rows: Math.max(3, c.opts.length), style: { width: '100%' }, placeholder: 'One per line', oninput: (e) => { c.opts = toList(e.target.value); } }, lines(c.opts))) : null);
+        })),
+        h('h3', {}, 'Kind of event'),
+        h('label', { class: 'row', style: { gap: '6px' } }, h('input', { type: 'checkbox', checked: F.kinds.on, onchange: (e) => { F.kinds.on = e.target.checked; } }), 'Ask the kind of event (sections can show for a kind)'),
+        h('label', { class: 'f' }, h('span', {}, 'Question'), h('input', { value: F.kinds.label, oninput: (e) => { F.kinds.label = e.target.value; } })),
+        h('label', { class: 'f' }, h('span', {}, 'Kinds (one per line)'), h('textarea', { rows: Math.max(4, F.kinds.list.length), oninput: (e) => { F.kinds.list = toList(e.target.value); } }, lines(F.kinds.list))),
+        h('div', {}, h('div', { class: 'dim small', style: { marginBottom: '4px' } }, 'Do not ask it for these services:'), chipsOf(meta.services, F.kinds.skip, () => {})),
+        h('h3', {}, 'Sections of questions'),
+        h('p', { class: 'dim small', style: { margin: '0 0 4px' } }, 'They show in this order, after the event details, once someone picks a service.'),
+        ...F.groups.map(groupCard),
+        h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } }, sm('+ Add a section', () => { const id = 'new-' + Date.now().toString(36); F.groups.push({ id, title: 'New section', sub: '', when: [], questions: [{ label: '', type: 'text', opts: [], ph: '', req: false, wide: false }] }); opener.add(id); paint(); })),
+        h('div', { class: 'row', style: { marginTop: '16px', gap: '8px', flexWrap: 'wrap' } },
+          h('button', { class: 'primary', onclick: async () => { try { const r = await api('PUT', '/api/site/booking-form', { form: F }); F = r.form; toast('Booking form saved'); paint(); } catch (e) { oops(e); } } }, 'Save'),
+          h('a', { class: 'btn', href: (App.cfg.siteUrl || '') + '/book', target: '_blank', rel: 'noopener' }, 'Open the form ↗'),
+          h('button', { class: 'danger sm', onclick: async () => { if (!confirm('Put the booking form back to the standard one? Your changes to it are lost.')) return; try { const r = await api('PUT', '/api/site/booking-form', { reset: true }); F = r.form; toast('Back to the standard form'); paint(); } catch (e) { oops(e); } } }, 'Back to the standard form')));
+    }
+    api('GET', '/api/site/booking-form').then((r) => { F = r.form; meta = r; paint(); }).catch((e) => { box.textContent = e.message; });
+    return box;
+  }
+
   function websiteTab() {
     const box = h('div', { class: 'card dim' }, 'Loading…');
     api('GET', '/api/site/landing').then((l) => {
@@ -371,7 +445,7 @@
       if (window.RFPNotifyUI) window.RFPNotifyUI.settings(inner);
       return box;
     };
-    const body = { notifications: notificationsTab, team: teamTab, members: membersTab, account: () => [accountTab(), verseCard()], connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab, server: App.serverTab, website: () => [websiteTab(), softwareCard(), siteBiblesCard()] }[tab]();
+    const body = { notifications: notificationsTab, team: teamTab, members: membersTab, account: () => [accountTab(), verseCard()], connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab, server: App.serverTab, website: () => [websiteTab(), bookingFormCard(), softwareCard(), siteBiblesCard()] }[tab]();
     return { el: h('div', {}, pageHead('Settings'), h('div', { class: 'tabs' }, tabs.map(([k, l]) => h('button', { class: k === tab ? 'on' : '', onclick: () => { tab = k; route(); } }, l))), body) };
   };
 })();
