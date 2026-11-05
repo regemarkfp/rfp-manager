@@ -229,3 +229,10 @@ input.sermon-q { width: 100%; font: inherit; color: var(--text); background: var
 .up-row button.primary { background: var(--accent); color: #0b0b0b; border: 0; border-radius: 18px; padding: 7px 14px; font-weight: 700; }
 .push-inline button.primary, .track-now button.primary { background: var(--accent); color: #0b0b0b; border: 0; border-radius: 20px; padding: 9px 18px; font-weight: 700; cursor: pointer; margin-left: 8px; }
 button.dl { border: 0; font: inherit; cursor: pointer; }
+/* the booking form: sections, chips for "tick all that apply" */
+.book-sec h2 { font-size: 17px; margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); } .book-sec .sub { margin: 4px 0 0; font-size: 13px; }
+.book-extra .book-form.inner { margin-top: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { background: #121212; color: var(--text); border: 1px solid var(--line); border-radius: 18px; padding: 7px 13px; font: inherit; font-size: 14px; cursor: pointer; }
+.chip.on { background: #00ff8222; border-color: var(--accent); color: var(--accent); }
+.chip.on::before { content: '✓ '; }
