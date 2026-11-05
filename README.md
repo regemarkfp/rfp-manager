@@ -1021,6 +1021,14 @@ One page, in sections: **You** (name, organisation, email, WhatsApp number, best
   sponsor branding, the programme.
 * **Video & photography:** what is needed, hours, final length, deadline and where it will be used.
 
+**Everything is yours to change** in Settings → Website → **Booking form** (site admins): the line under the heading;
+each standard field on or off, required or not, and its label (and the choices for *best way to reach you*, *budget*
+and *how did you hear*); the *kind of event* question, its kinds and the services that skip it; and the **sections of
+questions**: add, remove, rename and reorder them, choose the services or kinds of event each one shows for (none =
+every service), and edit their questions (short or long text, number, date, pick one, tick any; required; full width;
+the choices; a hint). *Back to the standard form* undoes it all. Name and service are always asked, and people give an
+email or a phone number. Required fields are checked by the website too.
+
 The answers are on the booking (*What they need*), in the email to the Admins and the client's copy, and in the
 description of the production made when a Producer accepts it (its TX time is the start time).
 
@@ -1205,6 +1213,7 @@ lib/blobs.js         per-machine image folder
 lib/auth.js          Google sign-in, passwords, sessions, machine keys
 lib/api.js           HTTP API                lib/hub.js           WebSocket for the management app
 lib/bookings.js      booking tracking (/track/<key>) and client messages
+shared/bookingform.js the booking form as data (the standard one, cleaning, which sections show)
 lib/payments.js      PayFast for invoices, booking deposits and software (lib/pay.js: the checkout)
 lib/whatsapp.js      WhatsApp: Meta Cloud API (send, webhook) or a linked phone (lib/walinked.js, Baileys)
 lib/live.js          live match sessions, scorer/control/monitor WebSocket, rundown monitor API
