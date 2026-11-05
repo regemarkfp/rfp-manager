@@ -234,6 +234,8 @@
         (mine || (admin && d.producer)) && !['Accepted', 'Booked', 'Not going ahead'].includes(d.status) ? [h('button', { class: 'primary', onclick: () => respond(true) }, 'Accept'), h('button', { class: 'danger', onclick: () => respond(false) }, 'Decline')] : null,
         prod ? h('a', { class: 'btn primary', href: '#/edit/production/' + prod.id }, 'Open the production – crew & setup ›') : null)),
       d.status === 'Accepted' && !prod && d.production ? h('p', { class: 'dim small' }, 'Production made: ' + d.production) : null),
+    (d.answers || []).length ? h('div', { class: 'card' }, h('h2', { style: { marginTop: 0 } }, 'What they need'),
+      h('table', { class: 'kv', style: { width: '100%', borderCollapse: 'collapse' } }, d.answers.map((x) => h('tr', {}, h('td', { class: 'dim', style: { padding: '5px 12px 5px 0', verticalAlign: 'top', width: '34%' } }, x.q), h('td', { style: { padding: '5px 0', whiteSpace: 'pre-wrap' } }, x.a))))) : null,
     (admin || mine) && App.cfg.mode === 'cloud' ? conversation(doc) : null];
   };
 

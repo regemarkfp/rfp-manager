@@ -493,32 +493,117 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       (l.services || []).length ? [el('h2', { class: 'sec' }, 'What we do'), el('div', { class: 'land-services' }, l.services.map((x) => el('a', { class: 'svc', href: '/book?service=' + encodeURIComponent(x.title), 'data-nav': '' }, el('b', {}, x.title), el('p', {}, x.text || ''), el('span', { class: 'more' }, 'Book ›'))))] : null,
       l.email || l.phone ? el('p', { class: 'land-contact' }, 'Contact us: ', l.email ? el('a', { href: 'mailto:' + l.email }, l.email) : null, l.email && l.phone ? ' · ' : '', l.phone ? el('a', { href: 'tel:' + l.phone.replace(/\s+/g, '') }, l.phone) : null) : null];
   }
+  // ---- the booking form (/book): what every quote needs, then questions for the kind of job (sport, church,
+  // wedding, conference, video & photos), so the team can quote without a round of questions first.
+  const SPORTS = ['Rugby', 'Cricket', 'Soccer', 'Hockey', 'Netball', 'Athletics', 'Tennis', 'Basketball', 'Volleyball', 'Water polo', 'Swimming', 'Squash', 'Padel', 'Golf', 'Other'];
+  const EVENT_TYPES = ['Church service', 'Wedding', 'Funeral / memorial', 'Concert / show', 'Conference / corporate', 'School event', 'Sport', 'Other'];
+  const kindOf = (service, type) => {
+    const s = String(service || '').toLowerCase();
+    if (/sport|match|broadcast/.test(s) || type === 'Sport') return 'sport';
+    if (/video|photo|film|highlight/.test(s)) return type === 'Wedding' || type === 'Funeral / memorial' ? 'family' : 'media';
+    if (type === 'Church service') return 'church';
+    if (type === 'Wedding' || type === 'Funeral / memorial') return 'family';
+    if (type) return 'event';
+    return '';
+  };
   async function bookPage(service) {
     let l;
     try { l = await landingData(); } catch (e) { return el('div', { class: 'empty' }, e.message); }
     document.title = 'Book services · ' + (l.site || 'RegemarkFP');
-    const f = { name: D.me ? D.me.name : '', email: D.me ? D.me.email : '', phone: '', organisation: '', service, date: '', venue: '', details: '', website: '' };
-    const input = (k, label, attrs = {}) => el('label', { class: 'fld' }, el('span', {}, label), el(attrs.rows ? 'textarea' : 'input', { ...attrs, value: f[k] || '', oninput: (e) => { f[k] = e.target.value; } }));
-    const opts = (l.services || []).map((x) => x.title);
-    const sel = el('select', { onchange: (e) => { f.service = e.target.value; } }, el('option', { value: '' }, 'Choose…'), opts.map((o) => el('option', { value: o, selected: o === service ? '' : null }, o)), el('option', { value: 'Something else' }, 'Something else'));
+    const f = { name: D.me ? D.me.name : '', email: D.me ? D.me.email : '', phone: '', organisation: '', service, date: '', endDate: '', startTime: '', endTime: '', venue: '', town: '', details: '', website: '', contactBy: 'WhatsApp', budget: '', heard: '' };
+    const A = {};                  // the answers to the questions for this kind of job: { question: answer }
+    let eventType = '';
+    const input = (k, label, attrs = {}) => el('label', { class: 'fld' + (attrs.wide ? ' wide' : '') }, el('span', {}, label), el(attrs.rows ? 'textarea' : 'input', { ...attrs, wide: null, value: f[k] || '', oninput: (e) => { f[k] = e.target.value; } }));
+    const select = (k, label, opts, attrs = {}) => el('label', { class: 'fld' + (attrs.wide ? ' wide' : '') }, el('span', {}, label), el('select', { onchange: (e) => { f[k] = e.target.value; } }, opts.map((o) => el('option', { value: o === 'Choose…' ? '' : o, selected: f[k] === o ? '' : null }, o))));
+    // a question for this kind of job (kept in A by its label)
+    const q = {
+      text: (label, ph = '', wide) => el('label', { class: 'fld' + (wide ? ' wide' : '') }, el('span', {}, label), el('input', { placeholder: ph, value: A[label] || '', oninput: (e) => { A[label] = e.target.value; } })),
+      num: (label, ph = '') => el('label', { class: 'fld' }, el('span', {}, label), el('input', { type: 'number', min: 0, placeholder: ph, value: A[label] || '', oninput: (e) => { A[label] = e.target.value; } })),
+      one: (label, opts, wide) => el('label', { class: 'fld' + (wide ? ' wide' : '') }, el('span', {}, label), el('select', { onchange: (e) => { A[label] = e.target.value; } }, ['Choose…', ...opts].map((o) => el('option', { value: o === 'Choose…' ? '' : o, selected: A[label] === o ? '' : null }, o)))),
+      many: (label, opts) => el('div', { class: 'fld wide' }, el('span', {}, label), el('div', { class: 'chips' }, opts.map((o) => {
+        const on = () => String(A[label] || '').split(', ').filter(Boolean).includes(o);
+        const b = el('button', { type: 'button', class: 'chip' + (on() ? ' on' : ''), onclick: () => { const cur = String(A[label] || '').split(', ').filter(Boolean); A[label] = (on() ? cur.filter((x) => x !== o) : [...cur, o]).join(', '); b.classList.toggle('on', on()); } }, o);
+        return b;
+      })))
+    };
+    const head = (t, sub) => el('div', { class: 'wide book-sec' }, el('h2', {}, t), sub ? el('p', { class: 'sub' }, sub) : null);
+    const coverage = () => [
+      head('What you need', 'Tick everything that applies. Not sure? Leave it and we will advise.'),
+      q.many('Deliverables', ['Live stream', 'Recording of the full event', 'Highlights video', 'Photos', 'Big screen / projection at the venue', 'Sound / PA']),
+      q.one('Cameras', ['Not sure – advise me', '1', '2', '3', '4', '5 or more']),
+      q.many('Stream to', [(l.site || 'RegemarkFP') + ' website', 'YouTube', 'Facebook', 'Our own website', 'Private link only', 'Paid tickets for viewers']),
+      q.one('Internet at the venue', ['Fibre / Wi-Fi we can use', 'Mobile signal only', 'None', 'Not sure']),
+      q.one('Power near the cameras', ['Yes', 'No', 'Not sure']),
+      q.one('Indoors or outdoors', ['Indoors', 'Outdoors', 'Both'])];
+    const parts = {
+      sport: () => [head('The sport', 'So we bring the right scoring, graphics and crew.'),
+        q.one('Sport', SPORTS), q.one('Level', ['Primary school', 'High school', 'Club', 'University', 'Provincial', 'Professional', 'Tournament / festival']),
+        q.text('Teams or age groups', 'e.g. 1st XV, U16A, Girls U14', true), q.text('Matches (who plays who)', 'e.g. Grey v Shimla, 15:00', true),
+        q.num('Number of matches', '1'), q.num('Fields or courts at the same time', '1'),
+        q.text('Competition or tournament', 'e.g. Wildeklawer, Craven Week'),
+        q.many('For the broadcast', ['Live score bug & match graphics', 'Commentary', 'Replays / slow motion', 'Line-ups & player stats', 'Sponsor adverts', 'Drone shots', 'Big screen at the venue', 'Match statistics for coaches', 'Highlights per match']),
+        q.text('Sponsors to show', 'Names of sponsors, if any', true)],
+      church: () => [head('The service'),
+        q.one('Kind of service', ['Sunday service', 'Special / holiday service', 'Conference', 'Youth service', 'Other']),
+        q.one('How often', ['Once', 'Every week', 'Every month', 'A series']),
+        q.many('On screen', ['Song lyrics', 'Bible verses', 'Names of speakers', 'Announcements', 'Sermon notes']),
+        q.many('Afterwards', ['Sermon archive on your channel', 'Clips for social media', 'Audio only (podcast)']),
+        q.text('Equipment you already have', 'Cameras, sound desk, projector…', true)],
+      family: () => [head('The occasion'),
+        q.num('Number of guests', ''), q.one('Coverage', ['Ceremony only', 'Ceremony and reception', 'The whole day', 'Service / memorial only']),
+        q.many('Deliverables for the family', ['Live stream for family far away', 'Private link only', 'Full ceremony film', 'Highlight film', 'Photos', 'USB / download of everything']),
+        q.text('Names (for titles on screen)', 'e.g. Anna & Jan, or In memory of …', true)],
+      event: () => [head('The event'),
+        q.num('Audience size', ''), q.num('Speakers or performers', ''), q.num('Sessions or rooms at the same time', '1'),
+        q.many('On the day', ['Slides / presentations on the stream', 'Remote speakers (hybrid)', 'Q&A / audience microphones', 'Names on screen (lower thirds)', 'Sponsor branding', 'Interviews', 'Several venues']),
+        q.text('Run sheet or programme', 'Link, or say if you will send it', true)],
+      media: () => [head('The video or photos'),
+        q.many('What you need', ['Highlights video', 'Promo / advert', 'Interviews', 'Event photos', 'Headshots / team photos', 'Social media clips', 'Drone footage']),
+        q.num('Hours of filming / shooting', ''), q.one('Final length of the video', ['Under 1 minute', '1–3 minutes', '3–10 minutes', 'Longer', 'Not sure']),
+        q.text('Needed by', 'Date you need the final files', false), q.text('Where it will be used', 'Website, Instagram, TV …', false)]
+    };
     const err = el('p', { class: 'err' });
     const box = el('div', { class: 'book' });
     const btn = el('button', { class: 'primary', type: 'submit' }, 'Send request');
+    const extra = el('div', { class: 'wide book-extra' });
+    const paintExtra = () => {
+      const kind = kindOf(f.service, eventType);
+      const needType = f.service && !/sport|match|broadcast/i.test(f.service);
+      extra.replaceChildren(el('div', { class: 'book-form inner' },
+        needType ? el('label', { class: 'fld wide' }, el('span', {}, 'What kind of event?'), el('select', { onchange: (e) => { eventType = e.target.value; paintExtra(); } }, ['Choose…', ...EVENT_TYPES].map((o) => el('option', { value: o === 'Choose…' ? '' : o, selected: eventType === o ? '' : null }, o)))) : null,
+        kind && parts[kind] ? parts[kind]() : null,
+        f.service && kind !== 'media' ? coverage() : null));
+    };
+    const opts = (l.services || []).map((x) => x.title);
+    const sel = el('select', { required: '', onchange: (e) => { f.service = e.target.value; paintExtra(); } }, el('option', { value: '' }, 'Choose…'), opts.map((o) => el('option', { value: o, selected: o === service ? '' : null }, o)), el('option', { value: 'Something else' }, 'Something else'));
     const form = el('form', { class: 'book-form', onsubmit: async (e) => {
       e.preventDefault(); btn.disabled = true; err.textContent = '';
-      try { if (form.querySelector('textarea')) f.details = form.querySelector('textarea').value; const r = await post('/api/public/booking', f);
+      const answers = Object.entries({ ...(eventType ? { 'Kind of event': eventType } : {}), ...A }).filter(([, v]) => String(v || '').trim()).map(([q2, a]) => ({ q: q2, a: String(a) }));
+      try { const r = await post('/api/public/booking', { ...f, details: form.querySelector('textarea.details').value, answers });
         box.replaceChildren(el('h1', {}, 'Thank you'), el('p', { class: 'sub' }, 'We have your request and will be in touch soon.' + (f.email ? ' A copy is on its way to ' + f.email + ', with the link to follow your booking.' : '')),
           r && r.track ? el('p', {}, el('a', { class: 'btn-big', href: r.track, 'data-nav': '' }, 'Follow your booking ›'), ' ', el('span', { class: 'sub' }, 'Keep this link: it shows where your booking stands, and you can send us a message there.')) : null,
           el('a', { class: 'btn-big', href: '/', 'data-nav': '' }, 'Back to the home page'));
+        window.scrollTo(0, 0);
       } catch (x) { err.textContent = x.message; btn.disabled = false; }
     } },
-      input('name', 'Your name *', { required: '', autocomplete: 'name' }), input('organisation', 'Organisation / club / church', { autocomplete: 'organization' }),
+      head('You'),
+      input('name', 'Your name *', { required: '', autocomplete: 'name' }), input('organisation', 'Organisation / club / school / church', { autocomplete: 'organization' }),
       input('email', 'Email', { type: 'email', autocomplete: 'email' }), input('phone', 'Phone (WhatsApp)', { type: 'tel', autocomplete: 'tel' }),
-      el('label', { class: 'fld' }, el('span', {}, 'Service'), sel), input('date', 'Date of the event', { type: 'date' }), input('venue', 'Where', {}),
-      el('label', { class: 'fld wide' }, el('span', {}, 'Tell us about it'), el('textarea', { rows: 5, placeholder: 'What is the event, how many cameras or what you would like streamed, graphics, anything else…' })),
+      select('contactBy', 'Best way to reach you', ['WhatsApp', 'Email', 'Phone call']),
+      head('The event'),
+      el('label', { class: 'fld' }, el('span', {}, 'Service *'), sel), input('date', 'Date *', { type: 'date', required: '' }),
+      input('startTime', 'Starts at', { type: 'time' }), input('endTime', 'Ends at', { type: 'time' }),
+      input('endDate', 'Last day (if more than one day)', { type: 'date' }),
+      input('venue', 'Venue', { placeholder: 'e.g. Grey College, B-field' }), input('town', 'Town / city', { placeholder: 'e.g. Bloemfontein' }),
+      extra,
+      head('Anything else'),
+      select('budget', 'Budget (helps us quote the right package)', ['Not sure', 'Under R5 000', 'R5 000 – R10 000', 'R10 000 – R25 000', 'R25 000 – R50 000', 'Over R50 000']),
+      select('heard', 'How did you hear about us?', ['Choose…', 'Google', 'Facebook / Instagram', 'Recommended by someone', 'Saw us at an event', 'Booked before', 'Other']),
+      el('label', { class: 'fld wide' }, el('span', {}, 'Tell us more'), el('textarea', { class: 'details', rows: 4, placeholder: 'Anything we should know: the programme, special requests, links …' })),
       el('input', { class: 'hp', name: 'website', tabindex: '-1', autocomplete: 'off', oninput: (e) => { f.website = e.target.value; } }),
       err, el('div', { class: 'wide' }, btn));
-    box.append(el('h1', {}, 'Book services'), el('p', { class: 'sub' }, 'Tell us about your event and we will get back to you with a quote.'), form);
+    paintExtra();
+    box.append(el('h1', {}, 'Book services'), el('p', { class: 'sub' }, 'Tell us about your event and we will get back to you with a quote. The more you fill in, the faster and more accurate it is.'), form);
     return box;
   }
 
