@@ -1004,6 +1004,26 @@ Render (Environment), or on your own server in `/etc/rfp-manager/env`:
 * **SMTP** (your own server only; Render's free plan blocks mail ports): `SMTP_URL=smtps://user:password@smtp.host:465`
   and `MAIL_FROM`. With Google Workspace use smtp.gmail.com with an app password.
 
+### The booking form (/book)
+
+One page, in sections: **You** (name, organisation, email, WhatsApp number, best way to reach them), **The event**
+(service, date and last day, start and end time, venue and town), questions for **the kind of job**, **What you need**
+(deliverables, cameras, where to stream, internet and power at the venue, indoors or outdoors) and **Anything else**
+(budget band, how they heard of you, notes). The job questions follow the service and the kind of event:
+
+* **Sport broadcasts:** the sport, level, teams or age groups, the matches, how many matches and fields at once, the
+  competition, what the broadcast needs (score bug and graphics, commentary, replays, line-ups and stats, sponsor
+  adverts, drone, big screen, stats for coaches, highlights per match) and sponsors.
+* **Church service:** kind of service, how often, what goes on screen (lyrics, Bible verses, names), what happens
+  afterwards (sermon archive, clips, podcast) and their own equipment.
+* **Wedding / funeral:** guests, coverage, what the family receives, names for titles.
+* **Conference, concert, school event:** audience, speakers, rooms at once, slides, hybrid speakers, Q&A, lower thirds,
+  sponsor branding, the programme.
+* **Video & photography:** what is needed, hours, final length, deadline and where it will be used.
+
+The answers are on the booking (*What they need*), in the email to the Admins and the client's copy, and in the
+description of the production made when a Producer accepts it (its TX time is the start time).
+
 ### Booking requests: tracking and messages (email + WhatsApp)
 
 Every booking request from the website gets its own private page, **/track/<key>**, like a parcel. The link is shown
