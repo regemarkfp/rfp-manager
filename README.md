@@ -955,7 +955,8 @@ Buttons, text fields, cards, panels, chat bubbles and video thumbnails everywher
 Settings → Members (Admins). Adding someone emails them an invitation: **Accept the invitation** opens `/join/<link>`,
 where they set their own password (no Google account needed) and go straight into the team, or they sign in with Google
 using that email. The link works for 14 days and stops working once they have a password or are removed; **Send invite**
-on their row emails a fresh one.
+on their row emails a fresh one. When someone accepts, the team's Admins get a notification (app, browser and inbox) and an email
+(switch it off under Settings → Notifications → "someone accepts their invitation").
 
 Phone numbers (booking form, crew, bookings, call sheets, My account) have a country picker and are saved with the code,
 e.g. `+27 82 123 4567`. A number typed with a 0 gets the default code: the WhatsApp country (Settings → Server →
