@@ -427,6 +427,8 @@
     App.unread = n;
     const a = document.querySelector('.nav a[href="#/notifications"]');
     if (a) a.textContent = 'Notifications' + (n ? ` (${n})` : '');
+    const bell = document.querySelector('.appbar a[href="#/notifications"]');      // the Android app's bell
+    if (bell) { const b = bell.querySelector('.badge'); if (b) b.remove(); if (n) bell.append(h('span', { class: 'badge' }, n > 99 ? '99+' : String(n))); }
   };
   setInterval(() => { if (App.cfg && App.cfg.mode === 'cloud' && App.me && !document.hidden && window.RFPNotifyUI) window.RFPNotifyUI.unread().then(window.rfpUnread); }, 60000);
   setTimeout(() => { if (App.cfg && App.cfg.mode === 'cloud' && App.me && window.RFPNotifyUI) window.RFPNotifyUI.unread().then(window.rfpUnread); }, 3000);
