@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>RegemarkFP · Superuser</title>
+  <link rel="icon" type="image/png" href="/icons/favicon-64.png">
+  <style>
+    :root { --bg: #0f0f0f; --card: #1a1a1a; --line: #2c2c2c; --txt: #ececec; --dim: #9a9a9a; --acc: #00ff82; --bad: #ff5c5c; --warn: #ffb648; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--txt); font: 15px/1.45 "Segoe UI", Roboto, Arial, sans-serif; }
+    header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); }
+    header img { height: 30px; }
+    header .grow { flex: 1; font-weight: 600; }
+    main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 60px; }
+    h1 { font-size: 22px; margin: 0 0 14px; } h2 { font-size: 17px; margin: 0 0 12px; }
+    .card { background: var(--card); border: 1px solid var(--line); padding: 16px 18px; margin-bottom: 16px; clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%); }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+    .tile { background: #222; padding: 10px 14px; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
+    .tile b { display: block; font-size: 20px; } .tile span { color: var(--dim); font-size: 13px; }
+    .ok { color: var(--acc); } .bad { color: var(--bad); } .warn { color: var(--warn); } .dim { color: var(--dim); } .small { font-size: 13px; }
+    input { width: 100%; padding: 10px 12px; margin: 4px 0 12px; background: #111; color: var(--txt); border: 1px solid var(--line); font: inherit; clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
+    button, .btn { display: inline-block; padding: 9px 20px; background: var(--acc); color: #000; border: 0; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
+    button.ghost, .btn.ghost { background: #2a2a2a; color: var(--txt); }
+    button:disabled { opacity: .5; }
+    .login { max-width: 380px; margin: 60px auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--dim); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+    td.n, th.n { text-align: right; white-space: nowrap; }
+    .scroll { overflow-x: auto; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .msg { margin: 8px 0; } a { color: var(--acc); }
+    .pill { display: inline-block; padding: 1px 8px; background: #2a2a2a; font-size: 12px; margin: 0 4px 4px 0; }
+  </style>
+</head>
+<body>
+  <header><img src="/brand/rfp-logo-sm.png" alt="RFP"><div class="grow">Superuser</div><div id="who" class="small dim"></div></header>
+  <main id="main"><p class="dim">Loading…</p></main>
+  <script src="/js/super.js"></script>
+</body>
+</html>
