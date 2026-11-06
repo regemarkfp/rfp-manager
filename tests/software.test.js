@@ -43,6 +43,12 @@ test('software: GitHub releases copied here, pages, downloads, paid apps, update
   assert.equal((await admin.post('/api/software', { name: 'Replay', repo: 'not a repo' })).status, 400);
   const saved = await admin.post('/api/software', { name: 'Regemark Replay', tagline: 'Replay for live sport', repo: 'regemarkfp/regemark-replay', description: 'EVS-style replay.' });
   assert.equal(saved.status, 200, JSON.stringify(saved.data));
+  // an app icon (an uploaded image) is kept and shown on the public list; anything else is not an icon
+  const withIcon = await admin.post('/api/software', { ...saved.data.product, id: 'product_regemark-replay', logo: 'img_icon1' });
+  assert.equal(withIcon.data.product.logo, 'img_icon1');
+  assert.equal((await anon.get('/api/public/software')).data.list.find((x) => x.slug === 'regemark-replay').logo, 'img_icon1');
+  assert.equal((await admin.post('/api/software', { ...saved.data.product, id: 'product_regemark-replay', logo: 'javascript:x' })).data.product.logo, '');
+  await admin.post('/api/software', { ...saved.data.product, id: 'product_regemark-replay', logo: 'img_icon1' });
   const sync = (await admin.post('/api/software/regemark-replay/sync', {})).data;
   assert.deepEqual(sync, { releases: 1, copied: 2 }, 'betas left out; installers only');
   assert.equal((await admin.post('/api/software/regemark-replay/sync', {})).data.copied, 0, 'nothing copied twice');
