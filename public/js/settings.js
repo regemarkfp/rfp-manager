@@ -293,6 +293,7 @@
       const form = h('div', { class: 'form' },
         ...[['name', 'Name', 'Regemark Replay'], ['slug', 'Web address (/software/…)', 'regemark-replay'], ['tagline', 'One line', 'Replay and ISO recording for live sport'], ['repo', 'GitHub repository (owner/name)', 'regemarkfp/regemark-replay']]
           .map(([k, l, ph]) => h('label', { class: 'f' }, h('span', {}, l), h('input', { value: f[k] || '', placeholder: ph, oninput: (e) => { f[k] = e.target.value; } }))),
+        h('div', { class: 'f' }, h('div', { class: 'flabel' }, 'App icon'), imageField(f.logo || '', (v) => { f.logo = v; }, 'logo'), h('div', { class: 'help' }, 'Square PNG, SVG or WebP, 256×256 or larger. Shows on /software and the app\'s page; empty = its first letter.')),
         h('label', { class: 'f wide' }, h('span', {}, 'Description'), h('textarea', { rows: 5, oninput: (e) => { f.description = e.target.value; } }, f.description || '')),
         h('label', { class: 'f' }, h('span', {}, 'Price (ZAR, 0 = free)'), h('input', { type: 'number', min: 0, value: f.price || 0, oninput: (e) => { f.price = Number(e.target.value) || 0; } }), h('div', { class: 'help' }, 'Paid apps cannot be downloaded until buying is switched on, except by the emails below.')),
         h('label', { class: 'f' }, h('span', {}, 'Who may download a paid app now (emails)'), h('textarea', { rows: 2, oninput: (e) => { f.access = e.target.value.split(/[\s,;]+/).filter(Boolean); } }, (f.access || []).join('\n'))),
@@ -305,6 +306,7 @@
       box.replaceChildren(h('div', { class: 'spread' }, h('h2', {}, 'Software on the website'), h('button', { class: 'primary', onclick: () => edit(null) }, '+ Add an app')),
         h('p', { class: 'dim', style: { marginTop: 0 } }, `Publish a release on GitHub as usual: the website copies its installers (.exe, .msi, .dmg, .pkg, .AppImage, .deb, .rpm …) to ${r.folder} every 6 hours (or now, with Sync) and serves them at /software.`),
         r.list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {}, r.list.map((p) => { const rel = p.releases[0]; return h('tr', {},
+          h('td', { style: { width: '48px' } }, p.logo ? h('img', { src: '/media/' + p.logo, alt: '', style: { width: '40px', height: '40px', borderRadius: '9px', objectFit: 'cover', display: 'block' } }) : h('span', { style: { width: '40px', height: '40px', borderRadius: '9px', background: 'var(--accent)', color: '#111', display: 'grid', placeItems: 'center', fontWeight: 700 } }, String(p.name || '?').slice(0, 1))),
           h('td', {}, h('b', {}, p.name), p.visible === false ? h('span', { class: 'pill', style: { marginLeft: '6px' } }, 'hidden') : null, h('div', { class: 'dim small' }, p.repo || 'no repository'), h('div', { class: 'dim small' }, `/software/${p.slug}`)),
           h('td', { class: 'small' }, rel ? `v${rel.version} · ${rel.assets.length} file${rel.assets.length === 1 ? '' : 's'}` : 'no release yet', h('div', { class: 'dim small' }, `synced ${when(p.synced)} · ${p.downloads} download${p.downloads === 1 ? '' : 's'}`)),
           h('td', { class: 'small' }, p.price ? 'R ' + p.price : 'Free'),
