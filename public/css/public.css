@@ -246,3 +246,13 @@ button.dl { border: 0; font: inherit; cursor: pointer; }
 .aspects { display: grid; gap: 4px; } .aspect { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--dim); }
 .reviews { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 12px; }
 .review { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; } .review p { margin: 8px 0; line-height: 1.5; }
+
+/* RegemarkFP look: buttons slanted like the RFP logo (round icon buttons, the search button and stars stay as they are) */
+:root { --slant: 8px; }
+button, .btn-big, .dl { border-radius: 2px; clip-path: polygon(var(--slant) 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%); padding-left: calc(16px + var(--slant) * .6); padding-right: calc(16px + var(--slant) * .6); }
+button.sm, .alerts button.sm, button.follow.sm { --slant: 6px; }
+.btn-big { --slant: 11px; border-radius: 2px; }
+button.icon, .icon, .search button, .stars.pick button, .chip, button.chip, .noslant { clip-path: none; }
+button.icon, .icon { padding: 6px 10px; border-radius: 50%; } .search button { padding: 8px 18px; border-radius: 0 20px 20px 0; } .stars.pick button { padding: 0 2px; }
+button:focus-visible, .btn-big:focus-visible, .dl:focus-visible { outline: none; box-shadow: inset 0 -3px 0 var(--accent), inset 0 3px 0 var(--accent); }
+.me .studio { border: 0; background: var(--panel2); } .me .studio:hover { background: #3a3a3a; }
