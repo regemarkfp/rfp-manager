@@ -1049,6 +1049,10 @@ Received → Being reviewed → Quote sent → Confirmed → Crew booked → Eve
   ticks (sent, delivered, read). The client answers on the tracking page or on WhatsApp; the answer appears on the
   booking and the Producer (or the Admins when nobody is allocated) gets an email and a notification.
 * **Copy tracking link** and **What the client sees ↗** are on the booking.
+* **The way the client talks to you decides the channel.** A client whose last message came by WhatsApp, or who chose
+  WhatsApp on the form, is written to on WhatsApp only (replies and step updates; email only if WhatsApp fails, marked
+  "instead of WhatsApp"). One who chose email gets email only. Otherwise both. The reply box ticks Email / WhatsApp to
+  match, and you can tick the other to send it there too.
 
 **WhatsApp (Settings → Server → WhatsApp, site admins)** works one of two ways.
 
