@@ -25,7 +25,7 @@ test('email notifications: added to a team, booked, officiating, expenses, resul
   await admin.post('/api/members?team=' + team, { email: 'ref@example.com', role: 'Official', officialName: 'Ref One' });
   await admin.post('/api/members?team=' + team, { email: 'coach@example.com', role: 'Coach', clubs: ['club_che'] });
   const welcome = (await mails('crew@example.com'))[0];
-  assert.match(welcome.subject, /added to RegemarkFP/);
+  assert.match(welcome.subject, /invited to RegemarkFP/);
   assert.match(welcome.text, /Admin A added you as Crew/);
   assert.match(welcome.html, /https:\/\/rfp\.example\//);
   await admin.post('/api/members?team=' + team, { email: 'crew@example.com', role: 'Scorer' });

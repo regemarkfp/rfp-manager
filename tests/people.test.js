@@ -111,6 +111,6 @@ test('coaches, officials, and expenses with receipts', async (t) => {
   assert.equal(prof.status, 200);
   assert.equal((await ref.post('/api/me', { name: 'Ref One', phone: '082 000 0000', image: prof.data.doc.id })).status, 200);
   const me = (await ref.get('/api/me')).data.user;
-  assert.equal(me.phone, '082 000 0000');
+  assert.equal(me.phone, '+27 82 000 0000', 'saved with the country code');
   assert.equal(me.image, prof.data.doc.id);
 });
