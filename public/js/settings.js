@@ -60,21 +60,22 @@
           h('td', {}, admin ? h('select', { style: { width: '140px' }, onchange: async (e) => { if (['Coach', 'Official'].includes(e.target.value)) return roleDetails({ ...m, data: { ...m.data, role: e.target.value } }, paint); try { await api('POST', '/api/members?team=' + App.team, { email: m.data.email, name: m.data.name, role: e.target.value }); toast('Role changed'); } catch (err) { oops(err); paint(); } } }, Schema.ROLES.map((r) => h('option', { selected: r === m.data.role }, r))) : m.data.role),
           h('td', { class: 'nowrap small' }, m.data.role === 'Coach' ? (m.data.clubs || []).map((c) => App.title('club', c)).join(', ') || h('span', { class: 'pill warn' }, 'no club yet') : m.data.role === 'Official' ? 'Named as: ' + (m.data.officialName || m.data.name || '—') : '',
             admin && ['Coach', 'Official'].includes(m.data.role) ? h('button', { class: 'sm ghost', style: { marginLeft: '6px' }, onclick: () => roleDetails(m, paint) }, 'Change') : null),
-          h('td', { class: 'r' }, admin ? h('button', { class: 'sm ghost danger', onclick: async () => { if (await confirmBox(`Remove ${m.data.email} from this production team?`, 'Remove')) { try { await api('DELETE', `/api/members/${m.id}?team=${App.team}`); App.docs.delete(m.id); paint(); } catch (err) { oops(err); } } } }, 'Remove') : null)))))));
+          h('td', { class: 'r nowrap' }, admin && !local && m.data.email !== App.me.email ? h('button', { class: 'sm ghost', title: 'Email them a new invitation link (14 days): they set a password or use Google', onclick: async (e) => { e.target.disabled = true; try { const r = await api('POST', `/api/members/${m.id}/invite?team=${App.team}`, {}); toast('Invitation sent to ' + r.sent); } catch (err) { oops(err); } e.target.disabled = false; } }, 'Send invite') : null,
+            admin ? h('button', { class: 'sm ghost danger', onclick: async () => { if (await confirmBox(`Remove ${m.data.email} from this production team?`, 'Remove')) { try { await api('DELETE', `/api/members/${m.id}?team=${App.team}`); App.docs.delete(m.id); paint(); } catch (err) { oops(err); } } } }, 'Remove') : null)))))));
     };
     paint();
     const f = { email: '', name: '', role: 'Scorer', password: '' };
     return h('div', { class: 'stack' }, h('div', { class: 'card' }, h('h2', {}, 'Members'), list,
       h('p', { class: 'help' }, 'Admin: everything, including members and settings. Producer: productions, crew, bookings, costing and every record. Scorer: score matches and control graphics. Crew: view, and add their expenses with receipts. Coach: their own clubs, teams, players and team sheets. Official: the matches they are named on, and confirming results.')),
     admin ? h('div', { class: 'card' }, h('h2', {}, 'Add someone'), h('div', { class: 'form' },
-      h('label', { class: 'f' }, h('span', {}, 'Email (their Google account)'), h('input', { type: 'email', oninput: (e) => { f.email = e.target.value; } })),
+      h('label', { class: 'f' }, h('span', {}, local ? 'Email (their Google account)' : 'Email'), h('input', { type: 'email', oninput: (e) => { f.email = e.target.value; } })),
       h('label', { class: 'f' }, h('span', {}, 'Name'), h('input', { oninput: (e) => { f.name = e.target.value; } })),
       h('label', { class: 'f' }, h('span', {}, 'Role'), h('select', { onchange: (e) => { f.role = e.target.value; } }, Schema.ROLES.map((r) => h('option', { selected: r === f.role }, r)))),
       local ? h('label', { class: 'f' }, h('span', {}, 'Password (optional, for signing in without internet)'), h('input', { type: 'password', autocomplete: 'new-password', oninput: (e) => { f.password = e.target.value; } })) : null),
-    h('p', { class: 'help' }, local ? 'They can sign in with Google using this email, or with the password you set here.' : 'They sign in with Google using this email and will see this production team straight away.'),
+    h('p', { class: 'help' }, local ? 'They can sign in with Google using this email, or with the password you set here.' : 'They get an email invitation: Accept sets their own password (no Google account needed), or they sign in with Google using this email. Send invite on their row sends a new link.'),
     h('button', { class: 'primary', style: { marginTop: '10px' }, onclick: async () => {
       if (['Coach', 'Official'].includes(f.role)) return roleDetails({ data: { email: f.email, name: f.name, role: f.role } }, () => route());
-      try { const r = await api('POST', '/api/members?team=' + App.team, f); App.docs.set(r.doc.id, r.doc); toast('Member added'); route(); } catch (e) { oops(e); }
+      try { const r = await api('POST', '/api/members?team=' + App.team, f); App.docs.set(r.doc.id, r.doc); toast(local || !App.cfg.mail ? 'Member added' : 'Member added and invited by email'); route(); } catch (e) { oops(e); }
     } }, 'Add member')) : null);
   }
 
@@ -121,7 +122,7 @@
     return h('div', { class: 'card' }, h('h2', {}, 'My account'), h('p', {}, h('b', {}, App.me.email), App.me.google ? h('span', { class: 'pill ok', style: { marginLeft: '8px' } }, 'Google') : null, App.me.hasPassword ? h('span', { class: 'pill', style: { marginLeft: '8px' } }, 'Password set') : null),
       linked ? h('p', { class: 'dim' }, 'This machine is linked to the website, so your name and sign-in are managed there and synced down.') : h('div', {}, h('div', { class: 'form' },
         h('label', { class: 'f' }, h('span', {}, 'Name'), h('input', { value: f.name, oninput: (e) => { f.name = e.target.value; } })),
-        h('label', { class: 'f' }, h('span', {}, 'Phone'), h('input', { type: 'tel', value: f.phone, oninput: (e) => { f.phone = e.target.value; } })),
+        h('label', { class: 'f' }, h('span', {}, 'Phone'), Phone.input(f.phone, (v) => { f.phone = v; }, { make: h, dial: App.cfg.dial })),
         App.cfg.mail ? h('label', { class: 'row', style: { gap: '8px', gridColumn: '1 / -1' } }, h('input', { type: 'checkbox', checked: !f.emailOff, onchange: (e) => { f.emailOff = !e.target.checked; } }), 'Email me: when I am hired (with the call sheet), matches I officiate, results of my teams, expenses') : null,
         App.cfg.mail ? h('label', { class: 'row', style: { gap: '8px', gridColumn: '1 / -1' } }, h('input', { type: 'checkbox', checked: !f.emailNoNew, onchange: (e) => { f.emailNoNew = !e.target.checked; } }), 'Email me when a new production is added to my team\'s calendar') : null,
         h('div', { class: 'f' }, h('span', { class: 'flabel' }, 'Picture'), h('div', { class: 'row', style: { gap: '10px' } }, App.avatar(App.me.image, App.me.name || App.me.email, 48), h('span', { class: 'dim small' }, App.me.google ? 'Your Google profile picture. Change it in your Google account; it updates here the next time you sign in.' : 'Sign in with Google to use your Google profile picture.'))),

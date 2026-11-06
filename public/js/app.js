@@ -388,6 +388,7 @@ function fieldInput(f, value, onChange, ctx = {}) {
         !known && value ? h('option', { value, selected: true }, value) : null,
         ms.map((m) => h('option', { value: m.data.email, selected: m.data.email === value }, (m.data.name || m.data.email) + ' (' + m.data.role + ')')));
     }
+    case 'phone': return Phone.input(value, onChange, { make: h, dial: App.cfg.dial, readonly: f.readonly });
     case 'image': return imageField(value, onChange, f.k);
     case 'list': return listField(f, value, onChange, ctx);
     default: return h('input', { value: value === undefined || value === null ? '' : value, placeholder: ph, readonly: f.readonly || null, oninput: (e) => onChange(e.target.value) });

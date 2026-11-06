@@ -579,7 +579,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     } },
       head('You'),
       el('label', { class: 'fld' }, el('span', {}, 'Your name *'), el('input', { required: '', autocomplete: 'name', value: f.name, oninput: (e) => { f.name = e.target.value; } })),
-      input('organisation', 'Organisation', { autocomplete: 'organization' }), input('email', 'Email', { type: 'email', autocomplete: 'email' }), input('phone', 'Phone', { type: 'tel', autocomplete: 'tel' }),
+      input('organisation', 'Organisation', { autocomplete: 'organization' }), input('email', 'Email', { type: 'email', autocomplete: 'email' }), on('phone') ? el('label', { class: 'fld' }, el('span', {}, label('phone', 'Phone') + star('phone')), Phone.input(f.phone, (v) => { f.phone = v; }, { make: el, dial: l.dial, required: C.phone && C.phone.req })) : null,
       pick('contactBy', 'Best way to reach you', C.contactBy ? C.contactBy.opts : []),
       head('The event'),
       el('label', { class: 'fld' }, el('span', {}, 'Service *'), sel), input('date', 'Date', { type: 'date' }),
