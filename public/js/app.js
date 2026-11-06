@@ -342,6 +342,19 @@ function route() {
   // on a phone the tab rows scroll sideways: keep the chosen tab in view
   app.querySelectorAll('.tabs').forEach((t) => { const on = t.querySelector('.on'); if (on && t.scrollWidth > t.clientWidth) t.scrollLeft = on.offsetLeft - t.offsetLeft - 16; });
   if (page.keepScroll) window.scrollTo(0, y); else window.scrollTo(0, 0);
+  if (!offerApp.done) { offerApp.done = true; setTimeout(offerApp, 1200); }
+}
+// an Admin on an Android phone's browser (not in the app): offer the app once, again after 14 days if they said Not now
+const APP_OFFER = { phone: () => /Android/i.test(navigator.userAgent) && /Mobile/i.test(navigator.userAgent) && !/; wv\)|RFPManager/.test(navigator.userAgent),
+  due: () => { try { return Date.now() - Number(localStorage.getItem('rfp-app-offer') || 0) > 14 * 86400e3; } catch (e) { return true; } },
+  later: () => { try { localStorage.setItem('rfp-app-offer', String(Date.now())); } catch (e) { /* asked again next time */ } } };
+function offerApp() {
+  if (ANDROID || !APP_OFFER.phone() || !App.cfg.androidApp || !(App.teams || []).some((t) => t.role === 'Admin') || !APP_OFFER.due()) return;
+  modal({ title: 'Get the RFP Manager app', body: h('div', {},
+    h('img', { src: '/brand/rfp-logo-sm.png', alt: '', style: { height: '40px', marginBottom: '10px' } }),
+    h('p', { style: { marginTop: 0 } }, 'Run your productions from the Android app: tabs at the bottom, push notifications for bookings, crew and matches, and Google sign-in that stays signed in.'),
+    h('p', { class: 'dim small' }, 'After downloading, open the file and allow installing from your browser if Android asks.')),
+  actions: [{ label: 'Not now', onClick: APP_OFFER.later }, { label: '⬇ Download the app', primary: true, onClick: () => { APP_OFFER.later(); location.href = '/app/rfp-manager.apk'; } }] });
 }
 window.addEventListener('hashchange', () => { if (App.me && App.team) route(); });
 App.pages.notfound = () => ({ el: h('div', { class: 'card' }, 'That page does not exist. ', h('a', { href: '#/' }, 'Go to the dashboard')) });

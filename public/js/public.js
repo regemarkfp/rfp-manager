@@ -722,6 +722,23 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     if (sp.get('signin') === '1') { if (D.me && backTo) { location.replace(backTo); return; } if (!D.me) signIn(); }
     if (sp.has('signin')) { sp.delete('signin'); sp.delete('next'); history.replaceState(null, '', location.pathname + (sp.toString() ? '?' + sp : '')); }
     render();
+    setTimeout(offerApp, 1500);
+  }
+  // an Admin on an Android phone's browser (not in the app): offer the app once, again after 14 days if they said Not now
+  function offerApp() {
+    const ua = navigator.userAgent;
+    if (!D || !D.me || !D.me.admin || !D.androidApp || !/Android/i.test(ua) || !/Mobile/i.test(ua) || /; wv\)|RFPManager/.test(ua) || document.getElementById('app-offer')) return;
+    try { if (Date.now() - Number(localStorage.getItem('rfp-app-offer') || 0) < 14 * 86400e3) return; } catch (e) { /* ask */ }
+    const later = () => { try { localStorage.setItem('rfp-app-offer', String(Date.now())); } catch (e) { /* asked again next time */ } };
+    const close = () => { later(); wrap.remove(); };
+    const wrap = el('div', { id: 'app-offer', class: 'modal', onclick: (e) => { if (e.target === wrap) close(); } },
+      el('div', { class: 'modal-box' }, el('button', { class: 'icon x', onclick: close, 'aria-label': 'Close' }, '✕'),
+        el('img', { src: '/brand/rfp-logo-sm.png', alt: '', style: { height: '34px' } }), el('h2', {}, 'Get the RFP Manager app'),
+        el('p', { class: 'sub' }, 'Run your productions from the Android app: push notifications for bookings, crew and matches, and Google sign-in that stays signed in.'),
+        el('p', {}, el('a', { class: 'btn-big primary', href: '/app/rfp-manager.apk', download: 'rfp-manager.apk', onclick: () => { later(); setTimeout(() => wrap.remove(), 300); } }, '⬇ Download the app')),
+        el('p', { class: 'sub small' }, 'After downloading, open the file and allow installing from your browser if Android asks.'),
+        el('button', { onclick: close }, 'Not now')));
+    document.body.append(wrap);
   }
   load();
   setInterval(async () => { try { D = await get('/api/public/home'); if (!/^\/(c|match|team|software|client|player|track)\//.test(location.pathname) && !['/', '/book', '/teams', '/following', '/notifications', '/software'].includes(location.pathname)) render(); } catch (e) { /* next time */ } }, 30000);   // live now / viewers
