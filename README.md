@@ -1054,6 +1054,19 @@ Received → Being reviewed → Quote sent → Confirmed → Crew booked → Eve
   "instead of WhatsApp"). One who chose email gets email only. Otherwise both. The reply box ticks Email / WhatsApp to
   match, and you can tick the other to send it there too.
 
+**Ratings after the event.** When a booking reaches *Completed*, the client's message asks them to rate it, with a
+link straight to the rating on their tracking page (and one reminder three days later if they have not). They give
+1–5 stars overall and for quality, communication, punctuality and setup, and value for money, a comment, and say
+whether you may show it on the website (and under what name). The team gets an email and a notification; the rating
+is on the booking and on **Productions → Ratings** (averages and every rating). Reviews clients allowed show under
+*What clients say* on the home page (hide one from the booking; switch them all off in Settings → Website).
+
+Google does not let a website post a review for someone, so after rating, clients get a **Share it on Google too**
+button that opens your Google review page, where they post it themselves (the home page has *Review us on Google*).
+Put your link in Settings → Website → *Google review link*: Google Business Profile → *Ask for reviews* → copy the link
+(a Place ID starting ChIJ works too). Every client gets the button, whatever they rated: Google does not allow asking
+only happy clients.
+
 **WhatsApp (Settings → Server → WhatsApp, site admins)** works one of two ways.
 
 *Link my WhatsApp (phone)*: the business's own WhatsApp is linked to the website the way WhatsApp Web is, with a QR
