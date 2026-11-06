@@ -260,7 +260,7 @@
       { k: 'active', l: 'In use', t: 'bool', def: true, help: 'Off: kept for old documents but not offered on new ones.' }, { k: 'notes', l: 'Private notes', t: 'textarea' }] },
     advert: { label: 'Advert', plural: 'Adverts', group: 'Advertising', title: (d) => [d.name, d.sponsor].filter(Boolean).join(' · '), cols: ['image', 'name', 'sponsor', 'layout', 'duration'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'sponsor', l: 'Sponsor / client', t: 'text' }, { k: 'client', l: 'Client', t: 'ref', ref: 'client', help: 'Clients load their own adverts from their portal; they show here as Pending.' },
-      { k: 'approval', l: 'Approval', t: 'select', opts: ['Approved', 'Pending', 'Rejected'], def: 'Approved', help: 'Adverts loaded by a client from their portal wait for your approval; only Approved adverts play.' }, { k: 'slot', l: 'Ad space', t: 'ref', ref: 'adSlot' }, { k: 'sponsorEmail', l: 'Sponsor email (proof of play)', t: 'text', ph: 'marketing@sponsor.example', help: 'Gets the monthly proof-of-play report (Advertising → Sponsor reports).' },
+      { k: 'approval', l: 'Approval', t: 'select', opts: ['Approved', 'Pending', 'Rejected'], def: 'Approved', help: 'Adverts loaded by a client from their portal wait for your approval; only Approved adverts play.' }, { k: 'slot', l: 'Ad space', t: 'ref', ref: 'adSlot' }, { k: 'sponsorEmail', l: 'Sponsor email (proof of play)', t: 'text', ph: 'marketing@sponsor.example', help: 'Gets the monthly proof-of-play report (Adverts & sponsors → Sponsor reports).' },
       { k: 'kind', l: 'Kind', t: 'select', opts: ['Image', 'CasparCG clip'], def: 'Image' },
       { k: 'image', l: 'Image', t: 'image' }, { k: 'clip', l: 'CasparCG clip name', t: 'text', ph: 'ADS/SPONSOR_30', help: 'A video in CasparCG\'s media folder. Used when Kind is "CasparCG clip".' },
       { k: 'layout', l: 'Layout', t: 'select', opts: ['Full screen', 'Lower banner', 'Corner bug', 'Side panel', 'Custom position'], def: 'Full screen' },
@@ -289,7 +289,7 @@
     dashboard: { label: 'Dashboard', plural: 'Dashboards', group: 'Live', title: (d) => d.name, cols: ['name', 'notes'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true, ph: 'Rugby desk / Sponsor board / Tablet for the floor manager' },
       { k: 'notes', l: 'Notes', t: 'textarea' }] },
-    // custom values for a sport, a competition or one match ({var_attendance}, {var_man_of_the_match} …): Live → Variables & triggers
+    // custom values for a sport, a competition or one match ({var_attendance}, {var_man_of_the_match} …): Live & graphics → Variables & triggers
     variable: { label: 'Variable', plural: 'Variables', group: 'Live', hidden: true, title: (d) => d.name || d.key, cols: ['name', 'key', 'scope'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'key', l: 'Key', t: 'text' }, { k: 'notes', l: 'Notes', t: 'textarea' }] },
     // when something happens in a game (a try, a six, a red card …) run actions: an advert, a graphic, a macro, set a variable
