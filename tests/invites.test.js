@@ -36,6 +36,13 @@ test('invitations: accept with your own password, resend, cancelled when removed
   const ok = await form(app.url + path, { name: 'Cam Op', password: 'long enough', password2: 'long enough' });
   assert.equal(ok.status, 303); assert.equal(ok.headers.get('location'), '/app');
   const cookie = ok.headers.get('set-cookie').split(';')[0];
+  // the Admins hear that they joined: email and the notifications inbox
+  await app.notify.idle();
+  const joined = app.mail.outbox.find((m) => m.to.includes('admin@example.com') && /Cam Op joined Test Team/.test(m.subject));
+  assert.ok(joined, 'the Admin is emailed');
+  assert.match(joined.text, /cam\.op@example\.com/);
+  const inbox = (await admin.get('/api/notifications')).data;
+  assert.ok((inbox.list || []).some((n) => /Cam Op joined Test Team/.test(n.title)), JSON.stringify(inbox));
   const me = await (await fetch(app.url + '/api/me', { headers: { cookie } })).json();
   assert.equal(me.user.email, 'cam.op@example.com');
   assert.deepEqual(me.teams.map((x) => x.name), ['Test Team']);
