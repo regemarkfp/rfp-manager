@@ -1,4 +1,4 @@
-/* Live → Variables & triggers.
+/* Live & graphics → Variables & triggers.
    Variables: your own values ({var_attendance}, {var_man_of_the_match} …) kept for everyone, per sport, per competition
    or per match, set from dashboards, buttons, macros and here; usable in every template, trigger and action.
    Game triggers: WHEN something happens in a game (a try, a six, a wicket, a red card …) THEN run actions (an advert,

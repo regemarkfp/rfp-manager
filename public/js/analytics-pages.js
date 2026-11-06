@@ -64,7 +64,7 @@
 
   // a small card on the dashboard
   function dashCard() {
-    if (!allowed()) return null;
+    if (!allowed() || !App.can('admin')) return null;          // on the dashboard: Admins only
     const box = h('div', { class: 'card' }, h('div', { class: 'spread' }, h('h2', { style: { margin: 0 } }, 'Video analytics · 30 days'), h('a', { class: 'small', href: '#/analytics' }, 'Open')), h('div', { class: 'dim small' }, 'Loading…'));
     api('GET', `/api/analytics?team=${App.team}&days=30`).then((r) => {
       if (!r.streams.length) { box.style.display = 'none'; return; }

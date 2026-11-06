@@ -54,6 +54,7 @@
       n('nextQuote', 'Next quote number', `Next: ${b.nextQuoteNumber}`), n('nextInvoice', 'Next invoice number', `Next: ${b.nextInvoiceNumber}`),
       sec('On the document'), t('bank', 'Banking details', 'Bank Name: …\nBranch Code: …\nAccount Name: …\nAccount Number: …', true, 5), t('tagline', 'Tagline', 'Capturing life in motion'),
       h('label', { class: 'f' }, h('span', {}, 'Colour of headings and items'), h('input', { type: 'color', value: f.accent || '#1a8cff', oninput: (e) => { f.accent = e.target.value; } })),
+      t('docTerms', 'Quote and invoice terms (every document, unless it has its own)', 'Payment is due within 14 days. A 50% deposit confirms the booking.', true, 3),
       t('conditions', 'Terms and conditions (printed after the totals)', 'Lines starting with "1. Title" print bold; lines starting with "- " are bullets.', true, 10), t('notes', 'Small print', '', true, 2)),
     actions: [{ label: 'Cancel' }, App.can('admin') ? { label: 'Save', primary: true, onClick: async () => {
       const body = { ...f };
@@ -219,7 +220,8 @@
           h('button', { class: 'ghost danger', onclick: async () => { if (!(await confirmBox(`Delete ${x.number}? This cannot be undone.`))) return; try { await api('DELETE', `/api/invoices/${enc(id)}?${T()}`); location.hash = '#/money'; } catch (e) { oops(e); } } }, 'Delete')),
         x.source && x.source.system === 'invoiceninja' ? h('p', { class: 'pill', style: { whiteSpace: 'normal', marginBottom: '12px' } }, `Imported from Invoice Ninja${Math.abs((x.source.amount || 0) - totals(x).total) > 0.05 ? ` (its total there: ${money(x.source.amount)})` : ''}. `, x.source.pdf ? h('a', { href: '/media/' + x.source.pdf, target: '_blank', rel: 'noopener' }, 'Their PDF ↗') : null) : null,
         s ? h('div', { class: 'card', style: { borderLeft: '4px solid var(--accent)' } }, h('div', { class: 'row' }, s.image ? h('img', { src: s.image, alt: 'Signature', style: { height: '56px', background: '#fff', borderRadius: '4px', padding: '4px' } }) : null,
-          h('div', {}, h('b', {}, `Signed by ${s.name}`), h('div', { class: 'dim small' }, `${new Date(s.at).toLocaleString('en-GB')}${s.email ? ' · ' + s.email : ''}${s.ip ? ' · ' + s.ip : ''}`)))) : quote && x.status !== 'Draft' ? h('p', { class: 'pill warn', style: { whiteSpace: 'normal' } }, 'Waiting for the client to sign it in their portal.') : null,
+          h('div', { class: 'grow' }, h('b', {}, `Contract signed by ${s.name}`), h('div', { class: 'dim small' }, `${new Date(s.at).toLocaleString('en-GB')}${s.email ? ' · ' + s.email : ''}${s.ip ? ' · ' + s.ip : ''}${s.method === 'upload' ? ' · picture loaded' : ''}`)),
+            x.contract ? h('button', { onclick: () => window.open(`/api/invoices/${enc(id)}/contract.pdf?${T()}`, '_blank') }, 'Contract (PDF)') : null)) : quote && x.status !== 'Draft' ? h('p', { class: 'pill warn', style: { whiteSpace: 'normal' } }, 'Waiting for the client to sign it in their portal.') : null,
         h('div', { class: 'card' }, h('div', { class: 'form' },
           f('Client', h('select', { onchange: (e) => { x.client = e.target.value; const c = App.docs.get(x.client); if (c) x.clientName = c.data.name; paint(); mark(); } }, h('option', { value: '' }, '— not in Clients —'), clients.map((c) => h('option', { value: c.id, selected: c.id === x.client || null }, c.data.name)))),
           !x.client ? f('Client name', inp('clientName')) : h('div', { class: 'f' }, h('span', { class: 'flabel' }, 'Client'), h('a', { href: '#/edit/client/' + x.client }, (client && client.data.name) || x.clientName), client && Number(client.data.discount) ? h('div', { class: 'help' }, `Their discount: ${client.data.discount}%`) : null),
@@ -235,7 +237,7 @@
               h('select', { style: { width: '90px' }, onchange: (e) => { x.discountType = e.target.value; mark(); } }, h('option', { value: 'percent', selected: x.discountType !== 'amount' || null }, '%'), h('option', { value: 'amount', selected: x.discountType === 'amount' || null }, 'R')))),
             f('VAT %', h('input', { type: 'number', step: 'any', value: x.vatRate || 0, oninput: (e) => { x.vatRate = Number(e.target.value) || 0; mark(); } }))),
           totalsBox),
-        h('div', { class: 'card' }, h('div', { class: 'form' }, f(quote ? 'Quote terms (above the banking details)' : 'Invoice terms (above the banking details)', h('textarea', { rows: 3, oninput: (e) => { x.terms = e.target.value; dirty = true; } }, x.terms || ''), true),
+        h('div', { class: 'card' }, h('div', { class: 'form' }, f(quote ? 'Quote terms (above the banking details)' : 'Invoice terms (above the banking details)', h('textarea', { rows: 3, placeholder: 'Empty: your quote and invoice terms from Billing details', oninput: (e) => { x.terms = e.target.value; dirty = true; } }, x.terms || ''), true),
           f('Note to the client', h('textarea', { rows: 2, oninput: (e) => { x.notes = e.target.value; dirty = true; } }, x.notes || ''), true)),
           h('div', { class: 'row', style: { marginTop: '10px' } }, saveBtn())),
         payments);

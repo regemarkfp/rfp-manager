@@ -105,7 +105,7 @@
     const body = d.role === 'Coach'
       ? h('div', {}, h('p', { class: 'dim', style: { marginTop: 0 } }, `${d.email} can change these clubs, their teams and players, and pick team sheets for their matches.`),
         clubs.length ? h('div', { class: 'stack', style: { maxHeight: '50vh', overflow: 'auto' } }, clubs.map((c) => h('label', { class: 'row', style: { gap: '8px' } }, h('input', { type: 'checkbox', checked: v.clubs.has(c.id), onchange: (e) => { if (e.target.checked) v.clubs.add(c.id); else v.clubs.delete(c.id); } }), c.data.name)))
-          : h('p', {}, 'Add the club first (Assets → Clubs).'))
+          : h('p', {}, 'Add the club first (Sport → Clubs).'))
       : h('div', {}, h('p', { class: 'dim', style: { marginTop: 0 } }, `${d.email} sees the matches where this name is listed under Match officials (as "Role: Name"), and can confirm their results.`),
         h('label', { class: 'f' }, h('span', {}, 'Name as written on the match sheets'), h('input', { value: v.officialName, oninput: (e) => { v.officialName = e.target.value; } })));
     modal({ title: `${d.role}: ${d.name || d.email}`, body, actions: [{ label: 'Cancel', onClick: () => { done(); } }, { label: 'Save', primary: true, onClick: async () => {
@@ -118,13 +118,16 @@
 
   function accountTab() {
     const linked = App.machine.linked;
-    const f = { name: App.me.name, phone: App.me.phone || '', emailOff: !!App.me.emailOff, emailNoNew: !!App.me.emailNoNew, password: '', currentPassword: '' };
+    const f = { name: App.me.name, phone: App.me.phone || '', emailOff: !!App.me.emailOff, emailNoNew: !!App.me.emailNoNew, marketingOptOut: !!App.me.marketingOptOut, password: '', currentPassword: '' };
+    const anyAdmin = App.cfg.mode === 'cloud' && (App.teams || []).some((t) => t.role === 'Admin');
     return h('div', { class: 'card' }, h('h2', {}, 'My account'), h('p', {}, h('b', {}, App.me.email), App.me.google ? h('span', { class: 'pill ok', style: { marginLeft: '8px' } }, 'Google') : null, App.me.hasPassword ? h('span', { class: 'pill', style: { marginLeft: '8px' } }, 'Password set') : null),
       linked ? h('p', { class: 'dim' }, 'This machine is linked to the website, so your name and sign-in are managed there and synced down.') : h('div', {}, h('div', { class: 'form' },
         h('label', { class: 'f' }, h('span', {}, 'Name'), h('input', { value: f.name, oninput: (e) => { f.name = e.target.value; } })),
         h('label', { class: 'f' }, h('span', {}, 'Phone'), Phone.input(f.phone, (v) => { f.phone = v; }, { make: h, dial: App.cfg.dial })),
         App.cfg.mail ? h('label', { class: 'row', style: { gap: '8px', gridColumn: '1 / -1' } }, h('input', { type: 'checkbox', checked: !f.emailOff, onchange: (e) => { f.emailOff = !e.target.checked; } }), 'Email me: when I am hired (with the call sheet), matches I officiate, results of my teams, expenses') : null,
         App.cfg.mail ? h('label', { class: 'row', style: { gap: '8px', gridColumn: '1 / -1' } }, h('input', { type: 'checkbox', checked: !f.emailNoNew, onchange: (e) => { f.emailNoNew = !e.target.checked; } }), 'Email me when a new production is added to my team\'s calendar') : null,
+        anyAdmin ? h('label', { class: 'row', style: { gap: '8px', gridColumn: '1 / -1' } }, h('input', { type: 'checkbox', checked: !f.marketingOptOut, onchange: (e) => { f.marketingOptOut = !e.target.checked; } }), 'Occasional news and offers from RegemarkFP by email (you can switch this off any time)') : null,
+        anyAdmin ? h('p', { class: 'dim small', style: { gridColumn: '1 / -1', margin: 0 } }, App.me.superTerms ? `You accepted the Admin terms on ${new Date(App.me.superTerms.at).toLocaleDateString('en-GB')}: your name and email are shared with RegemarkFP only, to contact you about your team.` : 'You have not accepted the Admin terms yet.', ' ', h('a', { href: '#', onclick: (e) => { e.preventDefault(); App.termsGate(true); } }, 'Read the terms')) : null,
         h('div', { class: 'f' }, h('span', { class: 'flabel' }, 'Picture'), h('div', { class: 'row', style: { gap: '10px' } }, App.avatar(App.me.image, App.me.name || App.me.email, 48), h('span', { class: 'dim small' }, App.me.google ? 'Your Google profile picture. Change it in your Google account; it updates here the next time you sign in.' : 'Sign in with Google to use your Google profile picture.'))),
         App.me.hasPassword ? h('label', { class: 'f' }, h('span', {}, 'Current password'), h('input', { type: 'password', autocomplete: 'current-password', oninput: (e) => { f.currentPassword = e.target.value; } })) : null,
         h('label', { class: 'f' }, h('span', {}, App.me.hasPassword ? 'New password (8+ characters)' : 'Set a password (8+ characters)'), h('input', { type: 'password', autocomplete: 'new-password', oninput: (e) => { f.password = e.target.value; } }),

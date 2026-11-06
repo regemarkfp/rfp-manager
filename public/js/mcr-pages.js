@@ -92,7 +92,7 @@
   }
   App.editAdPreset = editPreset;
 
-  // ---- Advertising → Stream adverts: the two video lists and the presets
+  // ---- Adverts & sponsors → Stream adverts: the two video lists and the presets
   App.pages.streamads = () => {
     const box = h('div', {}, h('div', { class: 'card dim' }, 'Loading…'));
     const paint = async () => {
@@ -257,7 +257,7 @@
               save('Rule added');
             } }, 'Add rule'));
         })(),
-        h('p', { class: 'dim small', style: { marginBottom: 0 } }, 'The scorer on the production PC reports the events (the PC must be signed in to this website). A rule never starts on top of an ad break, squeeze-back or slate, and rests for the time you set. The delay lets the replay or celebration play out first. A preset (Advertising → Stream adverts) is the easiest; otherwise the videos and settings ticked above are used.'));
+        h('p', { class: 'dim small', style: { marginBottom: 0 } }, 'The scorer on the production PC reports the events (the PC must be signed in to this website). A rule never starts on top of an ad break, squeeze-back or slate, and rests for the time you set. The delay lets the replay or celebration play out first. A preset (Adverts & sponsors → Stream adverts) is the easiest; otherwise the videos and settings ticked above are used.'));
     }
     // sponsor logos that take turns in the bug: the logos, how long each stays, and how they change
     function rotation(o, changed) {

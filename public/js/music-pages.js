@@ -1,5 +1,5 @@
 /* Music: playout of theme music and the library on the production PC (CasparCG), the production report and music cue
- * sheets after a production, and rights holders' reports. Tracks themselves are edited in Music → Music library. */
+ * sheets after a production, and rights holders' reports. Tracks themselves are edited in Media & music → Music library. */
 'use strict';
 (() => {
   const dur = (s) => { s = Math.round(Number(s) || 0); const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60; return (hh ? hh + ':' + String(mm).padStart(2, '0') : mm) + ':' + String(ss).padStart(2, '0'); };

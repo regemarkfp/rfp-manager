@@ -147,7 +147,7 @@
         link('Fill', 'Program output over black, to go with the key.', '/fill'))))),
       h('div', { class: 'card' }, h('h2', {}, 'Timeline'), h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {},
         link('Timeline', 'Edit and run a show timeline: tracks, cues, holds and GO.', '/timeline', true),
-        link('Dashboards', 'Your own control panels (Live → Dashboards), on a PC, tablet or phone.', '/dash', true),
+        link('Dashboards', 'Your own control panels (Live & graphics → Dashboards), on a PC, tablet or phone.', '/dash', true),
         link('Timeline crew view', 'Now and next for the tracks each person follows, with countdowns. Follows the timeline that is running.', '/crew'))))),
       h('div', { class: 'card' }, h('h2', {}, 'Worship'), h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {},
         link('Worship control', 'Songs, scripture, slides, names and stage tools.', '/worship', true),

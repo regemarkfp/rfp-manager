@@ -290,33 +290,83 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     let opened = false;
     const del = async (url) => { const r = await fetch(url, { method: 'DELETE', credentials: 'same-origin', headers: { 'x-rfp': '1' } }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Something went wrong'); return j; };
     const modal = (title, ...kids) => { const wrap = el('div', { class: 'modal', onclick: (e) => { if (e.target === wrap) wrap.remove(); } }, el('div', { class: 'modal-box', style: { maxWidth: '560px' } }, el('button', { class: 'icon x', onclick: () => wrap.remove(), 'aria-label': 'Close' }, '✕'), el('h2', {}, title), ...kids)); document.body.append(wrap); return wrap; };
-    // signing a quote: name, a signature drawn with finger or mouse, and agreeing to it
-    function signQuote(x, after) {
+    // signing a quote: a popup with the terms, the name, and a signature drawn with finger or mouse or loaded as a
+    // picture. It is kept as the contract (with the terms as they are now); the quote PDF itself stays clean.
+    function signQuote(x, after, terms) {
       const cv = el('canvas', { width: 520, height: 170, class: 'sign-pad' });
       const ctx = cv.getContext('2d');
+      let drawn = false, down = false, mode = 'draw';
       const clear = () => { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.strokeStyle = '#0b1b3a'; ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; drawn = false; };
-      let drawn = false, down = false;
       const at = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
-      cv.addEventListener('pointerdown', (e) => { down = true; cv.setPointerCapture(e.pointerId); const [px, py] = at(e); ctx.beginPath(); ctx.moveTo(px, py); e.preventDefault(); });
+      cv.addEventListener('pointerdown', (e) => { if (mode !== 'draw') return; down = true; cv.setPointerCapture(e.pointerId); const [px, py] = at(e); ctx.beginPath(); ctx.moveTo(px, py); e.preventDefault(); });
       cv.addEventListener('pointermove', (e) => { if (!down) return; const [px, py] = at(e); ctx.lineTo(px, py); ctx.stroke(); drawn = true; e.preventDefault(); });
       ['pointerup', 'pointercancel', 'pointerleave'].forEach((k) => cv.addEventListener(k, () => { down = false; }));
       clear();
+      // a picture of a signature: fitted onto the white pad, so what is kept is always the same size
+      const file = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', style: { display: 'none' }, onchange: () => {
+        const fl = file.files[0]; if (!fl) return;
+        if (fl.size > 5 * 1024 * 1024) { err.textContent = 'Pictures can be up to 5 MB.'; err.style.display = ''; return; }
+        const im = new Image();
+        im.onload = () => { clear(); const sc = Math.min((cv.width - 20) / im.width, (cv.height - 20) / im.height); const w = im.width * sc, hh = im.height * sc; ctx.drawImage(im, (cv.width - w) / 2, (cv.height - hh) / 2, w, hh); drawn = true; mode = 'upload'; paintTabs(); URL.revokeObjectURL(im.src); };
+        im.onerror = () => { err.textContent = 'That picture could not be read.'; err.style.display = ''; };
+        im.src = URL.createObjectURL(fl); file.value = '';
+      } });
+      const tabDraw = el('button', { type: 'button', class: 'sm', onclick: () => { mode = 'draw'; clear(); paintTabs(); } }, 'Draw');
+      const tabLoad = el('button', { type: 'button', class: 'sm', onclick: () => file.click() }, 'Load a picture');
+      const paintTabs = () => { tabDraw.className = 'sm' + (mode === 'draw' ? ' primary' : ''); tabLoad.className = 'sm' + (mode === 'upload' ? ' primary' : ''); };
+      paintTabs();
       const f = { name: '', agree: false };
       const err = el('p', { class: 'err', style: { display: 'none' } });
+      const docTerms = x.terms || (terms && terms.docTerms) || '', cond = (terms && terms.conditions) || '';
       const btn = el('button', { class: 'primary', onclick: async () => {
         err.style.display = 'none';
         if (f.name.trim().length < 2) { err.textContent = 'Type your full name.'; err.style.display = ''; return; }
-        if (!drawn) { err.textContent = 'Sign in the white box.'; err.style.display = ''; return; }
-        if (!f.agree) { err.textContent = 'Tick that you accept the quote and its terms.'; err.style.display = ''; return; }
+        if (!drawn) { err.textContent = 'Sign in the white box, or load a picture of your signature.'; err.style.display = ''; return; }
+        if (!f.agree) { err.textContent = 'Tick that you accept the quote and the terms and conditions.'; err.style.display = ''; return; }
         btn.disabled = true;
-        try { await post(x.sign, { name: f.name, agree: true, image: cv.toDataURL('image/png') }); wrap.remove(); say('Signed. Thank you: the production is confirmed.'); after(); } catch (e) { err.textContent = e.message; err.style.display = ''; btn.disabled = false; }
-      } }, 'Sign the quote');
+        try { await post(x.sign, { name: f.name, agree: true, method: mode, image: cv.toDataURL('image/png') }); wrap.remove(); say('Signed. Thank you: the production is confirmed. Your signed contract is with the quote.'); after(); } catch (e) { err.textContent = e.message; err.style.display = ''; btn.disabled = false; }
+      } }, 'Sign the contract');
       const wrap = modal(`Sign quote ${x.number}`,
-        el('p', { class: 'sub' }, `${x.title ? x.title + ' · ' : ''}${zar(x.total)}. `, el('a', { href: x.pdf, target: '_blank', rel: 'noopener' }, 'Read the quote and its terms (PDF)')),
+        el('p', { class: 'sub' }, `${x.title ? x.title + ' · ' : ''}${zar(x.total)}. `, el('a', { href: x.pdf, target: '_blank', rel: 'noopener' }, 'Read the quote (PDF)')),
+        docTerms || cond ? el('div', { class: 'terms-box' }, docTerms ? [el('b', {}, 'Quote terms'), el('p', {}, docTerms)] : null, cond ? [el('b', {}, 'Terms and conditions'), el('div', { class: 'pre' }, cond)] : null) : null,
         el('label', { class: 'fld' }, el('span', {}, 'Your full name'), el('input', { autocomplete: 'name', oninput: (e) => { f.name = e.target.value; } })),
-        el('div', { class: 'fld' }, el('span', {}, 'Your signature'), cv, el('button', { class: 'sm', type: 'button', onclick: clear, style: { marginTop: '6px' } }, 'Clear')),
-        el('label', { class: 'row', style: { display: 'flex', gap: '8px', alignItems: 'flex-start', margin: '12px 0' } }, el('input', { type: 'checkbox', onchange: (e) => { f.agree = e.target.checked; } }), el('span', {}, 'I accept this quote and its terms and conditions on behalf of the client.')),
+        el('div', { class: 'fld' }, el('div', { class: 'row', style: { display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '6px' } }, el('span', { style: { flex: 1 } }, 'Your signature'), tabDraw, tabLoad), cv, file,
+          el('button', { class: 'sm', type: 'button', onclick: () => { mode = 'draw'; clear(); paintTabs(); }, style: { marginTop: '6px' } }, 'Clear')),
+        el('label', { class: 'row', style: { display: 'flex', gap: '8px', alignItems: 'flex-start', margin: '12px 0' } }, el('input', { type: 'checkbox', onchange: (e) => { f.agree = e.target.checked; } }), el('span', {}, 'I accept this quote and the terms and conditions above on behalf of the client. My signature is kept as our contract.')),
         err, btn);
+    }
+    // the account behind this link: sign in with Google, with a password, or create one
+    function accountBox(c, after) {
+      const me = c.me, acc = c.account;
+      if (me.signedIn) return el('p', { class: 'sub small' }, `Signed in as ${me.email}. `, el('a', { href: '#', onclick: async (e) => { e.preventDefault(); await post('/api/auth/logout', {}).catch(() => {}); after(); } }, 'Sign out'));
+      const pw = el('input', { type: 'password', autocomplete: acc.password ? 'current-password' : 'new-password', placeholder: acc.password ? 'Your password' : 'Choose a password (8+ characters)' });
+      const err = el('p', { class: 'err', style: { display: 'none' } });
+      const go = async () => {
+        err.style.display = 'none';
+        try { if (acc.password) await post('/api/auth/login', { email: me.email, password: pw.value }); else await post(`${base}/password`, { password: pw.value }); after(); }
+        catch (e) { err.textContent = e.message; err.style.display = ''; }
+      };
+      pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+      return el('div', { class: 'portal-signin' },
+        el('p', { class: 'sub', style: { marginTop: 0 } }, me.other ? `You are signed in as ${me.other}, not ${me.email}. ` : '', `Sign in as ${me.email} to keep your details up to date.`),
+        el('div', { class: 'row', style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' } },
+          acc.google || !acc.password ? el('button', { class: 'primary', onclick: () => { backTo = location.pathname; signIn(`Sign in with Google as ${me.email} to manage your client portal.`); } }, 'Sign in with Google') : null,
+          acc.google ? null : [pw, el('button', { class: acc.google || !acc.password ? '' : 'primary', onclick: go }, acc.password ? 'Sign in' : 'Create password')]),
+        err);
+    }
+    // the client's details (name, accounts email, phone, address, VAT …): shown on quotes and invoices
+    function detailsBox(c, after) {
+      const cl = c.client, f = { name: cl.name, email: cl.email, phone: cl.phone, website: cl.website, vatNo: cl.vatNo, regNo: cl.regNo, address: cl.address };
+      const ro = !c.me.signedIn;
+      const fld = (k, label, attrs = {}) => el('label', { class: 'fld' }, el('span', {}, label), el(k === 'address' ? 'textarea' : 'input', { value: f[k] || '', disabled: ro ? '' : null, rows: k === 'address' ? 3 : null, ...attrs, oninput: (e) => { f[k] = e.target.value; } }, k === 'address' ? f[k] || '' : null));
+      const btn = ro ? null : el('button', { class: 'primary', onclick: async () => {
+        btn.disabled = true;
+        try { const r = await fetch(`${base}/details`, { method: 'PUT', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-rfp': '1' }, body: JSON.stringify(f) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Something went wrong'); say(j.changed.length ? 'Saved: ' + j.changed.join(', ') + '. Your quotes and invoices show it.' : 'Nothing changed.'); after(); }
+        catch (e) { say(e.message); btn.disabled = false; }
+      } }, 'Save my details');
+      return el('div', {}, accountBox(c, after),
+        el('div', { class: 'portal-details' }, fld('name', 'Name (on quotes and invoices)'), fld('email', 'Accounts email', { type: 'email' }), fld('phone', 'Phone', { type: 'tel' }), fld('website', 'Website'),
+          fld('vatNo', 'VAT number'), fld('regNo', 'Registration / ID number'), fld('address', 'Address')), btn);
     }
     function render2() {
       get(base).then((c) => {
@@ -327,7 +377,8 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
           el('a', { class: 'what', href: x.pdf, target: '_blank', rel: 'noopener', style: { color: 'inherit', textDecoration: 'none' } }, el('b', {}, x.title || (x.kind === 'quote' ? 'Quote' : 'Invoice') + ' ' + x.number),
             el('span', { class: 'sub' }, `${x.date} · ${x.state}${x.signed ? ` · signed by ${x.signed.name}` : ''} · ${zar(x.total)}${x.kind === 'invoice' && x.balance > 0 && x.balance !== x.total ? ` · ${zar(x.balance)} still due` : ''}`)),
           el('div', { class: 'row', style: { display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' } }, el('a', { class: 'dl', href: x.pdf, target: '_blank', rel: 'noopener' }, 'PDF'),
-            x.sign ? el('button', { class: 'primary sm', onclick: () => signQuote(x, render2) }, 'Sign') : null,
+            x.contract ? el('a', { class: 'dl', href: x.contract, target: '_blank', rel: 'noopener' }, 'Contract') : null,
+            x.sign ? el('button', { class: 'primary sm', onclick: () => signQuote(x, render2, c.terms) }, 'Sign') : null,
             x.pay ? el('button', { class: 'primary sm', onclick: async (e) => { e.target.disabled = true; try { await payGo(x.pay, {}); } catch (er) { say(er.message); e.target.disabled = false; } } }, `Pay ${zar(x.balance)}`) : null));
         const slot = (s) => {
           const f = { name: '', from: '' };
@@ -352,9 +403,9 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
         const nu = { email: '', name: '' };
         box.replaceChildren(paidNotice(() => render2()) || '',
           el('div', { class: 'thead' }, c.client.logo ? el('img', { class: 'tlogo big', src: img(c.client.logo), alt: '' }) : el('span', { class: 'tlogo big ph', style: { background: 'var(--accent)', color: '#111' } }, c.client.name.slice(0, 1)),
-            el('div', { class: 'grow' }, el('div', { class: 'sub' }, `Client portal · ${c.company.name}`), el('h1', {}, c.client.name), el('div', { class: 'sub' }, `Signed in with your link as ${c.me.email}`))),
+            el('div', { class: 'grow' }, el('div', { class: 'sub' }, `Client portal · ${c.company.name}`), el('h1', {}, c.client.name), el('div', { class: 'sub' }, c.me.signedIn ? `Signed in as ${c.me.email}` : `Opened with your link as ${c.me.email}`))),
           quotesToSign.length || c.owed > 0 ? el('div', { class: 'push-inline' }, el('span', {}, [quotesToSign.length ? `${quotesToSign.length} quote${quotesToSign.length === 1 ? '' : 's'} to sign` : '', c.owed > 0 ? `${zar(c.owed)} owed` : ''].filter(Boolean).join(' · ') + '.'),
-            quotesToSign.length ? el('button', { class: 'primary', onclick: () => signQuote(quotesToSign[0], render2) }, 'Sign now') : null) : null,
+            quotesToSign.length ? el('button', { class: 'primary', onclick: () => signQuote(quotesToSign[0], render2, c.terms) }, 'Sign now') : null) : null,
           section('Quotes & invoices', c.docs.length ? el('div', { class: 'up-list' }, c.docs.map(row)) : el('p', { class: 'sub' }, 'Nothing yet.')),
           c.productions.length ? section('Productions', el('div', { class: 'up-list' }, c.productions.map((p) => el('a', { class: 'up-row', href: p.page, 'data-nav': '' }, el('div', { class: 'when' }, el('b', {}, p.date || ''), el('span', {}, p.number)), el('div', { class: 'what' }, el('b', {}, p.name), el('span', { class: 'sub' }, p.status)), el('span', { class: 'go' }, 'Open ›'))))) : null,
           c.bookings.length ? section('Bookings & reviews', el('div', { class: 'up-list' }, c.bookings.map((b) => el(b.track ? 'a' : 'div', { class: 'up-row', href: b.track || null, 'data-nav': b.track ? '' : null }, el('div', { class: 'when' }, el('b', {}, b.date || '')),
@@ -365,12 +416,13 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
               el('div', { class: 'row', style: { display: 'flex', gap: '6px', alignItems: 'center' } }, el('span', { class: 'chip' + (a.approval === 'Approved' ? ' on' : '') }, a.approval === 'Pending' ? 'Waiting for approval' : a.approval),
                 a.approval !== 'Approved' ? el('button', { class: 'sm', onclick: async () => { if (!confirm('Remove this advert?')) return; try { await del(`${base}/ads/${encodeURIComponent(a.id)}`); render2(); } catch (e) { say(e.message); } } }, 'Remove') : null)))) : null,
             c.slots.length ? el('div', { class: 'svc-grid' }, c.slots.map(slot)) : el('p', { class: 'sub' }, 'No advert spaces are offered right now.')]),
+          section('Your details', detailsBox(c, render2)),
           section('People on this portal', el('div', {}, el('div', { class: 'up-list' }, c.users.map((u) => el('div', { class: 'up-row' }, el('div', { class: 'when' }, el('b', {}, u.name || '')), el('div', { class: 'what' }, el('b', {}, u.email), u.me ? el('span', { class: 'sub' }, 'you') : null),
             !u.me ? el('button', { class: 'sm', onclick: async () => { if (!confirm(`Take ${u.email} off? Their link stops working.`)) return; try { await del(`${base}/users/${encodeURIComponent(u.email)}`); render2(); } catch (e) { say(e.message); } } }, 'Remove') : el('span', {})))),
             el('div', { class: 'portal-add' }, el('input', { type: 'email', placeholder: 'Colleague\'s email', oninput: (e) => { nu.email = e.target.value; } }), el('input', { placeholder: 'Name', oninput: (e) => { nu.name = e.target.value; } }),
               el('button', { class: 'primary', onclick: async () => { try { await post(`${base}/users`, nu); say(`Added: ${nu.email} gets an email with their own link.`); render2(); } catch (e) { say(e.message); } } }, 'Add')))),
           el('p', { class: 'sub small', style: { marginTop: '24px' } }, `Questions? ${[c.company.email, c.company.phone].filter(Boolean).join(' · ')}`));
-        if (want && !opened) { opened = true; const x = c.docs.find((d) => d.id === want); const n = document.getElementById('doc-' + want); if (n) n.scrollIntoView({ block: 'center' }); if (x && x.sign) signQuote(x, render2); }
+        if (want && !opened) { opened = true; const x = c.docs.find((d) => d.id === want); const n = document.getElementById('doc-' + want); if (n) n.scrollIntoView({ block: 'center' }); if (x && x.sign) signQuote(x, render2, c.terms); }
       }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
     }
     render2();
@@ -766,6 +818,9 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const toggle = (e) => { e.stopPropagation(); if (menu) { menu.remove(); menu = null; return; }
       menu = el('div', { class: 'me-menu' }, el('div', { class: 'who' }, el('b', {}, m.name || ''), el('div', { class: 'sub' }, m.email)),
         m.teams ? el('a', { href: '/app' }, 'Studio') : null, el('a', { href: '/subscriptions', 'data-nav': '' }, 'Subscriptions'), el('a', { href: '/notifications', 'data-nav': '' }, 'Notifications'), el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); signOut(); } }, 'Sign out'));
+      // client portals of this email (a client of a production company): one link each
+      const box = menu;
+      get('/api/public/my-portals').then((r) => { if (box.isConnected && r.portals.length) box.insertBefore(el('div', {}, r.portals.map((x) => el('a', { href: x.url }, `Client portal: ${x.client}`))), box.children[1] || null); }).catch(() => {});
       $('me').append(menu); document.addEventListener('click', () => { if (menu) { menu.remove(); menu = null; } }, { once: true }); };
     $('me').replaceChildren(m && m.teams ? el('a', { href: '/app' }, el('button', { class: 'studio' }, 'Studio')) : null,
       m ? el('button', { class: 'icon avatar-btn', title: m.email, onclick: toggle }, avatar(m.image, m.name || m.email)) : signInButton());

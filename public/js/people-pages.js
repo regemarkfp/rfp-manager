@@ -296,12 +296,13 @@
           h('div', { style: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } }, m.text),
           m.from === 'us' ? h('div', { class: 'dim small', style: { marginTop: '2px' } }, [mailMark(m.email), tick(m.whatsapp)].filter(Boolean).join('  ·  ') || 'Kept here only') : null))
           : h('p', { class: 'dim' }, 'No messages yet.')),
-        ta,
-        h('div', { class: 'row', style: { marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' } },
+        !App.can('admin') ? h('p', { class: 'pill', style: { whiteSpace: 'normal' } }, 'Only Admins write to clients. You see the conversation and get the crew notifications.') : null,
+        App.can('admin') ? ta : null,
+        !App.can('admin') ? null : h('div', { class: 'row', style: { marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' } },
           h('label', { class: 'row', style: { gap: '6px' } }, viaMail, d.email ? 'Email ' + d.email : 'No email'),
           h('label', { class: 'row', style: { gap: '6px' }, title: App.cfg.whatsapp ? '' : 'A site admin sets up WhatsApp under Settings → Server' }, viaWa, !d.phone ? 'No phone number' : App.cfg.whatsapp ? 'WhatsApp ' + d.phone : 'WhatsApp (not set up)'),
           h('span', { style: { flex: 1 } }), send),
-        h('p', { class: 'dim small', style: { marginBottom: 0 } }, pref === 'whatsapp' ? 'They talk to you on WhatsApp, so messages and step updates go by WhatsApp only (email only if WhatsApp fails). Tick Email to send it there too.' : pref === 'email' ? 'They chose email, so messages and step updates go by email only. Tick WhatsApp to send it there too.' : 'Sent by email and WhatsApp, with the link to follow the booking. Their answers come back here.'));
+        !App.can('admin') ? null : h('p', { class: 'dim small', style: { marginBottom: 0 } }, pref === 'whatsapp' ? 'They talk to you on WhatsApp, so messages and step updates go by WhatsApp only (email only if WhatsApp fails). Tick Email to send it there too.' : pref === 'email' ? 'They chose email, so messages and step updates go by email only. Tick WhatsApp to send it there too.' : 'Sent by email and WhatsApp, with the link to follow the booking. Their answers come back here.'));
     };
     paint();
     if ((App.docs.get(doc.id) || doc).data.unread) api('POST', `${base}/seen?team=${App.team}`).then((r) => { App.docs.set(r.doc.id, r.doc); }).catch(() => {});

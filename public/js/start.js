@@ -178,6 +178,7 @@
       try { want = localStorage.getItem('rfp.team'); } catch { /* private window */ }
       await App.selectTeam((App.teams.find((t) => t.id === want) || App.teams[0]).id);
       route();
+      if (App.cfg.mode === 'cloud' && App.teams.some((t) => t.role === 'Admin') && !App.me.superTerms) App.termsGate();
     } catch (e) {
       root.replaceChildren(h('div', { class: 'login' }, h('div', { class: 'box card' }, h('h1', {}, 'Cannot start'), h('p', {}, e.message), h('button', { class: 'primary', onclick: () => location.reload() }, 'Try again'))));
     }

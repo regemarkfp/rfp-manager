@@ -145,6 +145,23 @@ const App = {
   refresh() { route(); },
 };
 
+// Admins (on the website) accept these once: their name and email are shared with RegemarkFP (the website's
+// superuser) only, to contact them about their team, and for occasional marketing email they can switch off.
+App.termsGate = (readOnly) => {
+  let optOut = !!App.me.marketingOptOut;
+  const body = h('div', { class: 'terms' },
+    h('p', {}, 'You are an Admin of a production team on RegemarkFP. To keep the service running for you:'),
+    h('ul', {},
+      h('li', {}, 'Your name and email address are shared with RegemarkFP (the people who run this website) only. They are not shown to other teams or the public.'),
+      h('li', {}, 'RegemarkFP uses them to contact you when needed: about your account, your team, payments, security or changes to the service.'),
+      h('li', {}, 'RegemarkFP may also send you occasional news and offers. You can opt out here or any time under Settings → My account.'),
+      h('li', {}, 'RegemarkFP sees numbers about your team (members per role, productions, matches, bookings, viewers), never the names of your crew, clients or anyone else.')),
+    readOnly && App.me.superTerms ? null : h('label', { class: 'row', style: { gap: '8px' } }, h('input', { type: 'checkbox', checked: optOut, onchange: (e) => { optOut = e.target.checked; } }), 'No marketing emails, thanks'));
+  UI.modal({ title: 'Admin terms', body, actions: readOnly && App.me.superTerms ? [{ label: 'Close', primary: true }] : [
+    { label: 'Later' },
+    { label: 'I accept', primary: true, onClick: async () => { await api('POST', '/api/me', { acceptTerms: true, marketingOptOut: optOut }); await App.loadMe(); toast('Thank you'); if (readOnly) route(); } }] });
+};
+
 // The website: which production PC the live screens (Graphics control, scorer, dashboards …) use. Chosen per browser.
 function pcPicker() {
   const list = App.pcs || [], cur = list.find((p) => p.id === App.pc);
@@ -178,24 +195,27 @@ function navFor() {
   if (c.bridge) {
     return [
       ['', [['#/', 'Bridge']]],
-      ['Live', [['#/monitors', 'Monitors'], ['#/templates', 'Templates'], ['#/variables', 'Variables'], ['#/list/theme', 'Themes'], ['#/adverts', 'Advert playout'], ['#/music', 'Music playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'], ['#/playlog', 'Play log']]],
+      ['Live', [['#/monitors', 'Monitors'], ['#/templates', 'Templates'], ['#/list/theme', 'Themes'], ['#/adverts', 'Advert playout'], ['#/music', 'Music playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'], ['#/playlog', 'Play log']]],
       ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/bibles', 'Bibles'], ['#/ccli', 'CCLI report']]],
       ['From the website', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions'], ['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], ['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/crewMember', 'Crew'], ['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/images', 'Images']]],
       ['', [['#/settings', 'Settings']]],
     ];
   }
   const local = c.mode === 'local', pc = local || !!App.pc;          // live screens: on a PC, or on the website with a PC chosen
+  const ed = App.can('edit'), web = !local, money = ed && web;
+  const n = (k) => (k ? ` (${k})` : '');
+  const ifs = (...links) => links.filter(Boolean);
+  // grouped by what you are doing: selling, running a production, the sport, the live show, the stream, sponsors, media
   return [
-    ['', [['#/', 'Dashboard'], local ? null : ['#/notifications', 'Notifications' + (App.unread ? ` (${App.unread})` : '')]].filter(Boolean)],
-    ['Matches', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions']]],
-    ['Productions', [['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], App.can('edit') && !local ? ['#/list/booking', 'Booking requests' + (App.waitingBookings && App.waitingBookings().length ? ` (${App.waitingBookings().length})` : '')] : null, ['#/list/expense', App.can('edit') ? 'Expenses' : 'My expenses'], App.can('edit') && !local ? ['#/list/client', 'Clients'] : null, App.can('edit') && !local ? ['#/money', 'Quotes & invoices'] : null, App.can('edit') && !local ? ['#/list/service', 'Products & services'] : null, App.can('edit') && !local ? ['#/ratings', 'Ratings'] : null, local ? null : ['#/availability', 'My availability'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment']].filter(Boolean)],
-    ['Assets', [['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/theme', 'Themes'], ['#/images', 'Images']]],
-    ['Advertising', [['#/list/advert', 'Adverts'], App.can('edit') && !local ? ['#/list/adSlot', 'Ad spaces (clients)'] : null, ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log'], App.can('edit') && !local ? ['#/sponsors', 'Sponsor reports'] : null, local ? null : ['#/streamads', 'Stream adverts']].filter(Boolean)],
-    ['Music', [['#/list/track', 'Music library'], pc ? ['#/music', 'Music playout'] : null, App.can('edit') ? ['#/musicrights', 'Music use report'] : null].filter(Boolean)],
+    ['', ifs(['#/', 'Dashboard'], web && ['#/notifications', 'Notifications' + n(App.unread)])],
+    money ? ['Clients & sales', [['#/list/booking', 'Booking requests' + n(App.waitingBookings && App.waitingBookings().length)], ['#/list/client', 'Clients'], ['#/money', 'Quotes & invoices'], ['#/list/service', 'Products & services'], ['#/ratings', 'Ratings']]] : null,
+    ['Productions', ifs(['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment'], ['#/list/expense', ed ? 'Expenses' : 'My expenses'], web && ['#/availability', 'My availability'])],
+    ['Sport', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions'], ['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues']]],
+    ['Live & graphics', ifs(App.pcs && ['#/pcs', 'Production PCs'], pc && ['#/monitors', 'Monitors'], pc && ['#/templates', 'Templates'], ['#/list/theme', 'Themes'], pc && ['#/adverts', 'Advert playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'])],
+    web ? ['Streaming', ifs(['#/list/channel', 'Channels'], ed && ['#/streams', 'Live streams'], ed && ['#/analytics', 'Analytics'], ed && ['#/sales', 'Ticket sales'], ['#/streamads', 'Stream adverts'])] : null,
+    ['Adverts & sponsors', ifs(['#/list/advert', 'Adverts'], money && ['#/list/adSlot', 'Ad spaces (clients)'], ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log'], money && ['#/sponsors', 'Sponsor reports'])],
+    ['Media & music', ifs(['#/images', 'Images'], ['#/list/track', 'Music library'], pc && ['#/music', 'Music playout'], ed && ['#/musicrights', 'Music use report'])],
     ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report']].concat(local ? [['#/bibles', 'Bibles']] : [])],
-    local ? null : ['Streaming', [['#/list/channel', 'Channels'], App.can('edit') ? ['#/streams', 'Live streams'] : null, App.can('edit') ? ['#/analytics', 'Analytics'] : null, App.can('edit') ? ['#/sales', 'Ticket sales'] : null].filter(Boolean)],
-    ['Live', [App.pcs ? ['#/pcs', 'Production PCs'] : null, pc ? ['#/monitors', 'Monitors'] : null, pc ? ['#/templates', 'Templates'] : null, pc ? ['#/variables', 'Variables'] : null, pc ? ['#/adverts', 'Advert playout'] : null,
-      ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers']].filter(Boolean)],
     ['', [['#/settings', 'Settings']]],
   ].filter(Boolean);
 }
