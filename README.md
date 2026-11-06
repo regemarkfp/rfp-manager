@@ -946,9 +946,9 @@ In the Android app the Studio looks like an Android app: an app bar on top (logo
 your picture → Settings) and tabs at the bottom (Home, Matches, Productions, Calendar, More; Crew, Coaches and Officials
 get their own), with More listing everything else, your account and Sign out. Forms open as bottom sheets. The website
 and production PCs keep the side menu (`/app?android=1` shows the app layout in a browser, `?android=0` turns it off).
-An Admin who opens the website or the Studio in a phone's browser on Android (not in the app) is offered the app once
+Admins, Producers, Scorers and Crew who open the website or the Studio in a phone's browser on Android (not in the app) is offered the app once
 (Download / Not now; asked again after 14 days).
-Buttons, cards, panels and video thumbnails everywhere are slanted like the RFP logo (add class `noslant` to keep one square).
+Buttons, text fields, cards, panels, chat bubbles and video thumbnails everywhere are slanted like the RFP logo (add class `noslant` to keep one square).
 
 ### People and roles
 
@@ -1140,7 +1140,7 @@ confirm before anything counts as paid. The `PAYFAST_*` variables still work and
 The Android app is an APK that opens the website as an app (full screen, its own icon, Google sign-in, the camera
 for receipts). It runs through Chrome, which every Android phone has.
 
-* **Getting it:** on the website's sign-in page on a phone, **⬇ Get the Android app** (`/app/rfp-manager.apk`).
+* **Getting it:** the app is for the production team only (Admins, Producers, Scorers, Crew): signed in on an Android phone's browser they are offered it, and `/app/rfp-manager.apk` downloads only for them (others are asked to sign in, or told it is for the team). The installed app's own updates still download.
   Open the downloaded file and allow installing from your browser when Android asks (it is not from the Play Store).
 * **Building it:** GitHub builds it by itself. The `android` folder and `.github/workflows/android.yml` are in the
   repository; whenever the `android` folder changes (or Actions → Android app → Run workflow), GitHub builds the APK,
