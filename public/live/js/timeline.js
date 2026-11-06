@@ -92,7 +92,7 @@
     list = m.list || [];
     const p = $('#tl-pick');
     p.innerHTML = (id ? '' : '<option value="">' + (mode === 'crew' ? 'The timeline that is running' : 'Choose a timeline…') + '</option>') + list.map((x) => `<option value="${esc(x.id)}" ${x.id === id ? 'selected' : ''}>${esc(x.name)}${x.date ? ' · ' + esc(x.date) : ''}</option>`).join('');
-    if (!id && !list.length && mode === 'edit') $('#tl-main').innerHTML = '<div class="tl-empty">No timelines yet. Make one in RFP Manager → Live → Timelines, then open it here.</div>';
+    if (!id && !list.length && mode === 'edit') $('#tl-main').innerHTML = '<div class="tl-empty">No timelines yet. Make one in RFP Manager → Live & graphics → Timelines, then open it here.</div>';
     else if (!id && mode === 'edit' && list.length) { id = list[0].id; history.replaceState(null, '', '?id=' + encodeURIComponent(id)); openTl(); }
   });
   CG.on('tl', (m) => {

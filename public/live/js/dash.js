@@ -39,7 +39,7 @@
     const p = $('#d-pick');
     p.innerHTML = (id ? '' : '<option value="">Choose a dashboard…</option>') + dashList.map((x) => `<option value="${esc(x.id)}" ${x.id === id ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
     if (!id && dashList.length) { id = dashList[0].id; history.replaceState(null, '', '?id=' + encodeURIComponent(id) + (design ? '&edit=1' : '')); CG.send('dash', 'open', { id }).catch(() => { }); }
-    else if (!id) $('#d-main').innerHTML = '<div class="d-empty">No dashboards yet. Make one in RFP Manager → Live → Dashboards, then open it here.</div>';
+    else if (!id) $('#d-main').innerHTML = '<div class="d-empty">No dashboards yet. Make one in RFP Manager → Live & graphics → Dashboards, then open it here.</div>';
   });
   CG.on('dash', (m) => {
     if (m.id !== id) return;
@@ -322,7 +322,7 @@
       </div>
       <h4 style="margin-top:14px">This page</h4><div class="form-grid"><label class="f full"><span>Page name</span><input type="text" data-p="name" value="${esc(pages()[page].name)}"></label></div>
       <div class="row" style="margin-top:6px">${pages().length > 1 ? '<button class="btn sm danger" data-p-del>Delete this page</button>' : ''}<button class="btn sm" data-p-dup>Duplicate page</button></div>
-      <p class="small muted" style="margin-top:12px">Click a control to change it. Live text uses live values in braces: {teamA_name}, {scoreA}, {clock_text}, {var_attendance} … Your own variables are made in RFP Manager → Live → Variables &amp; triggers.</p>`;
+      <p class="small muted" style="margin-top:12px">Click a control to change it. Live text uses live values in braces: {teamA_name}, {scoreA}, {clock_text}, {var_attendance} … Your own variables are made in RFP Manager → Live & graphics → Variables &amp; triggers.</p>`;
       box.addEventListener('input', (e) => { const k2 = e.target.dataset.d, kp = e.target.dataset.p; if (!k2 && !kp) return; if (k2) doc[k2] = e.target.type === 'number' ? Number(e.target.value) : e.target.value; if (kp) { pages()[page].name = e.target.value; drawPages(); } edited(); if (k2 && k2 !== 'name') { clearTimeout(box._t); box._t = setTimeout(() => draw(), 400); } });
       box.addEventListener('change', (e) => { if (e.target.dataset.d === 'theme') { doc.theme = e.target.value; edited(); draw(); } });
       box.addEventListener('click', (e) => {
