@@ -349,3 +349,13 @@ select.appbar-team option { background: #222; font-size: 15px; font-weight: 400;
 .more-list a:last-child { border-bottom: 0; } .more-list a:hover { background: #262626; text-decoration: none; } .more-list a svg { color: var(--dim); }
 .more-foot { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 0 20px; }
 @media print { .appbar, .tabbar { display: none !important; } .shell.android .main { padding: 0; } }
+
+/* boxes slanted too: cards, tiles, the dashboard header, score panels, tables, image wells and dialogs */
+.card, .tile, .hero, .board .tm, .board .mid, .gallery .g, .imgfield .pv, .tablewrap, .more-me, .more-list, .android-app .card { --box: 12px; border-radius: 2px; border-color: transparent; clip-path: polygon(var(--box) 0, 100% 0, calc(100% - var(--box)) 100%, 0 100%); }
+.tile, .gallery .g, .imgfield .pv, .tablewrap { --box: 8px; }
+.card, .hero, .more-me { padding-left: 22px; padding-right: 22px; }
+.board .tm { border-top: 6px solid #888; }          /* the team colour bar stays */
+@media (min-width: 700px) { .modal { --box: 16px; border-radius: 2px; border-color: transparent; clip-path: polygon(var(--box) 0, 100% 0, calc(100% - var(--box)) 100%, 0 100%); padding-left: 30px; padding-right: 30px; } }
+.cpx button, .cpx-sws button { clip-path: none; padding: 0; }
+.noslant { clip-path: none !important; }
+.android-app .card, .android-app .tile, .android-app .hero, .android-app .board .tm, .android-app .board .mid, .android-app .tablewrap { background-color: #2a2a2a; }
