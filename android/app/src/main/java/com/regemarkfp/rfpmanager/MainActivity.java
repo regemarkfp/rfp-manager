@@ -559,6 +559,8 @@ public class MainActivity extends AppCompatActivity implements App.TokenListener
             .setMimeType("application/vnd.android.package-archive")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
             .setDestinationInExternalFilesDir(this, "updates", "rfp-manager.apk");
+        String cookie = CookieManager.getInstance().getCookie(SITE);       // the app is for signed-in team members only
+        if (cookie != null) r.addRequestHeader("Cookie", cookie);
         updateDownload = dm.enqueue(r);
         Toast.makeText(this, "Downloading the update…", Toast.LENGTH_SHORT).show();
         if (downloadDone == null) {
