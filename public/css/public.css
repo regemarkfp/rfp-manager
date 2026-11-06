@@ -291,3 +291,10 @@ input:not([type=checkbox]):not([type=radio]):focus, select:focus, textarea:focus
 .portal-add { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; } .portal-add input { flex: 1 1 200px; padding: 9px 12px; color: var(--text); font: inherit; }
 .modal-box .fld { display: block; margin-top: 10px; } .modal-box .fld > span { display: block; color: var(--dim); font-size: 13px; margin-bottom: 4px; } .modal-box .fld input { width: 100%; box-sizing: border-box; padding: 9px 12px; color: var(--text); font: inherit; }
 .modal-box .err { color: #ff8a8a; }
+/* the client portal: the terms in the signing popup, the account and the client's details */
+.terms-box { text-align: left; max-height: 220px; overflow-y: auto; background: #151515; border: 1px solid #2c2c2c; padding: 10px 12px; margin: 10px 0; font-size: 13px; line-height: 1.45; }
+.terms-box b { display: block; margin: 4px 0; } .terms-box p { margin: 0 0 8px; } .terms-box .pre { white-space: pre-wrap; }
+.portal-signin { margin-bottom: 12px; } .portal-signin input { max-width: 260px; }
+.portal-details { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px 14px; margin-bottom: 10px; }
+.portal-details .fld:last-child { grid-column: 1 / -1; }
+.portal-details input:disabled, .portal-details textarea:disabled { opacity: .7; }
