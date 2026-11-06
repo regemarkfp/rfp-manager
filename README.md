@@ -940,6 +940,14 @@ should be one (for example one made on a production PC before it was linked) are
 **Settings → Production team → Merge another production team into this one** (you must be an Admin of both).
 Everything in the other team moves across, the other team is removed, and linked PCs follow by themselves.
 
+### The Android app and the RegemarkFP look
+
+In the Android app the Studio looks like an Android app: an app bar on top (logo, production team, notifications bell,
+your picture → Settings) and tabs at the bottom (Home, Matches, Productions, Calendar, More; Crew, Coaches and Officials
+get their own), with More listing everything else, your account and Sign out. Forms open as bottom sheets. The website
+and production PCs keep the side menu (`/app?android=1` shows the app layout in a browser, `?android=0` turns it off).
+Buttons everywhere are slanted like the RFP logo.
+
 ### People and roles
 
 Settings → Members (Admins). Adding someone emails them an invitation: **Accept the invitation** opens `/join/<link>`,
