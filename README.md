@@ -942,7 +942,16 @@ Everything in the other team moves across, the other team is removed, and linked
 
 ### People and roles
 
-Settings → Members (Admins). The roles:
+Settings → Members (Admins). Adding someone emails them an invitation: **Accept the invitation** opens `/join/<link>`,
+where they set their own password (no Google account needed) and go straight into the team, or they sign in with Google
+using that email. The link works for 14 days and stops working once they have a password or are removed; **Send invite**
+on their row emails a fresh one.
+
+Phone numbers (booking form, crew, bookings, call sheets, My account) have a country picker and are saved with the code,
+e.g. `+27 82 123 4567`. A number typed with a 0 gets the default code: the WhatsApp country (Settings → Server →
+WhatsApp), otherwise South Africa (+27).
+
+The roles:
 
 | Role | Can |
 |---|---|
