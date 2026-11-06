@@ -246,14 +246,19 @@
     const base = `/api/bookings/${encodeURIComponent(doc.id)}`;
     const when = (t) => new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
     const tick = (w) => (!w ? '' : !w.ok ? '✕ WhatsApp: ' + (w.error || 'not sent') : { sent: '✓ WhatsApp', delivered: '✓✓ WhatsApp', read: '✓✓ WhatsApp (read)' }[w.status] || '✓ WhatsApp');
-    const mailMark = (e) => (!e ? '' : e.ok ? '✓ Email' : '✕ Email: ' + (e.error || 'not sent'));
+    const mailMark = (e) => (!e ? '' : e.ok ? (e.fallback ? '✓ Email (instead of WhatsApp)' : '✓ Email') : '✕ Email: ' + (e.error || 'not sent'));
     const paint = () => {
       const d = (App.docs.get(doc.id) || doc).data;
       const track = d.track || [], stage = (track[track.length - 1] || {}).stage || 'Received';
       const ended = ['Declined', 'Cancelled'].includes(stage);
       const ta = h('textarea', { rows: 3, placeholder: `Write to ${String(d.name || 'the client').split(' ')[0]}…`, style: { width: '100%' } });
-      const viaMail = h('input', { type: 'checkbox', checked: !!d.email, disabled: !d.email });
-      const viaWa = h('input', { type: 'checkbox', checked: !!(d.phone && App.cfg.whatsapp), disabled: !(d.phone && App.cfg.whatsapp) });
+      // ticked the way the client talks to us: WhatsApp only when they write on WhatsApp (or chose it), email only when they chose email
+      const canWa = !!(d.phone && App.cfg.whatsapp), lastIn = (d.messages || []).filter((m) => m.from === 'client').pop();
+      let pref = lastIn && lastIn.via === 'whatsapp' ? 'whatsapp' : /whats/i.test(d.contactBy || '') ? 'whatsapp' : /mail/i.test(d.contactBy || '') ? 'email' : 'both';
+      if (pref === 'whatsapp' && !canWa) pref = d.email ? 'email' : 'both';
+      if (pref === 'email' && !d.email) pref = canWa ? 'whatsapp' : 'both';
+      const viaMail = h('input', { type: 'checkbox', checked: !!d.email && pref !== 'whatsapp', disabled: !d.email });
+      const viaWa = h('input', { type: 'checkbox', checked: canWa && pref !== 'email', disabled: !canWa });
       const send = h('button', { class: 'primary', onclick: async () => {
         if (!ta.value.trim()) return;
         if (!viaMail.checked && !viaWa.checked) return toast('Tick email or WhatsApp');
@@ -289,7 +294,7 @@
           h('label', { class: 'row', style: { gap: '6px' } }, viaMail, d.email ? 'Email ' + d.email : 'No email'),
           h('label', { class: 'row', style: { gap: '6px' }, title: App.cfg.whatsapp ? '' : 'A site admin sets up WhatsApp under Settings → Server' }, viaWa, !d.phone ? 'No phone number' : App.cfg.whatsapp ? 'WhatsApp ' + d.phone : 'WhatsApp (not set up)'),
           h('span', { style: { flex: 1 } }), send),
-        h('p', { class: 'dim small', style: { marginBottom: 0 } }, 'Sent at once by email and WhatsApp, with the link to follow the booking. Their answers come back here.'));
+        h('p', { class: 'dim small', style: { marginBottom: 0 } }, pref === 'whatsapp' ? 'They talk to you on WhatsApp, so messages and step updates go by WhatsApp only (email only if WhatsApp fails). Tick Email to send it there too.' : pref === 'email' ? 'They chose email, so messages and step updates go by email only. Tick WhatsApp to send it there too.' : 'Sent by email and WhatsApp, with the link to follow the booking. Their answers come back here.'));
     };
     paint();
     if ((App.docs.get(doc.id) || doc).data.unread) api('POST', `${base}/seen?team=${App.team}`).then((r) => { App.docs.set(r.doc.id, r.doc); }).catch(() => {});
