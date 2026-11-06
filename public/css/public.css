@@ -236,3 +236,13 @@ button.dl { border: 0; font: inherit; cursor: pointer; }
 .chip { background: #121212; color: var(--text); border: 1px solid var(--line); border-radius: 18px; padding: 7px 13px; font: inherit; font-size: 14px; cursor: pointer; }
 .chip.on { background: #00ff8222; border-color: var(--accent); color: var(--accent); }
 .chip.on::before { content: '✓ '; }
+/* ratings: the card on the tracking page and the reviews on the home page */
+.rate-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin: 0 0 18px; display: grid; gap: 10px; }
+.rate-card h2 { margin: 0; font-size: 19px; } .rate-card textarea { width: 100%; box-sizing: border-box; background: #121212; color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: inherit; }
+.rate-card .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; } .rate-card .primary { background: var(--accent); color: #0b0b0b; border: 0; border-radius: 20px; padding: 10px 22px; font-weight: 700; cursor: pointer; }
+.rate-ok { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 14px; color: var(--dim); } .rate-ok input[type=text], .rate-ok input:not([type]) { background: #121212; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font: inherit; width: 160px; }
+.stars { color: #ffc531; letter-spacing: 2px; } .stars.big { font-size: 30px; }
+.stars.pick { display: flex; gap: 2px; } .stars.pick button { background: none; border: 0; padding: 0 2px; font-size: 22px; line-height: 1; color: #555; cursor: pointer; } .stars.pick.big button { font-size: 38px; } .stars.pick button.on { color: #ffc531; }
+.aspects { display: grid; gap: 4px; } .aspect { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--dim); }
+.reviews { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.review { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; } .review p { margin: 8px 0; line-height: 1.5; }
