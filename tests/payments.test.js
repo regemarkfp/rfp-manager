@@ -71,27 +71,34 @@ test('PayFast: settings, booking deposits, invoices paid online, software sold',
   assert.equal((await admin.put(`/api/docs/booking/${b.id}?team=${team}`, { data: { ...d, depositPaidAt: 0, notes: 'x' } })).status, 200);
   assert.ok((await app.store.get(b.id)).data.depositPaidAt);
 
-  // ---- an invoice paid online from the client page; the email has a "Pay now"
+  // ---- an invoice paid online from the client portal; the email has a "Pay now" to it, and the production's client page pays too
   await admin.put(`/api/docs/production/prod_x?team=${team}`, { data: { name: 'Cup final', date: '2099-01-10', client: 'Test Club', clientEmail: 'club@example.com' } });
-  let prod = await app.store.get('prod_x');
-  await app.save(team, 'production', prod.id, { ...prod.data, invoices: [{ kind: 'invoice', number: 'INV2099-001', date: '2099-01-01', due: '2099-01-31', status: 'Draft', vatRate: 15, lines: [{ label: 'Cameras', qty: 1, amount: 1000 }] }] }, '');
-  await app.invoices.send(await app.store.get(prod.id), 'INV2099-001', {}, 'Test Admin');
-  prod = await app.store.get(prod.id);
-  const ck = prod.data.clientKey;
-  assert.ok(ck, 'a client page made for paying');
-  const mail = app.mail.outbox.find((m) => /Invoice INV2099-001/.test(m.subject));
-  assert.ok(mail.text.includes(`https://site.example/client/${ck}?pay=INV2099-001`), mail.text);
-  let cv = (await guest.get('/api/client/' + ck)).data;
-  assert.equal(cv.invoices[0].pay, `/api/client/${ck}/pay/INV2099-001`);
-  r = (await guest.post(cv.invoices[0].pay, {})).data;
-  assert.equal(field(r, 'amount'), '1150.00');
+  let inv = (await admin.post(`/api/productions/prod_x/invoices?team=${team}`, { kind: 'invoice' })).data.doc;
+  assert.equal(inv.number, 'RFPINV0001');
+  inv = (await admin.put(`/api/invoices/${inv.id}?team=${team}`, { vatRate: 15, lines: [...inv.lines, { item: 'Cameras', qty: 1, rate: 1000 }] })).data.doc;
+  assert.equal(inv.total, 2875);               // booking fee 1500 + cameras 1000, + 15% VAT
+  const sent = await admin.post(`/api/invoices/${inv.id}/send?team=${team}`, {});
+  assert.equal(sent.status, 200, JSON.stringify(sent.data));
+  const mail = app.mail.outbox.find((m) => /Invoice RFPINV0001/.test(m.subject));
+  const portal = sent.data.portal;
+  assert.ok(portal && mail.text.includes(`${portal}?doc=${inv.id}`) && /Pay R2,875\.00 now/.test(mail.text), mail.text);
+  const pkey = portal.split('/portal/')[1];
+  let pv = (await guest.get('/api/portal/' + pkey)).data;
+  assert.equal(pv.docs[0].pay, `/api/portal/${pkey}/pay/${inv.id}`);
+  r = (await guest.post(pv.docs[0].pay, {})).data;
+  assert.equal(field(r, 'amount'), '2875.00');
   assert.equal(field(r, 'email_address'), 'club@example.com');
-  assert.equal(await itn(r.id, '1150.00'), 200);
-  await until(async () => ((await app.store.get(prod.id)).data.invoices[0].status === 'Paid'), 5000, 'invoice paid');
-  cv = (await guest.get('/api/client/' + ck)).data;
-  assert.deepEqual([cv.invoices[0].state, cv.invoices[0].pay], ['Paid', '']);
-  assert.equal((await guest.post(`/api/client/${ck}/pay/INV2099-001`, {})).status, 409);
-  assert.equal((await guest.post(`/api/client/${ck}/pay/NOPE`, {})).status, 404);
+  assert.equal(await itn(r.id, '2875.00'), 200);
+  await until(async () => (await app.invoices.one(team, inv.id)).status === 'Paid', 5000, 'invoice paid');
+  pv = (await guest.get('/api/portal/' + pkey)).data;
+  assert.deepEqual([pv.docs[0].state, pv.docs[0].pay, pv.docs[0].balance], ['Paid', '', 0]);
+  assert.equal((await guest.post(`/api/portal/${pkey}/pay/${inv.id}`, {})).status, 409);
+  assert.equal((await guest.post(`/api/portal/${pkey}/pay/nope`, {})).status, 404);
+  // the production's client page shows it (paid) too
+  const ck = (await admin.post(`/api/productions/prod_x/client-link?team=${team}`)).data.key;
+  const cv = (await guest.get('/api/client/' + ck)).data;
+  assert.deepEqual([cv.invoices[0].number, cv.invoices[0].state, cv.invoices[0].pay], ['RFPINV0001', 'Paid', '']);
+  assert.equal((await guest.post(`/api/client/${ck}/pay/RFPINV0001`, {})).status, 409);
 
   // ---- software with a price: bought on the account, then it downloads
   const sp = await admin.post('/api/software', { name: 'CG Motion', slug: 'cg-motion', price: 250, visible: true });

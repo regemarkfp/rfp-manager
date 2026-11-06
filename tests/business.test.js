@@ -27,19 +27,20 @@ test('company and fan features', async (t) => {
   await put('production', 'production_2', { name: 'Same day', date: '2026-12-05', crew: [{ role: 'crewRole_cam', crewMember: 'crewMember_a' }] });
   assert.equal((await admin.put(`/api/billing${q}`, { legalName: 'Test Productions (Pty) Ltd', vatNo: '4000000000', vatRate: 15, terms: 7, bank: 'Bank · 123' })).status, 200);
   const inv = (await admin.post(`/api/productions/production_1/invoices${q}`, { kind: 'invoice' })).data.doc;
-  assert.match(inv.number, /^INV2026-001$/);
-  assert.deepEqual(inv.lines.map((l) => [l.label, l.qty, l.amount]), [['Camera operator', 1, 1800], ['Camera kit', 2, 900], ['Travel', 1, 500]]);
-  assert.equal(inv.subtotal, 4100); assert.equal(inv.vat, 615); assert.equal(inv.total, 4715);
-  assert.equal((await admin.post(`/api/productions/production_1/invoices${q}`, { kind: 'quote' })).data.doc.number, 'Q2026-001');
-  const pdf = await admin.get(`/api/productions/production_1/invoices/${inv.number}.pdf${q}`);
+  assert.equal(inv.number, 'RFPINV0001');
+  // the booking fee, then the costing
+  assert.deepEqual(inv.lines.map((l) => [l.item, l.qty, l.rate]), [['Booking fee', 1, 1500], ['Camera operator', 1, 1800], ['Camera kit', 2, 900], ['Travel', 1, 500]]);
+  assert.equal(inv.subtotal, 5600); assert.equal(inv.vat, 840); assert.equal(inv.total, 6440);
+  assert.equal((await admin.post(`/api/productions/production_1/invoices${q}`, { kind: 'quote' })).data.doc.number, 'RFPQ0001');
+  const pdf = await admin.get(`/api/invoices/${inv.id}/pdf${q}`);
   assert.equal(pdf.status, 200); assert.ok(pdf.data.toString('latin1').startsWith('%PDF'));
-  const sent = await admin.post(`/api/productions/production_1/invoices/${inv.number}/send${q}`, {});
+  const sent = await admin.post(`/api/invoices/${inv.id}/send${q}`, {});
   assert.equal(sent.data.to, 'client@example.com');
   assert.ok(app.mail.outbox.some((m) => m.to.includes('client@example.com') && m.attachments.length === 1));
-  await admin.put(`/api/productions/production_1/invoices/${inv.number}${q}`, { due: '2020-01-01' });
+  await admin.put(`/api/invoices/${inv.id}${q}`, { due: '2020-01-01' });
   let ov = (await admin.get(`/api/invoices${q}`)).data;
-  assert.equal(ov.overdue, 4715, 'sent and past due: overdue');
-  await admin.put(`/api/productions/production_1/invoices/${inv.number}${q}`, { status: 'Paid' });
+  assert.equal(ov.overdue, 6440, 'sent and past due: overdue');
+  await admin.put(`/api/invoices/${inv.id}${q}`, { status: 'Paid' });
   ov = (await admin.get(`/api/invoices${q}`)).data;
   assert.equal(ov.owed, 0);
 
@@ -61,7 +62,7 @@ test('company and fan features', async (t) => {
   const link = (await admin.post(`/api/productions/production_1/client-link${q}`, {})).data;
   assert.match(link.url, /^https:\/\/site\.example\/client\/[\w-]{16}$/);
   const key = link.key, cv = (await anon.get('/api/client/' + key)).data;
-  assert.equal(cv.name, 'Final'); assert.deepEqual(cv.invoices.map((x) => [x.number, x.state]), [['INV2026-001', 'Paid']], 'drafts (the quote) are not shown');
+  assert.equal(cv.name, 'Final'); assert.deepEqual(cv.invoices.map((x) => [x.number, x.state]), [['RFPINV0001', 'Paid']], 'drafts (the quote) are not shown');
   assert.equal((await anon.get(cv.invoices[0].url)).status, 200);
   assert.equal((await anon.get(`/api/client/${key}/callsheet.pdf`)).status, 200);
   assert.equal((await anon.get('/api/client/nonsense-key-123')).status, 404);
