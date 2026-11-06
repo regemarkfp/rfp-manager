@@ -437,6 +437,8 @@ if [ "$REMOTE" = "$LOCAL" ] || [ "$(printf '%s\n%s\n' "$REMOTE" "$LOCAL" | sort 
 echo "Updating $LOCAL -> $REMOTE"
 curl -fsSL --retry 3 --max-time 120 "$FROM/server/install.sh" | bash -s -- --from "$FROM" --update-key "$KEY"
 EOF
+  # switched to GitHub updates (github-update.sh --install): keep updating from GitHub, not the website
+  if [ -f "$ETC/update-github" ] && [ -f "$APP/tools/server/github-update.sh" ]; then cp "$APP/tools/server/github-update.sh" /usr/local/bin/rfp-autoupdate; fi
   chmod 755 /usr/local/bin/rfp-autoupdate
   cat > /etc/systemd/system/rfp-autoupdate.service <<'EOF'
 [Unit]
