@@ -281,6 +281,101 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
     return box;
   }
+  // ---- the client portal (/portal/<key>): quotes to sign, invoices to pay, productions, bookings, adverts, colleagues
+  function portalPage(key) {
+    const box = el('div', { class: 'portal' }, el('div', { class: 'empty' }, 'Loading…'));
+    const base = '/api/portal/' + encodeURIComponent(key);
+    const zar = (n) => 'R' + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const want = new URLSearchParams(location.search).get('doc');
+    let opened = false;
+    const del = async (url) => { const r = await fetch(url, { method: 'DELETE', credentials: 'same-origin', headers: { 'x-rfp': '1' } }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Something went wrong'); return j; };
+    const modal = (title, ...kids) => { const wrap = el('div', { class: 'modal', onclick: (e) => { if (e.target === wrap) wrap.remove(); } }, el('div', { class: 'modal-box', style: { maxWidth: '560px' } }, el('button', { class: 'icon x', onclick: () => wrap.remove(), 'aria-label': 'Close' }, '✕'), el('h2', {}, title), ...kids)); document.body.append(wrap); return wrap; };
+    // signing a quote: name, a signature drawn with finger or mouse, and agreeing to it
+    function signQuote(x, after) {
+      const cv = el('canvas', { width: 520, height: 170, class: 'sign-pad' });
+      const ctx = cv.getContext('2d');
+      const clear = () => { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.strokeStyle = '#0b1b3a'; ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; drawn = false; };
+      let drawn = false, down = false;
+      const at = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
+      cv.addEventListener('pointerdown', (e) => { down = true; cv.setPointerCapture(e.pointerId); const [px, py] = at(e); ctx.beginPath(); ctx.moveTo(px, py); e.preventDefault(); });
+      cv.addEventListener('pointermove', (e) => { if (!down) return; const [px, py] = at(e); ctx.lineTo(px, py); ctx.stroke(); drawn = true; e.preventDefault(); });
+      ['pointerup', 'pointercancel', 'pointerleave'].forEach((k) => cv.addEventListener(k, () => { down = false; }));
+      clear();
+      const f = { name: '', agree: false };
+      const err = el('p', { class: 'err', style: { display: 'none' } });
+      const btn = el('button', { class: 'primary', onclick: async () => {
+        err.style.display = 'none';
+        if (f.name.trim().length < 2) { err.textContent = 'Type your full name.'; err.style.display = ''; return; }
+        if (!drawn) { err.textContent = 'Sign in the white box.'; err.style.display = ''; return; }
+        if (!f.agree) { err.textContent = 'Tick that you accept the quote and its terms.'; err.style.display = ''; return; }
+        btn.disabled = true;
+        try { await post(x.sign, { name: f.name, agree: true, image: cv.toDataURL('image/png') }); wrap.remove(); say('Signed. Thank you: the production is confirmed.'); after(); } catch (e) { err.textContent = e.message; err.style.display = ''; btn.disabled = false; }
+      } }, 'Sign the quote');
+      const wrap = modal(`Sign quote ${x.number}`,
+        el('p', { class: 'sub' }, `${x.title ? x.title + ' · ' : ''}${zar(x.total)}. `, el('a', { href: x.pdf, target: '_blank', rel: 'noopener' }, 'Read the quote and its terms (PDF)')),
+        el('label', { class: 'fld' }, el('span', {}, 'Your full name'), el('input', { autocomplete: 'name', oninput: (e) => { f.name = e.target.value; } })),
+        el('div', { class: 'fld' }, el('span', {}, 'Your signature'), cv, el('button', { class: 'sm', type: 'button', onclick: clear, style: { marginTop: '6px' } }, 'Clear')),
+        el('label', { class: 'row', style: { display: 'flex', gap: '8px', alignItems: 'flex-start', margin: '12px 0' } }, el('input', { type: 'checkbox', onchange: (e) => { f.agree = e.target.checked; } }), el('span', {}, 'I accept this quote and its terms and conditions on behalf of the client.')),
+        err, btn);
+    }
+    function render2() {
+      get(base).then((c) => {
+        document.title = `${c.client.name} – client portal`;
+        const quotesToSign = c.docs.filter((x) => x.sign);
+        const row = (x) => el('div', { class: 'up-row' + (want === x.id ? ' hl' : ''), id: 'doc-' + x.id },
+          el('div', { class: 'when' }, el('b', {}, x.number), el('span', {}, x.kind === 'quote' ? 'Quote' : 'Invoice')),
+          el('a', { class: 'what', href: x.pdf, target: '_blank', rel: 'noopener', style: { color: 'inherit', textDecoration: 'none' } }, el('b', {}, x.title || (x.kind === 'quote' ? 'Quote' : 'Invoice') + ' ' + x.number),
+            el('span', { class: 'sub' }, `${x.date} · ${x.state}${x.signed ? ` · signed by ${x.signed.name}` : ''} · ${zar(x.total)}${x.kind === 'invoice' && x.balance > 0 && x.balance !== x.total ? ` · ${zar(x.balance)} still due` : ''}`)),
+          el('div', { class: 'row', style: { display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' } }, el('a', { class: 'dl', href: x.pdf, target: '_blank', rel: 'noopener' }, 'PDF'),
+            x.sign ? el('button', { class: 'primary sm', onclick: () => signQuote(x, render2) }, 'Sign') : null,
+            x.pay ? el('button', { class: 'primary sm', onclick: async (e) => { e.target.disabled = true; try { await payGo(x.pay, {}); } catch (er) { say(er.message); e.target.disabled = false; } } }, `Pay ${zar(x.balance)}`) : null));
+        const slot = (s) => {
+          const f = { name: '', from: '' };
+          const file = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif', class: 'hide', style: { display: 'none' }, onchange: async () => {
+            const fl = file.files[0]; if (!fl) return;
+            if (fl.size > 8 * 1024 * 1024) { say('Pictures can be up to 8 MB'); return; }
+            try {
+              const r = await fetch(`${base}/ads?slot=${encodeURIComponent(s.id)}&name=${encodeURIComponent(f.name || fl.name.replace(/\.\w+$/, ''))}&from=${encodeURIComponent(f.from)}`, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': fl.type, 'x-rfp': '1' }, body: fl });
+              const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Could not load it');
+              say(j.invoice ? `Thank you! Invoice ${j.invoice.number} (${zar(j.invoice.total)}) is below; your advert plays once it is approved.` : 'Thank you! Your advert plays once it is approved.');
+              render2();
+            } catch (e) { say(e.message); }
+            file.value = '';
+          } });
+          return el('div', { class: 'svc slot' }, el('b', {}, s.name), el('span', { class: 'sub' }, [s.sport, s.layout, s.width && s.height ? `${s.width} × ${s.height} px` : '', s.seconds ? `${s.seconds} s on screen` : ''].filter(Boolean).join(' · ')),
+            s.description ? el('p', { class: 'sub', style: { margin: '4px 0' } }, s.description) : null, s.formats ? el('p', { class: 'sub small', style: { margin: '2px 0' } }, s.formats) : null,
+            el('div', { style: { fontWeight: 700, margin: '6px 0' } }, s.price ? `${zar(s.price)} per ${s.period || 'month'}` : 'Included'),
+            el('input', { placeholder: 'Name of the advert (optional)', oninput: (e) => { f.name = e.target.value; } }),
+            el('label', { class: 'sub small', style: { display: 'block', marginTop: '6px' } }, 'Start on ', el('input', { type: 'date', style: { width: 'auto' }, oninput: (e) => { f.from = e.target.value; } })),
+            file, el('button', { class: 'primary sm', style: { marginTop: '8px' }, onclick: () => file.click() }, 'Upload your advert'));
+        };
+        const nu = { email: '', name: '' };
+        box.replaceChildren(paidNotice(() => render2()) || '',
+          el('div', { class: 'thead' }, c.client.logo ? el('img', { class: 'tlogo big', src: img(c.client.logo), alt: '' }) : el('span', { class: 'tlogo big ph', style: { background: 'var(--accent)', color: '#111' } }, c.client.name.slice(0, 1)),
+            el('div', { class: 'grow' }, el('div', { class: 'sub' }, `Client portal · ${c.company.name}`), el('h1', {}, c.client.name), el('div', { class: 'sub' }, `Signed in with your link as ${c.me.email}`))),
+          quotesToSign.length || c.owed > 0 ? el('div', { class: 'push-inline' }, el('span', {}, [quotesToSign.length ? `${quotesToSign.length} quote${quotesToSign.length === 1 ? '' : 's'} to sign` : '', c.owed > 0 ? `${zar(c.owed)} owed` : ''].filter(Boolean).join(' · ') + '.'),
+            quotesToSign.length ? el('button', { class: 'primary', onclick: () => signQuote(quotesToSign[0], render2) }, 'Sign now') : null) : null,
+          section('Quotes & invoices', c.docs.length ? el('div', { class: 'up-list' }, c.docs.map(row)) : el('p', { class: 'sub' }, 'Nothing yet.')),
+          c.productions.length ? section('Productions', el('div', { class: 'up-list' }, c.productions.map((p) => el('a', { class: 'up-row', href: p.page, 'data-nav': '' }, el('div', { class: 'when' }, el('b', {}, p.date || ''), el('span', {}, p.number)), el('div', { class: 'what' }, el('b', {}, p.name), el('span', { class: 'sub' }, p.status)), el('span', { class: 'go' }, 'Open ›'))))) : null,
+          c.bookings.length ? section('Bookings & reviews', el('div', { class: 'up-list' }, c.bookings.map((b) => el(b.track ? 'a' : 'div', { class: 'up-row', href: b.track || null, 'data-nav': b.track ? '' : null }, el('div', { class: 'when' }, el('b', {}, b.date || '')),
+            el('div', { class: 'what' }, el('b', {}, b.service || 'Booking'), el('span', { class: 'sub' }, b.stage + (b.rating ? ` · you rated it ${'★'.repeat(b.rating.stars)}${b.rating.comment ? ': "' + b.rating.comment.slice(0, 80) + '"' : ''}` : ''))), el('span', { class: 'go' }, b.track ? 'Follow ›' : ''))))) : null,
+          section('Your adverts', [
+            c.ads.length ? el('div', { class: 'up-list', style: { marginBottom: '14px' } }, c.ads.map((a) => el('div', { class: 'up-row' }, a.image ? el('img', { src: img(a.image), alt: '', style: { width: '140px', maxHeight: '70px', objectFit: 'contain', background: '#222' } }) : el('span', {}),
+              el('div', { class: 'what' }, el('b', {}, a.name), el('span', { class: 'sub' }, (c.slots.find((s) => s.id === a.slot) || {}).name || '')),
+              el('div', { class: 'row', style: { display: 'flex', gap: '6px', alignItems: 'center' } }, el('span', { class: 'chip' + (a.approval === 'Approved' ? ' on' : '') }, a.approval === 'Pending' ? 'Waiting for approval' : a.approval),
+                a.approval !== 'Approved' ? el('button', { class: 'sm', onclick: async () => { if (!confirm('Remove this advert?')) return; try { await del(`${base}/ads/${encodeURIComponent(a.id)}`); render2(); } catch (e) { say(e.message); } } }, 'Remove') : null)))) : null,
+            c.slots.length ? el('div', { class: 'svc-grid' }, c.slots.map(slot)) : el('p', { class: 'sub' }, 'No advert spaces are offered right now.')]),
+          section('People on this portal', el('div', {}, el('div', { class: 'up-list' }, c.users.map((u) => el('div', { class: 'up-row' }, el('div', { class: 'when' }, el('b', {}, u.name || '')), el('div', { class: 'what' }, el('b', {}, u.email), u.me ? el('span', { class: 'sub' }, 'you') : null),
+            !u.me ? el('button', { class: 'sm', onclick: async () => { if (!confirm(`Take ${u.email} off? Their link stops working.`)) return; try { await del(`${base}/users/${encodeURIComponent(u.email)}`); render2(); } catch (e) { say(e.message); } } }, 'Remove') : el('span', {})))),
+            el('div', { class: 'portal-add' }, el('input', { type: 'email', placeholder: 'Colleague\'s email', oninput: (e) => { nu.email = e.target.value; } }), el('input', { placeholder: 'Name', oninput: (e) => { nu.name = e.target.value; } }),
+              el('button', { class: 'primary', onclick: async () => { try { await post(`${base}/users`, nu); say(`Added: ${nu.email} gets an email with their own link.`); render2(); } catch (e) { say(e.message); } } }, 'Add')))),
+          el('p', { class: 'sub small', style: { marginTop: '24px' } }, `Questions? ${[c.company.email, c.company.phone].filter(Boolean).join(' · ')}`));
+        if (want && !opened) { opened = true; const x = c.docs.find((d) => d.id === want); const n = document.getElementById('doc-' + want); if (n) n.scrollIntoView({ block: 'center' }); if (x && x.sign) signQuote(x, render2); }
+      }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
+    }
+    render2();
+    return box;
+  }
   // ---- a booking followed by the client (/track/<key>): its steps, like a parcel, and the conversation
   function trackPage(key) {
     const box = el('div', { class: 'track' }, el('div', { class: 'empty' }, 'Loading…'));
@@ -683,6 +778,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     let view;
     if (centre && !p.startsWith('/match/')) { centre.stop(); centre = null; }
     if (p.startsWith('/client/')) view = clientPage(decodeURIComponent(p.slice(8).replace(/\/$/, '')));
+    else if (p.startsWith('/portal/')) view = portalPage(decodeURIComponent(p.slice(8).replace(/\/$/, '')));
     else if (p.startsWith('/track/')) view = trackPage(decodeURIComponent(p.slice(7).replace(/\/$/, '')));
     else if (p.startsWith('/player/')) view = playerPage(decodeURIComponent(p.slice(8).replace(/\/$/, '')));
     else if (p === '/software') view = softwarePage();
