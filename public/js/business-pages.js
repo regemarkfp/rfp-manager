@@ -111,6 +111,26 @@
     return { el: h('div', {}, pageHead('Quotes & invoices', h('button', { onclick: () => billingForm().catch(oops) }, 'Billing details')), body) };
   };
 
+  // ---- what clients thought: their ratings after the event (from the booking's tracking page)
+  App.pages.ratings = () => {
+    if (!App.can('edit')) return { el: h('div', {}, pageHead('Ratings'), h('div', { class: 'card empty' }, 'Producers and Admins see this.')) };
+    const body = h('div', {}, h('div', { class: 'card dim' }, 'Loading…'));
+    const stars = (n) => h('span', { style: { color: '#ffc531', letterSpacing: '1px' } }, '★'.repeat(Math.round(n)) + '☆'.repeat(5 - Math.round(n)));
+    api('GET', `/api/ratings?team=${App.team}`).then((r) => {
+      const tile = (l, v) => h('div', { class: 'card', style: { margin: 0 } }, h('div', { class: 'dim small' }, l), h('div', { style: { fontSize: '22px', fontWeight: 700 } }, v));
+      body.replaceChildren(
+        h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '14px' } },
+          tile('Average', r.count ? h('span', {}, `${r.average} `, stars(r.average)) : '–'), tile('Ratings', String(r.count)),
+          ...r.aspects.filter((a) => a.average).map((a) => tile(a.aspect, h('span', {}, `${a.average} `, stars(a.average))))),
+        r.list.length ? h('div', { class: 'card' }, h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {}, r.list.map((x) => h('tr', {},
+          h('td', { class: 'nowrap' }, stars(x.stars)), h('td', {}, h('a', { href: '#/edit/booking/' + x.id }, [x.name, x.organisation].filter(Boolean).join(' · ')), h('div', { class: 'dim small' }, [x.service, x.date].filter(Boolean).join(' · '))),
+          h('td', {}, x.comment || h('span', { class: 'dim' }, 'No comment')), h('td', { class: 'dim small nowrap' }, x.publicOk ? (x.hidden ? 'Hidden' : 'On the website') : 'Private'))))))) :
+          h('div', { class: 'card empty' }, 'No ratings yet. When a booking\'s production is completed, the client is asked to rate it (and once more three days later).'),
+        r.google ? h('p', { class: 'dim small' }, 'Clients get a button to post their review on Google too. ', h('a', { href: r.google, target: '_blank', rel: 'noopener' }, 'Your Google review page ↗')) : h('p', { class: 'dim small' }, 'Add your Google review link in Settings → Website so clients can post their review on Google too.'));
+    }).catch((e) => body.replaceChildren(h('div', { class: 'card' }, e.message)));
+    return { el: h('div', {}, pageHead('Ratings'), body) };
+  };
+
   // ---- kit out and back in for a production (scan a barcode or type a serial / name)
   App.pages.kit = (id) => {
     const doc = App.docs.get(id);

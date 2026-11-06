@@ -311,11 +311,36 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
         t.client || t.docs.length ? el('div', { class: 'dls' }, t.client ? el('a', { class: 'dl primary', href: t.client }, 'Your production page ›') : null,
           t.docs.map((x) => [el('a', { class: 'dl', href: x.url, target: '_blank', rel: 'noopener' }, `${x.kind === 'quote' ? 'Quote' : 'Invoice'} ${x.number} (PDF)${x.paid ? ' ✓ paid' : ''}`),
             x.pay ? el('button', { class: 'dl primary', onclick: async (e) => { e.target.disabled = true; try { await payGo(x.pay, {}); } catch (err) { say(err.message); e.target.disabled = false; } } }, `Pay invoice ${x.number} · R ${Number(x.total).toFixed(2)}`) : null])) : null,
+        t.rating ? ratingCard(t) : null,
         section('Messages', el('div', { class: 'chat' }, t.messages.length ? t.messages.map((m) => el('div', { class: 'msg ' + (m.from === 'client' ? 'me' : 'them') + (m.stage ? ' step' : '') },
           el('div', { class: 'sub' }, `${m.by} · ${when(m.at)}`), el('div', { class: 'body' }, m.text))) : el('p', { class: 'sub' }, 'No messages yet. We will write to you here, by email and on WhatsApp.'),
           el('div', { class: 'chat-send' }, ta, el('div', { class: 'row' }, sendBtn, err)))));
     };
-    const load = () => get('/api/public/track/' + encodeURIComponent(key)).then(paint);
+    // after the event: stars, per aspect, a comment, and may we show it; then on to Google if they like
+    function ratingCard(t) {
+      const R = t.rating;
+      const google = R.google ? el('a', { class: 'btn-big primary', href: R.google, target: '_blank', rel: 'noopener' }, 'Share it on Google too ↗') : null;
+      if (R.done) return el('div', { class: 'rate-card', id: 'rate' }, el('h2', {}, 'Thank you for your rating!'), el('div', { class: 'stars big' }, '★'.repeat(R.done.stars) + '☆'.repeat(5 - R.done.stars)),
+        R.done.comment ? el('p', { class: 'sub' }, '“' + R.done.comment + '”') : null,
+        google ? [el('p', {}, 'It helps others find us: would you post it on Google as well? You can copy what you wrote here.'), google] : null);
+      const v = { stars: 0, aspects: {}, comment: '', publicOk: true, shownAs: t.name };
+      const starRow = (val, set, big) => { const row = el('div', { class: 'stars pick' + (big ? ' big' : '') }); const draw = () => row.replaceChildren(...[1, 2, 3, 4, 5].map((n) => el('button', { type: 'button', class: n <= val() ? 'on' : '', 'aria-label': n + ' stars', onclick: () => { set(n); draw(); } }, '★'))); draw(); return row; };
+      const err = el('p', { class: 'err' });
+      const btn = el('button', { class: 'primary' }, 'Send my rating');
+      btn.onclick = async () => {
+        if (!v.stars) { err.textContent = 'Tap the stars first'; return; }
+        btn.disabled = true; err.textContent = '';
+        try { paint(await post(`/api/public/track/${encodeURIComponent(key)}/rate`, v)); const c = document.getElementById('rate'); if (c) c.scrollIntoView({ behavior: 'smooth' }); } catch (e) { err.textContent = e.message; btn.disabled = false; }
+      };
+      return el('div', { class: 'rate-card', id: 'rate' }, el('h2', {}, 'How did we do?'), el('p', { class: 'sub' }, 'Your rating helps us get better. It takes half a minute.'),
+        starRow(() => v.stars, (n) => { v.stars = n; }, true),
+        el('div', { class: 'aspects' }, R.aspects.map((a) => el('div', { class: 'aspect' }, el('span', {}, a), starRow(() => v.aspects[a] || 0, (n) => { v.aspects[a] = n; })))),
+        el('textarea', { rows: 3, placeholder: 'What went well, and what could we do better?', oninput: (e) => { v.comment = e.target.value; } }),
+        el('label', { class: 'rate-ok' }, el('input', { type: 'checkbox', checked: '', onchange: (e) => { v.publicOk = e.target.checked; } }), ' You may show my review on your website as ',
+          el('input', { value: v.shownAs, maxlength: 60, oninput: (e) => { v.shownAs = e.target.value; } })),
+        el('div', { class: 'row' }, btn, err));
+    }
+    const load = () => get('/api/public/track/' + encodeURIComponent(key)).then((t) => { paint(t); if (new URLSearchParams(location.search).get('rate') && t.rating) setTimeout(() => { const c = document.getElementById('rate'); if (c) c.scrollIntoView({ behavior: 'smooth' }); }, 300); });
     load().catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
     timer = setInterval(() => { if (!document.body.contains(box)) return clearInterval(timer); if (!box.querySelector('textarea') || !box.querySelector('textarea').value) load().catch(() => {}); }, 60000);
     return box;
@@ -491,6 +516,10 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
         el('a', { class: 'land-team', href: '#', onclick: (e) => { e.preventDefault(); team(); } }, D.me && D.me.teams ? 'Open your Studio (production team) ›' : 'Sign in as production team')),
       live ? el('a', { class: 'land-live', href: '/watch/' + live.slug }, el('span', { class: 'badge live', style: { position: 'static' } }, '● LIVE'), el('b', {}, live.title), el('span', { class: 'sub' }, live.channel.name + ' · watch now ›')) : null,
       (l.services || []).length ? [el('h2', { class: 'sec' }, 'What we do'), el('div', { class: 'land-services' }, l.services.map((x) => el('a', { class: 'svc', href: '/book?service=' + encodeURIComponent(x.title), 'data-nav': '' }, el('b', {}, x.title), el('p', {}, x.text || ''), el('span', { class: 'more' }, 'Book ›'))))] : null,
+      l.reviews && (l.reviews.list.length || l.reviews.google) ? [el('h2', { class: 'sec' }, 'What clients say', l.reviews.count ? el('span', { class: 'count' }, `${'★'.repeat(Math.round(l.reviews.average))} ${l.reviews.average} from ${l.reviews.count} rating${l.reviews.count === 1 ? '' : 's'}`) : null),
+        l.reviews.list.length ? el('div', { class: 'reviews' }, l.reviews.list.map((r) => el('div', { class: 'review' }, el('div', { class: 'stars' }, '★'.repeat(r.stars) + '☆'.repeat(5 - r.stars)), el('p', {}, '“' + r.comment + '”'),
+          el('div', { class: 'sub' }, [r.by, r.organisation, r.service].filter(Boolean).join(' · '))))) : null,
+        l.reviews.google ? el('p', {}, el('a', { class: 'btn-big', href: l.reviews.google, target: '_blank', rel: 'noopener' }, 'Review us on Google ↗')) : null] : null,
       l.email || l.phone ? el('p', { class: 'land-contact' }, 'Contact us: ', l.email ? el('a', { href: 'mailto:' + l.email }, l.email) : null, l.email && l.phone ? ' · ' : '', l.phone ? el('a', { href: 'tel:' + l.phone.replace(/\s+/g, '') }, l.phone) : null) : null];
   }
   // ---- the booking form (/book), as the site admin set it up (Settings → Website → Booking form; shared/bookingform.js):
