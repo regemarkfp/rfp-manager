@@ -946,6 +946,8 @@ In the Android app the Studio looks like an Android app: an app bar on top (logo
 your picture → Settings) and tabs at the bottom (Home, Matches, Productions, Calendar, More; Crew, Coaches and Officials
 get their own), with More listing everything else, your account and Sign out. Forms open as bottom sheets. The website
 and production PCs keep the side menu (`/app?android=1` shows the app layout in a browser, `?android=0` turns it off).
+An Admin who opens the website or the Studio in a phone's browser on Android (not in the app) is offered the app once
+(Download / Not now; asked again after 14 days).
 Buttons, cards, panels and video thumbnails everywhere are slanted like the RFP logo (add class `noslant` to keep one square).
 
 ### People and roles
