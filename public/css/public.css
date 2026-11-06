@@ -269,3 +269,15 @@ button:focus-visible, .btn-big:focus-visible, .dl:focus-visible { outline: none;
 @media (max-width: 700px) { .land-hero { --box: 18px; padding-left: 28px; padding-right: 28px; } }
 .land-hero { border-color: transparent; }
 .side a.on, .side a:hover { border-radius: 2px; clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%); }
+
+/* slants everywhere: buttons keep their slant whatever other rules say; text fields and chat bubbles slanted too */
+button:not(.icon):not(.avatar-btn):not(.chip), .btn-big, .dl { border-radius: 2px !important; }
+.avatar-btn { clip-path: none; padding: 0; border-radius: 50% !important; }
+.search button { clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%); padding: 8px 20px 8px 14px; }
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]), select, textarea {
+  --fs: 6px; border-radius: 2px !important; border: 0 !important; border-bottom: 2px solid #3d3d3d !important; background-color: #1b1b1b !important;
+  clip-path: polygon(var(--fs) 0, 100% 0, calc(100% - var(--fs)) 100%, 0 100%); padding-left: calc(10px + var(--fs)) !important; padding-right: calc(10px + var(--fs)) !important; }
+textarea { --fs: 10px; }
+.search input { clip-path: polygon(8px 0, 100% 0, 100% 100%, 0 100%); }
+input:not([type=checkbox]):not([type=radio]):focus, select:focus, textarea:focus { outline: none; border-bottom-color: var(--accent) !important; }
+.chat .msg { border-radius: 2px !important; clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%); padding-left: 20px; padding-right: 20px; }

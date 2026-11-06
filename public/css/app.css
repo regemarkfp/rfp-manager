@@ -359,3 +359,12 @@ select.appbar-team option { background: #222; font-size: 15px; font-weight: 400;
 .cpx button, .cpx-sws button { clip-path: none; padding: 0; }
 .noslant { clip-path: none !important; }
 .android-app .card, .android-app .tile, .android-app .hero, .android-app .board .tm, .android-app .board .mid, .android-app .tablewrap { background-color: #2a2a2a; }
+
+/* text fields slanted too: a dark slanted field with a line underneath (accent when typing) */
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]), select, textarea {
+  --fs: 6px; border-radius: 2px; border: 0; border-bottom: 2px solid #4a4a4a; background-color: #121212;
+  clip-path: polygon(var(--fs) 0, 100% 0, calc(100% - var(--fs)) 100%, 0 100%); padding-left: calc(9px + var(--fs)); padding-right: calc(9px + var(--fs)); }
+textarea { --fs: 10px; }
+input:not([type=checkbox]):not([type=radio]):focus-visible, select:focus-visible, textarea:focus-visible { outline: none; border-bottom-color: var(--accent); }
+.android-app input:not([type=checkbox]):not([type=radio]):not([type=color]), .android-app select, .android-app textarea { background-color: #161616; }
+select.appbar-team { clip-path: none; border: 0; background-color: transparent; }
