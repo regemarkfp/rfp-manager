@@ -140,7 +140,8 @@
       { k: 'date', l: 'Date', t: 'date' }, { k: 'days', l: 'Days', t: 'number', ph: '1' }, { k: 'venue', l: 'Venue', t: 'ref', ref: 'venue' },
       { k: 'event', l: 'Event', t: 'text', ph: 'From the competition unless you type one', help: 'Shown on the call sheet and rundown.' },
       { k: 'txTime', l: 'TX / kick-off time', t: 'time', help: 'Default TX time for the crew and the start line of the rundown.' },
-      { k: 'client', l: 'Client', t: 'text' }, { k: 'clientEmail', l: 'Client email', t: 'text', help: 'Quotes, invoices and the client page go here.' }, { k: 'producer', l: 'Producer', t: 'member', roles: ['Producer', 'Admin'] }, { k: 'description', l: 'Description', t: 'textarea' },
+      { k: 'clientRef', l: 'Client', t: 'ref', ref: 'client', help: 'From Clients: quotes and invoices use their details, discount and portal.' },
+      { k: 'client', l: 'Client name (not in Clients)', t: 'text' }, { k: 'clientEmail', l: 'Client email', t: 'text', help: 'Quotes, invoices and the client page go here (the client\'s own email if empty).' }, { k: 'producer', l: 'Producer', t: 'member', roles: ['Producer', 'Admin'] }, { k: 'description', l: 'Description', t: 'textarea' },
       { k: 'booking', l: 'Booking request', t: 'ref', ref: 'booking', hidden: true },
       { k: 'remoteStudio', l: 'Remote studio / gallery', t: 'text', ph: 'OB van, studio name…' }, { k: 'remoteStudioAddress', l: 'Remote studio address', t: 'text' },
       { k: 'contacts', l: 'Key contacts', t: 'list', help: 'Stadium manager, production coordinator, technical manager… Pick a crew member or type a name and number.', fields: [
@@ -241,8 +242,25 @@
       { k: 'serviceDue', l: 'Service / test due', t: 'date' }, { k: 'insuranceUntil', l: 'Insured until', t: 'date' }, { k: 'value', l: 'Replacement value', t: 'money' },
       { k: 'notes', l: 'Notes', t: 'textarea' }, { k: 'image', l: 'Image', t: 'image' }] },
 
+    client: { label: 'Client', plural: 'Clients', group: 'Productions', title: (d) => d.name, cols: ['logo', 'name', 'kind', 'email', 'phone', 'discount'], fields: [
+      { k: 'name', l: 'Name', t: 'text', req: true, ph: 'Grey College' }, { k: 'logo', l: 'Logo', t: 'image' }, { k: 'kind', l: 'Kind', t: 'combo', opts: ['School', 'Club', 'Church', 'Union / federation', 'Company', 'Production company', 'Broadcaster', 'Individual', 'Other'] },
+      { k: 'email', l: 'Email (accounts)', t: 'text', help: 'Quotes and invoices go here; the main contact\'s email if empty.' }, { k: 'phone', l: 'Phone', t: 'phone' }, { k: 'website', l: 'Website', t: 'text' },
+      { k: 'vatNo', l: 'VAT number', t: 'text' }, { k: 'regNo', l: 'Registration / ID number', t: 'text' },
+      { k: 'address', l: 'Address', t: 'textarea', ph: '2 Payne Road\nBryanston, Johannesburg 2191\nSouth Africa' },
+      { k: 'discount', l: 'Custom discount (%)', t: 'number', ph: '0', help: 'Given on every new quote and invoice for this client (you can still change it per document).' },
+      { k: 'rates', l: 'Custom rates', t: 'list', help: 'A different price for this client on certain products or services.', fields: [{ k: 'service', l: 'Product / service', t: 'ref', ref: 'service' }, { k: 'rate', l: 'Their price', t: 'money', w: 140 }] },
+      { k: 'terms', l: 'Payment terms (days)', t: 'number', ph: 'your default', help: 'Due date of their invoices.' },
+      { k: 'contacts', l: 'Contact people', t: 'list', fields: [{ k: 'name', l: 'Name', t: 'text' }, { k: 'role', l: 'Role', t: 'text', w: 150 }, { k: 'email', l: 'Email', t: 'text' }, { k: 'phone', l: 'Phone', t: 'phone' }, { k: 'primary', l: 'Main', t: 'bool', w: 60 }] },
+      { k: 'notes', l: 'Private notes', t: 'textarea' }] },
+    service: { label: 'Product / service', plural: 'Products & services', group: 'Productions', title: (d) => d.name, cols: ['name', 'category', 'rate', 'unit', 'active'], fields: [
+      { k: 'name', l: 'Item', t: 'text', req: true, ph: 'Full Day Tariff' }, { k: 'description', l: 'Description', t: 'textarea', ph: 'Booking fee for full day of work up to 10 hours' },
+      { k: 'rate', l: 'Price', t: 'money', help: 'Unit price on quotes and invoices (before VAT).' }, { k: 'cost', l: 'Cost to you', t: 'money', help: 'Private: what it costs you, for the profit on a production.' },
+      { k: 'unit', l: 'Per', t: 'combo', opts: ['day', 'hour', 'km', 'item', 'match', 'production', 'month'] }, { k: 'qty', l: 'Default quantity', t: 'number', ph: '1' },
+      { k: 'category', l: 'Category', t: 'combo', opts: ['Production', 'Crew', 'Equipment rental', 'Streaming', 'Graphics', 'Travel', 'Post-production', 'Photography', 'Fees', 'Other'] },
+      { k: 'active', l: 'In use', t: 'bool', def: true, help: 'Off: kept for old documents but not offered on new ones.' }, { k: 'notes', l: 'Private notes', t: 'textarea' }] },
     advert: { label: 'Advert', plural: 'Adverts', group: 'Advertising', title: (d) => [d.name, d.sponsor].filter(Boolean).join(' · '), cols: ['image', 'name', 'sponsor', 'layout', 'duration'], fields: [
-      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'sponsor', l: 'Sponsor / client', t: 'text' }, { k: 'sponsorEmail', l: 'Sponsor email (proof of play)', t: 'text', ph: 'marketing@sponsor.example', help: 'Gets the monthly proof-of-play report (Advertising → Sponsor reports).' },
+      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'sponsor', l: 'Sponsor / client', t: 'text' }, { k: 'client', l: 'Client', t: 'ref', ref: 'client', help: 'Clients load their own adverts from their portal; they show here as Pending.' },
+      { k: 'approval', l: 'Approval', t: 'select', opts: ['Approved', 'Pending', 'Rejected'], def: 'Approved', help: 'Adverts loaded by a client from their portal wait for your approval; only Approved adverts play.' }, { k: 'slot', l: 'Ad space', t: 'ref', ref: 'adSlot' }, { k: 'sponsorEmail', l: 'Sponsor email (proof of play)', t: 'text', ph: 'marketing@sponsor.example', help: 'Gets the monthly proof-of-play report (Advertising → Sponsor reports).' },
       { k: 'kind', l: 'Kind', t: 'select', opts: ['Image', 'CasparCG clip'], def: 'Image' },
       { k: 'image', l: 'Image', t: 'image' }, { k: 'clip', l: 'CasparCG clip name', t: 'text', ph: 'ADS/SPONSOR_30', help: 'A video in CasparCG\'s media folder. Used when Kind is "CasparCG clip".' },
       { k: 'layout', l: 'Layout', t: 'select', opts: ['Full screen', 'Lower banner', 'Corner bug', 'Side panel', 'Custom position'], def: 'Full screen' },
@@ -299,6 +317,7 @@
       { k: 'venue', l: 'Where', t: 'text' }, { k: 'town', l: 'Town / city', t: 'text' }, { k: 'contactBy', l: 'Best way to reach them', t: 'combo', opts: ['WhatsApp', 'Email', 'Phone call'] }, { k: 'budget', l: 'Budget', t: 'text' }, { k: 'heard', l: 'Heard about us from', t: 'text' },
       { k: 'details', l: 'What they asked', t: 'textarea' }, { k: 'notes', l: 'Our notes', t: 'textarea' }, { k: 'received', l: 'Received', t: 'text', help: 'When the request came in from the website.' },
       { k: 'production', l: 'Production', t: 'ref', ref: 'production', help: 'The production made for this booking.' },
+      { k: 'clientRef', l: 'Client', t: 'ref', ref: 'client', help: 'The client record (Clients). Their portal shows this booking.' },
       { k: 'deposit', l: 'Deposit (ZAR)', t: 'money', help: 'Optional. The client can pay it with PayFast on their tracking page; once paid the booking is Booked.' },
       { k: 'clientStage', l: 'Client sees', t: 'select', opts: ['', ...BOOKING_STAGES], help: 'Empty: the step follows the work (producer, quote sent, confirmed, crew booked, the date, completed). Choose one to set it by hand.' },
       { k: 'quiet', l: 'Quiet', t: 'bool', help: 'On: the client is not sent a message when the step changes (replies still go).' }] },
@@ -312,6 +331,15 @@
       { k: 'status', l: 'Status', t: 'select', opts: EXPENSE_STATUS, def: 'Submitted', help: 'Producers and Admins approve, reject or mark as paid back.' },
       { k: 'note', l: 'Note', t: 'textarea' }] },
 
+    adSlot: { label: 'Ad space', plural: 'Ad spaces', group: 'Advertising', title: (d) => [d.name, d.sport].filter(Boolean).join(' · '), cols: ['name', 'sport', 'layout', 'width', 'height', 'price', 'period', 'active'], fields: [
+      { k: 'name', l: 'Name', t: 'text', req: true, ph: 'Rugby lower banner' }, { k: 'sport', l: 'Sport', t: 'combo', opts: ['General', 'Rugby', 'Cricket', 'Soccer', 'Hockey', 'Netball', 'Athletics', 'Tennis', 'Basketball', 'Water polo', 'Church'], def: 'General', help: 'Clients see the spaces for General and for the sports of their productions.' },
+      { k: 'active', l: 'Offered to clients', t: 'bool', def: true },
+      { k: 'layout', l: 'Layout', t: 'select', opts: ['Full screen', 'Lower banner', 'Corner bug', 'Side panel', 'Custom position'], def: 'Lower banner' },
+      { k: 'width', l: 'Width (px)', t: 'number', ph: '1920', help: 'The size of the picture the client must make (on a 1920×1080 picture).' }, { k: 'height', l: 'Height (px)', t: 'number', ph: '200' },
+      { k: 'x', l: 'Left (px)', t: 'number', ph: '0' }, { k: 'y', l: 'Top (px)', t: 'number', ph: '880' }, { k: 'duration', l: 'Seconds on screen', t: 'number', ph: '10' },
+      { k: 'formats', l: 'File types', t: 'text', ph: 'PNG or JPG, under 8 MB', def: 'PNG or JPG (transparent PNG for banners), up to 8 MB' },
+      { k: 'price', l: 'Price (ZAR)', t: 'money', help: 'What a sponsor pays for this space. 0 = free (e.g. included in the production).' }, { k: 'period', l: 'Per', t: 'combo', opts: ['match', 'production', 'month', 'season', 'year'], def: 'month' },
+      { k: 'description', l: 'Description for clients', t: 'textarea', ph: 'Shown during the live stream between plays, about every 10 minutes.' }] },
     playlist: { label: 'Ad playlist', plural: 'Ad playlists', group: 'Advertising', title: (d) => d.name, cols: ['name', 'loop'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'loop', l: 'Loop until stopped', t: 'bool' },
       { k: 'items', l: 'Adverts', t: 'list', fields: [{ k: 'advert', l: 'Advert', t: 'ref', ref: 'advert' }, { k: 'duration', l: 'Seconds (optional)', t: 'number', w: 150 }] }] },
@@ -324,7 +352,7 @@
   // Everything else is managed on the website.
   const PC_EDIT = ['graphic', 'theme', 'dashboard', 'timeline', 'variable', 'gametrigger'];
 
-  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'musicuse', 'songuse', 'bible', 'product', 'user', 'machinekey', 'purchase', 'streamclip', 'comment', 'viewstat', 'streamvideo', 'mcr', 'videoad', 'adpreset', 'pushdevice', 'notification'];
+  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'musicuse', 'songuse', 'bible', 'product', 'user', 'machinekey', 'purchase', 'streamclip', 'comment', 'viewstat', 'streamvideo', 'mcr', 'videoad', 'adpreset', 'pushdevice', 'notification', 'invoice'];
   const ALL_TYPES = [...Object.keys(E), ...SYSTEM_TYPES];
 
   const has = (v) => v !== undefined && v !== null && v !== '';
