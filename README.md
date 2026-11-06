@@ -18,6 +18,13 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.0
+
+- **Menu** grouped by what you do: Clients & sales, Productions, Sport, Live & graphics, Streaming, Adverts & sponsors, Media & music, Worship.
+- **Dashboard analytics** for Admins only. **Producers** get the crew notifications (crew booked on a production, crew answers) but do not write to clients: client messages go to the Admins, who reply.
+- **Client portal accounts**: a new client with an email gets a welcome email with their portal link. On the portal they sign in with Google or create a password, then keep their details (name, accounts email, phone, VAT and registration numbers, address) up to date; quotes and invoices show them. Signed in on the website, the account menu lists their portals.
+- **Superuser page** at analytics.<your website> (or /super): the website's health (version, uptime, database, memory, load, disk, email, payments, WhatsApp, push, live streams, PCs online) and every production company with its users per role and its numbers. Sign in with a superuser email (`superUsers` in config.json or `SUPER_USERS`; info@regemarkfp.com by default) and a password set from the emailed **Set or reset password** link. Only Admins who accepted the **Admin terms** (asked once in the Studio) are named, with a CSV of those who did not opt out of marketing email (Settings → My account). Add the public hostname analytics.<your website> → http://localhost:8080 to the Cloudflare tunnel.
+
 ## 1. Run it on the production PC
 
 1. Install **Node.js 22.13 or newer** (the current LTS from https://nodejs.org is fine). Nothing else to install.
@@ -182,7 +189,7 @@ vMix, ATEM, HyperDeck, OBS, Companion …). Nothing has to be opened on the rout
 
 - On the website, the menu shows **PC: <name>** under the team. With one PC online it is used straight away; with
   several, pick one (remembered per browser). "No PC (website only)" uses the website itself (scoring and records,
-  no graphics). **Live → Production PCs** (or "+ Link a production PC…" in that list) shows which PCs are online.
+  no graphics). **Live & graphics → Production PCs** (or "+ Link a production PC…" in that list) shows which PCs are online.
 - Settings on the website gets **Connections** and **Production PC** tabs for the PC in use (Admins).
 - **Monitors** on the website gives links that work anywhere. View-only screens (confidence monitor, rundown,
   output, preview, fill/key, stage, crew view) carry the PC and its screen key, e.g.
@@ -377,8 +384,8 @@ can be the website, its database and the house NAS in one:
 | **Rundown** | Per match or production. Start times follow on from durations; a typed time pins an item. Each line can have a colour. **Print** gives the run order sheet (header box, Item / Time / Content / Source / Sound / Graphics / Duration, coloured lines). **Monitor** opens the rundown monitor. |
 | **Productions** | Event, TX time, remote studio, key contacts, crew by location with call and TX times, additional information, nearest hospitals, equipment and other costs. Costing shows cost, invoice, profit and margin. **Call sheet** prints with your production team's name, logo and details (Settings → Production team), followed by the run order. |
 | **Adverts** | Images (full screen, lower banner, corner bug, side panel, or a custom position and size in pixels) or CasparCG video clips, single or as a playlist. Per advert: picture fit, background, transition and its time, CasparCG channel, layer and template, loop and clip volume, run from / until dates and most plays a day (playlists skip adverts outside their dates or over their daily plays). Every play is logged for proof of play with the time it was really on air. |
-| **Timelines** | Live → Timelines: a show on tracks against time, run with PLAY and GO (see Timeline below). |
-| **Play log** | Live → Play log: everything that went to air (graphics and adverts) with start, end, time on air, channel-layer, the text on it, **who took it** (the screen, the person and their address: "Graphics control · Ruan · 100.64.0.7", "Timeline GO", "Trigger", "Companion", "Input", "Ad playlist"), who took it off, and the **production** and match. Filter by dates, kind, production, match, person / screen, text, and pick only certain graphics or adverts; totals per sponsor and advert; **Print report** (a printable page of what the filters show, with totals) and Export CSV. |
+| **Timelines** | Live & graphics → Timelines: a show on tracks against time, run with PLAY and GO (see Timeline below). |
+| **Play log** | Adverts & sponsors → Play log: everything that went to air (graphics and adverts) with start, end, time on air, channel-layer, the text on it, **who took it** (the screen, the person and their address: "Graphics control · Ruan · 100.64.0.7", "Timeline GO", "Trigger", "Companion", "Input", "Ad playlist"), who took it off, and the **production** and match. Filter by dates, kind, production, match, person / screen, text, and pick only certain graphics or adverts; totals per sponsor and advert; **Print report** (a printable page of what the filters show, with totals) and Export CSV. |
 | **Monitors** | The short link for every screen on this PC. |
 | **Worship** | Services, songs, CCLI report and Bibles (see Worship control below). |
 | **Phones and tablets** | Every screen fits a phone and a tablet: the side menu opens from ☰, tab rows swipe sideways, scorers and Graphics control stack into one column, bigger touch targets, and the commentary and rundown monitors turn into one column you scroll when the screen is upright. On the Timeline hold a finger on a track to add a cue. |
@@ -445,7 +452,7 @@ player (on the field first, then the bench). The big number on each side is how 
 - **On the field:** players on for each side, from the line-up, substitutions, sin bins and red cards. − / +
   corrects it by hand.
 - **Lineup:** who starts, who is on the bench and who is not playing, with their number and position for this
-  match. It starts from the team's squad (the *Starter* tick in Assets → Teams).
+  match. It starts from the team's squad (the *Starter* tick in Sport → Teams).
 - **History:** every event, newest first. ⚑ marks a moment, ✎ changes the team, player or time, ✕ deletes it, and
   **+ Add event** logs one afterwards.
 - **Match statistics** (tackles, carries, possession …) sit under the scoring rows unless the competition or match is
@@ -511,7 +518,7 @@ scorer link; both work on the same match at the same time.
 
 Events that aren't set up yet are made from the names the system sends (gender, age group and discipline are read from "Men's 100 Meter", "Girls U16 80m Hurdles"…), the race being timed becomes the current event (graphics follow), and the race clock runs from the system. Results from .lif files are official: lines from a scoreboard never overwrite them. Serial ports on Windows are read through PowerShell (no drivers or extra software). New template fields: `ath_gender`, `ath_age`, `ath_discipline`, `rsN_reaction`.
 
-### Variables (Live → Variables)
+### Variables (Live & graphics → Variables)
 
 Every value RFP Manager can put in a template, listed sport by sport: **Every sport** (the same names in cricket and the others), **All sports except cricket** (clocks, cards, statistics …), each sport's own names, **Production and devices** (date, team, timeline, vMix / ATEM, your own variables) and **Graphic fields** (what each built-in graphic sends: line1, player_name …). Each row has the name, what it is, an example from a sample match (green: the value now, with a match on air) and **Copy**; numbered series (sl1_name … sl16_name) are one row with a number to choose. Copy as `{key}` (text fields and actions), `key`, or `data-f="key"` (your own HTML). Search covers every sport at once; "Copy all" copies a whole group.
 
@@ -640,7 +647,7 @@ button actions.
 
 ### Dashboards
 
-Your own control panels: Live → Dashboards → new → **Design**. Drag controls onto the page, drag to move, drag the
+Your own control panels: Live & graphics → Dashboards → new → **Design**. Drag controls onto the page, drag to move, drag the
 corner to resize (snaps to the grid; Alt for free), and set each one up on the right:
 
 | Control | Does |
@@ -662,7 +669,7 @@ mode works on a PC, tablet or phone: the page scales to the screen (a phone held
 dashboard's record, the `/dash` link (Monitors), or the app's tray menu. Using a dashboard needs the Scorer role;
 designing one, Producer.
 
-### Variables and game triggers (Live → Variables & triggers)
+### Variables and game triggers (Live & graphics → Variables & triggers)
 
 **Variables** are your own values: a name and a key, text, number (lowest / highest), on / off or one of a list,
 kept as one value, one per sport, per competition or **per match**, and optionally only for one sport or competition.
@@ -682,7 +689,7 @@ the match on air; the play log shows them as "Game trigger".
 ### Timeline
 
 A show laid out on tracks against time, for concerts, services, awards, half-time shows and anything that runs to a
-plan. Make one under Live → Timelines (name, date, the production or match it belongs to, length, tempo), then
+plan. Make one under Live & graphics → Timelines (name, date, the production or match it belongs to, length, tempo), then
 **Open timeline**.
 
 - **Tracks** for shots, graphics, lyrics, lights, audio, playback, notes or anything else. A track can be switched
@@ -886,11 +893,11 @@ Cancel puts the colour back. A colour without transparency is stored as `#rrggbb
 
 ### Music rights, cue sheets and the production report
 
-- **Music library** (Music → Music library): every track with its title, artist, composers, publishers, ISWC / ISRC, length, and its rights: where it comes from (commercial release, production music library, royalty-free, commissioned …), whether it is cleared, what for (TV, stream, social, PA, radio) and from / until when. Admins and Producers edit it.
+- **Music library** (Media & music → Music library): every track with its title, artist, composers, publishers, ISWC / ISRC, length, and its rights: where it comes from (commercial release, production music library, royalty-free, commissioned …), whether it is cleared, what for (TV, stream, social, PA, radio) and from / until when. Admins and Producers edit it.
 - **Theme music**: a competition has its own theme music (Competition → Theme music), and a production can add more (Production → Music & report). Music playout on the production PC shows the theme music of the match on air first, then the whole library.
 - **What gets logged, by itself**: tracks played from Music playout (CasparCG, layer 60 of the program channel), a vMix input whose title is a track's "vMix input title" while it runs (and is not muted), and the music under stream slates (Master control). Anything else (a DJ, the stadium PA, a band, the ATEM) goes on the production under "Music used (added by hand)". Tracks that are not cleared ask before they play and are flagged on the report.
 - **After the production**: Production → Report & cue sheet. The report has the summary, matches and results, commentators and officials, crew and costs, the graphics and adverts that went to air, the music, the stream's viewers and recordings, and the incidents logged on the production (PDF or print). The music cue sheet comes in the SAMRO layout and a broadcaster layout, each as PDF or CSV, timed from the TX time.
-- **Rights holders**: Music → Music use report lists every use over a period for a composer, publisher or library (CSV to send them).
+- **Rights holders**: Media & music → Music use report lists every use over a period for a composer, publisher or library (CSV to send them).
 
 ### Production numbers, completing a production and its report
 
@@ -922,16 +929,16 @@ Settings → Website → Software on the website (site admins): add an app with 
 
 ### Running the company
 
-- **Clients** (Productions → Clients): name, logo, kind, accounts email, phone, website, VAT and registration numbers, address, contact people, a custom discount (%) given on every new quote and invoice, their own prices for certain products or services, payment terms, private notes. A production or booking links to its client.
-- **Products & services** (Productions → Products & services): item, description, price, your cost, per (day, km …), default quantity, category. On a quote or invoice, type an item or pick it from the list: the description and price (or the client's own price) fill in.
-- **Quotes & invoices** (Productions → Quotes & invoices, on each production and on each client): numbered **RFPQ0001** and **RFPINV0001** (prefixes, digits and the next numbers under Billing details, e.g. carry on from Invoice Ninja at RFPINV0557). Every new one starts with the **booking fee** (R1 500 by default, with a description of what it is for; amount, wording or off under Billing details), then the production's costing when made from a production. Everything stays editable like in Invoice Ninja: client, production, title, number, dates, PO number, status, and every line (item, production/rental date, description, unit cost, quantity, discount %), a discount on the whole (% or rand), VAT, invoice terms and a note; payments are recorded (Partial / Paid) or added by PayFast. A quote becomes an invoice with **Convert**; **Copy** makes a new one. The PDF follows RegemarkFP's Invoice Ninja layout: logo and company, the numbers and balances with the client's details, the lines with their dates, invoice terms with the banking details and the totals, then the terms and conditions and the tagline (Billing details). Quotes carry a **signature line**: the client signs in their portal, which accepts the quote and confirms its production (the team is told).
+- **Clients** (Clients & sales → Clients): name, logo, kind, accounts email, phone, website, VAT and registration numbers, address, contact people, a custom discount (%) given on every new quote and invoice, their own prices for certain products or services, payment terms, private notes. A production or booking links to its client.
+- **Products & services** (Clients & sales → Products & services): item, description, price, your cost, per (day, km …), default quantity, category. On a quote or invoice, type an item or pick it from the list: the description and price (or the client's own price) fill in.
+- **Quotes & invoices** (Clients & sales → Quotes & invoices, on each production and on each client): numbered **RFPQ0001** and **RFPINV0001** (prefixes, digits and the next numbers under Billing details, e.g. carry on from Invoice Ninja at RFPINV0557). Every new one starts with the **booking fee** (R1 500 by default, with a description of what it is for; amount, wording or off under Billing details), then the production's costing when made from a production. Everything stays editable like in Invoice Ninja: client, production, title, number, dates, PO number, status, and every line (item, production/rental date, description, unit cost, quantity, discount %), a discount on the whole (% or rand), VAT, invoice terms and a note; payments are recorded (Partial / Paid) or added by PayFast. A quote becomes an invoice with **Convert**; **Copy** makes a new one. The PDF follows RegemarkFP's Invoice Ninja layout: logo and company, the numbers and balances with the client's details, the lines with their dates, invoice terms with the banking details and the totals, then the terms and conditions and the tagline (Billing details). **Quote and invoice terms** under Billing details apply to every document that has no terms of its own. Signing a quote is a **contract**: in their portal the client opens a popup with the terms and conditions, types their name and draws their signature or loads a picture of it. The quote PDF stays clean; the signature, the terms as they stood at that moment and a fingerprint (SHA-256) are kept with the quote, and **Contract (PDF)** shows the signed agreement (in the Studio and the portal). Signing confirms the production and tells the team.
 - **Client portal** (`/portal/<link>`): emailing a quote or invoice gives the client a portal with all their quotes (to read and sign), invoices (to pay with PayFast), productions, bookings and reviews, and their adverts. Everyone on it has their own link; they add colleagues themselves, and you see and remove them on the client's page (Invite to the portal).
-- **Ad spaces** (Advertising → Ad spaces): sizes and places for client adverts (per sport or General, layout, width × height in pixels, seconds on screen, file types, price per match / month / season). Clients upload their picture in the portal; it waits as **Pending** under Adverts until you set it to Approved (only approved adverts play), and a paid space gets an invoice they pay in the portal.
+- **Ad spaces** (Adverts & sponsors → Ad spaces): sizes and places for client adverts (per sport or General, layout, width × height in pixels, seconds on screen, file types, price per match / month / season). Clients upload their picture in the portal; it waits as **Pending** under Adverts until you set it to Approved (only approved adverts play), and a paid space gets an invoice they pay in the portal.
 - **Importing from Invoice Ninja** (Quotes & invoices → Import from Invoice Ninja, Admins): your Invoice Ninja address and an API token (Settings → Account Management → Integrations → API Tokens; used once, not kept). Clients with their contacts, products, quotes and invoices (with what was paid, the line dates, and a copy of each Invoice Ninja PDF) come across as a backup; run it again for anything newer. Quotes and invoices kept on productions before 0.1.48 moved to the new list by themselves.
 - **Crew answers from the call sheet email**: "I'm in" / "Can't make it" buttons, no sign-in needed; the producer is told. Crew mark the days they cannot work (My availability); a production shows clashes (not available, booked twice the same day, declined).
 - **Kit out / in** per production: scan a barcode (or type a serial or name) as kit goes out and comes back; damaged and missing items; service and insurance dates on equipment.
 - **Client page**: a private link per production with its call sheet, stream, recordings, report and the quotes and invoices you have sent.
-- **Sponsor reports** (Advertising → Sponsor reports): proof of play per sponsor per month from the playout log, as a PDF and emailed to the sponsor email on their adverts.
+- **Sponsor reports** (Adverts & sponsors → Sponsor reports): proof of play per sponsor per month from the playout log, as a PDF and emailed to the sponsor email on their adverts.
 - **Health alerts** during a show: a weak stream for a minute, a live match with no scoring for 12 minutes, a production PC going offline on a production day.
 
 ### For fans
@@ -1090,7 +1097,7 @@ Received → Being reviewed → Quote sent → Confirmed → Crew booked → Eve
 link straight to the rating on their tracking page (and one reminder three days later if they have not). They give
 1–5 stars overall and for quality, communication, punctuality and setup, and value for money, a comment, and say
 whether you may show it on the website (and under what name). The team gets an email and a notification; the rating
-is on the booking and on **Productions → Ratings** (averages and every rating). Reviews clients allowed show under
+is on the booking and on **Clients & sales → Ratings** (averages and every rating). Reviews clients allowed show under
 *What clients say* on the home page (hide one from the booking; switch them all off in Settings → Website).
 
 Google does not let a website post a review for someone, so after rating, clients get a **Share it on Google too**
