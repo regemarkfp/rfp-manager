@@ -145,13 +145,13 @@
       { k: 'remoteStudio', l: 'Remote studio / gallery', t: 'text', ph: 'OB van, studio name…' }, { k: 'remoteStudioAddress', l: 'Remote studio address', t: 'text' },
       { k: 'contacts', l: 'Key contacts', t: 'list', help: 'Stadium manager, production coordinator, technical manager… Pick a crew member or type a name and number.', fields: [
         { k: 'title', l: 'Title', t: 'combo', opts: ['Stadium Manager', 'Production Coordinator', 'Technical Manager', 'Producer', 'Client Contact', 'Safety Officer'] },
-        { k: 'crewMember', l: 'Crew member', t: 'ref', ref: 'crewMember' }, { k: 'name', l: 'or name', t: 'text' }, { k: 'phone', l: 'Phone', t: 'text' }] },
+        { k: 'crewMember', l: 'Crew member', t: 'ref', ref: 'crewMember' }, { k: 'name', l: 'or name', t: 'text' }, { k: 'phone', l: 'Phone', t: 'phone' }] },
       { k: 'crew', l: 'Crew', t: 'list', fields: [{ k: 'location', l: 'Location', t: 'combo', opts: ['Gallery', 'Venue', 'Studio', 'OB Van', 'Remote'], w: 150 }, { k: 'role', l: 'Role', t: 'ref', ref: 'crewRole' },
         { k: 'crewMember', l: 'Crew member', t: 'ref', ref: 'crewMember' }, { k: 'callTime', l: 'Call time', t: 'time' }, { k: 'productionTime', l: 'TX time', t: 'time' },
         { k: 'confirmed', l: 'Confirmed', t: 'bool', w: 90, help: 'Tick when this person has said yes: they get an email that they are hired, with the call sheet.' },
         { k: 'rate', l: 'Day rate', t: 'money', w: 110, ph: 'role rate', help: 'Only if this person is paid differently from the role.' }, { k: 'paid', l: 'Paid', t: 'bool', w: 70 }] },
       { k: 'crewNotes', l: 'Additional information', t: 'textarea', ph: 'Entrance: please use the bottom gate. Bring a set of headphones for comms.', help: 'One point per line. Start a line with "Label:" to print the label in bold.' },
-      { k: 'hospitals', l: 'Emergency: nearest hospitals', t: 'list', fields: [{ k: 'name', l: 'Hospital', t: 'text' }, { k: 'area', l: 'Area', t: 'text' }, { k: 'phone', l: 'Phone', t: 'text' }] },
+      { k: 'hospitals', l: 'Emergency: nearest hospitals', t: 'list', fields: [{ k: 'name', l: 'Hospital', t: 'text' }, { k: 'area', l: 'Area', t: 'text' }, { k: 'phone', l: 'Phone', t: 'phone' }] },
       { k: 'equipment', l: 'Equipment', t: 'list', fields: [{ k: 'item', l: 'Item', t: 'ref', ref: 'equipment' }, { k: 'quantity', l: 'Qty', t: 'number', w: 80 }, { k: 'notes', l: 'Notes', t: 'text' }] },
       { k: 'extras', l: 'Other costs', t: 'list', fields: [{ k: 'description', l: 'Description', t: 'text' }, { k: 'cost', l: 'Cost', t: 'money' }, { k: 'invoice', l: 'Invoice', t: 'money' }] },
       { k: 'fixtures', l: 'Matches', t: 'list', hidden: true, fields: [{ k: 'fixture', l: 'Match', t: 'ref', ref: 'fixture' }] },
@@ -225,7 +225,7 @@
     crewMember: { label: 'Crew member', plural: 'Crew', group: 'Productions', title: (d) => [d.name, d.surname].filter(Boolean).join(' '), cols: ['image', 'name', 'surname', 'phone', 'email'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'surname', l: 'Surname', t: 'text' }, { k: 'dateOfBirth', l: 'Date of birth', t: 'date' },
       { k: 'idNumber', l: 'ID number', t: 'text', sensitive: true, help: 'Only Admins and Producers can see this.' },
-      { k: 'phone', l: 'Phone', t: 'text' }, { k: 'email', l: 'Email', t: 'text' }, { k: 'image', l: 'Photo', t: 'image' },
+      { k: 'phone', l: 'Phone', t: 'phone' }, { k: 'email', l: 'Email', t: 'text' }, { k: 'image', l: 'Photo', t: 'image' },
       { k: 'roles', l: 'Roles', t: 'multi', opts: 'crewRoles' }, { k: 'notes', l: 'Notes', t: 'textarea' },
       { k: 'unavailable', l: 'Not available', t: 'list', help: 'Days this person cannot work. Crew set these themselves on their home page; booking them then shows a clash.', fields: [{ k: 'from', l: 'From', t: 'date' }, { k: 'to', l: 'To', t: 'date' }, { k: 'note', l: 'Note', t: 'text' }] }] },
 
@@ -294,7 +294,7 @@
     booking: { label: 'Booking request', plural: 'Booking requests', group: 'Productions', title: (d) => [d.name, d.service].filter(Boolean).join(' · '), cols: ['received', 'name', 'service', 'date', 'producer', 'status'], fields: [
       { k: 'status', l: 'Status', t: 'select', opts: BOOKING_STATUS, def: 'New' },
       { k: 'producer', l: 'Producer', t: 'member', roles: ['Producer', 'Admin'], help: 'The Producer who looks after this booking. Only they (and Admins) see it; they accept or decline it.' },
-      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'email', l: 'Email', t: 'text' }, { k: 'phone', l: 'Phone', t: 'text' }, { k: 'organisation', l: 'Organisation', t: 'text' },
+      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'email', l: 'Email', t: 'text' }, { k: 'phone', l: 'Phone', t: 'phone' }, { k: 'organisation', l: 'Organisation', t: 'text' },
       { k: 'service', l: 'Service', t: 'text' }, { k: 'date', l: 'Date of the event', t: 'date' }, { k: 'endDate', l: 'Last day', t: 'date' }, { k: 'startTime', l: 'Starts at', t: 'time' }, { k: 'endTime', l: 'Ends at', t: 'time' },
       { k: 'venue', l: 'Where', t: 'text' }, { k: 'town', l: 'Town / city', t: 'text' }, { k: 'contactBy', l: 'Best way to reach them', t: 'combo', opts: ['WhatsApp', 'Email', 'Phone call'] }, { k: 'budget', l: 'Budget', t: 'text' }, { k: 'heard', l: 'Heard about us from', t: 'text' },
       { k: 'details', l: 'What they asked', t: 'textarea' }, { k: 'notes', l: 'Our notes', t: 'textarea' }, { k: 'received', l: 'Received', t: 'text', help: 'When the request came in from the website.' },
