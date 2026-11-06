@@ -317,7 +317,14 @@ Steps:
    VM off.
 
 Encoders on the tailnet send to the address the installer prints: `rtmp://<pi>.<tailnet>.ts.net/live` and
-`srt://<pi>.<tailnet>.ts.net:8890`. Updates install by themselves: every night at 04:30 the server asks the website it came from (Render) for a newer version and installs it, using its own update key (`--no-auto-update` turns this off; `sudo rfp-autoupdate` updates now). By hand: make a new setup command and run it again. It stays a
+`srt://<pi>.<tailnet>.ts.net:8890`. Updates install by themselves: every night at 04:30 the server asks the website it came from (Render) for a newer version and installs it, using its own update key (`--no-auto-update` turns this off; `sudo rfp-autoupdate` updates now). By hand: make a new setup command and run it again.
+
+**Updating from GitHub (free, no Render needed).** Run once on the server:
+`curl -fsSL https://raw.githubusercontent.com/regemarkfp/rfp-manager/main/tools/server/github-update.sh | sudo bash -s -- --install`.
+It installs the newest version from github.com/regemarkfp/rfp-manager now, and from then on `sudo rfp-autoupdate` and the
+04:30 nightly check take the code straight from GitHub (a newer version in package.json on main). The old copy is kept as
+`/opt/rfp-manager.old` and put back if the new one does not start; settings, the database, recordings and the NAS are not
+touched, and `/etc/rfp-manager/stream-host` is applied. A later setup command keeps the GitHub updater. It stays a
 home server, and the flags are not needed again. Logs: `journalctl -u rfp-manager -f`, `journalctl -u cloudflared -f`.
 
 #### An old PC as server, database and NAS
