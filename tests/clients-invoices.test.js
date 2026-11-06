@@ -83,8 +83,14 @@ test('quotes and invoices: numbers, booking fee, client discount and rates, edit
   assert.equal((await guest.post(doc.sign, { name: 'X', agree: true, image: 'data:image/png;base64,' + tinyPng().toString('base64') })).status, 409, 'signed once');
   await app.notify.idle();
   assert.ok(app.mail.outbox.find((m) => m.to.includes('admin@example.com') && /Quote RFPQ0001 signed by Sam Contact/.test(m.subject)));
-  const signedPdf = await fetch(app.url + doc.pdf);
-  assert.ok(Buffer.from(await signedPdf.arrayBuffer()).length > buf.length, 'the signature is on the PDF');
+  // the signature is not on the quote; it is kept as the contract, with the terms as they were
+  assert.ok(quote.contract && /^[0-9a-f]{64}$/.test(quote.contract.hash));
+  pv = (await guest.get('/api/portal/' + key)).data;
+  assert.ok(pv.docs[0].contract, 'the portal links the contract');
+  const contract = await fetch(app.url + pv.docs[0].contract);
+  assert.equal(contract.status, 200);
+  assert.equal(Buffer.from(await contract.arrayBuffer()).slice(0, 5).toString(), '%PDF-');
+  assert.equal((await fetch(app.url + q(`/api/invoices/${quote.id}/contract.pdf`), { headers: { cookie: admin.cookie() } })).status, 200);
 
   // the quote becomes an invoice: RFPINV0001 with the same lines; payments make it Partial then Paid
   let inv = (await admin.post(q(`/api/invoices/${quote.id}/convert`), {})).data.doc;
@@ -133,7 +139,7 @@ test('client portal: colleagues, adverts in ad spaces (pending, invoiced), the t
   const key = link.split('/portal/')[1];
   const head = client(app.url);
   let pv = (await head.get('/api/portal/' + key)).data;
-  assert.deepEqual(pv.users.map((u) => u.email), ['head@school.example']);
+  assert.deepEqual(pv.users.map((u) => u.email).sort(), ['head@school.example', 'office@school.example'], 'the new client was welcomed on their accounts email');
   assert.deepEqual(pv.slots.map((s) => s.name).sort(), ['Corner logo', 'Lower banner']);
   // they add a colleague, who can be taken off again (and their link stops working)
   assert.equal((await head.post(`/api/portal/${key}/users`, { email: 'bursar@school.example', name: 'Bursar' })).status, 200);
@@ -165,7 +171,7 @@ test('client portal: colleagues, adverts in ad spaces (pending, invoiced), the t
   assert.ok(app.mail.outbox.find((m) => m.to.includes('admin@example.com') && /New advert from Sponsor School/.test(m.subject)));
   // the team's view of the portal
   const tv = (await admin.get(q('/api/clients/cli_sch/portal'))).data;
-  assert.deepEqual(tv.users.map((u) => u.email), ['head@school.example']);
+  assert.deepEqual(tv.users.map((u) => u.email).sort(), ['head@school.example', 'office@school.example']);
   assert.equal((await admin.del(q(`/api/clients/cli_sch/portal/${encodeURIComponent('head@school.example')}`))).status, 200);
   assert.equal((await head.get('/api/portal/' + key)).status, 404);
 });
