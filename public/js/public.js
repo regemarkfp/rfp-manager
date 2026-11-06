@@ -727,7 +727,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   // an Admin on an Android phone's browser (not in the app): offer the app once, again after 14 days if they said Not now
   function offerApp() {
     const ua = navigator.userAgent;
-    if (!D || !D.me || !D.me.admin || !D.androidApp || !/Android/i.test(ua) || !/Mobile/i.test(ua) || /; wv\)|RFPManager/.test(ua) || document.getElementById('app-offer')) return;
+    if (!D || !D.me || !D.me.appOk || !D.androidApp || !/Android/i.test(ua) || !/Mobile/i.test(ua) || /; wv\)|RFPManager/.test(ua) || document.getElementById('app-offer')) return;
     try { if (Date.now() - Number(localStorage.getItem('rfp-app-offer') || 0) < 14 * 86400e3) return; } catch (e) { /* ask */ }
     const later = () => { try { localStorage.setItem('rfp-app-offer', String(Date.now())); } catch (e) { /* asked again next time */ } };
     const close = () => { later(); wrap.remove(); };

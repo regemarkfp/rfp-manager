@@ -349,7 +349,7 @@ const APP_OFFER = { phone: () => /Android/i.test(navigator.userAgent) && /Mobile
   due: () => { try { return Date.now() - Number(localStorage.getItem('rfp-app-offer') || 0) > 14 * 86400e3; } catch (e) { return true; } },
   later: () => { try { localStorage.setItem('rfp-app-offer', String(Date.now())); } catch (e) { /* asked again next time */ } } };
 function offerApp() {
-  if (ANDROID || !APP_OFFER.phone() || !App.cfg.androidApp || !(App.teams || []).some((t) => t.role === 'Admin') || !APP_OFFER.due()) return;
+  if (ANDROID || !APP_OFFER.phone() || !App.cfg.androidApp || !(App.teams || []).some((t) => ['Admin', 'Producer', 'Scorer', 'Crew'].includes(t.role)) || !APP_OFFER.due()) return;
   modal({ title: 'Get the RFP Manager app', body: h('div', {},
     h('img', { src: '/brand/rfp-logo-sm.png', alt: '', style: { height: '40px', marginBottom: '10px' } }),
     h('p', { style: { marginTop: 0 } }, 'Run your productions from the Android app: tabs at the bottom, push notifications for bookings, crew and matches, and Google sign-in that stays signed in.'),
