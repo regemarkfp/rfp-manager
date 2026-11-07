@@ -298,3 +298,13 @@ input:not([type=checkbox]):not([type=radio]):focus, select:focus, textarea:focus
 .portal-details { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px 14px; margin-bottom: 10px; }
 .portal-details .fld:last-child { grid-column: 1 / -1; }
 .portal-details input:disabled, .portal-details textarea:disabled { opacity: .7; }
+/* release forms (/release/<key>) */
+.release { max-width: 680px; margin: 0 auto; }
+.release .ticks { display: grid; gap: 10px; }
+.release .tick { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; line-height: 1.4; }
+.release .tick input { margin-top: 3px; width: 20px; height: 20px; flex: none; }
+.release .bul { margin: 0 0 6px 4px; }
+.release .sign-pad { margin-top: 0; }
+.release button.big { width: 100%; padding: 14px; font-size: 17px; margin-top: 14px; }
+.release-done { text-align: center; padding: 40px 10px; }
+.release-done .big-tick { font-size: 54px; color: var(--accent, #00ff82); }
