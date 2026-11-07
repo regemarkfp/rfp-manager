@@ -840,7 +840,29 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
         el('p', { class: 'sub small' }, 'Production team members go to their Studio after signing in.')));
     document.body.append(wrap);
     if (!D.googleClientId) { holder.replaceChildren(el('span', { class: 'sub' }, 'Sign-in is not set up on this website yet.')); return; }
-    if (window.RFPNative && window.RFPNative.signInWithGoogle) { holder.replaceChildren(el('button', { class: 'primary', onclick: () => window.RFPNative.signInWithGoogle(backTo ? new URL(backTo, location.href).pathname : location.pathname) }, 'Sign in with Google')); return; }
+    if (window.RFPNative && window.RFPNative.signInWithGoogle) {
+      // the Android app: the phone's own Google account sheet, else the browser round trip
+      const nx = backTo ? new URL(backTo, location.href).pathname : location.pathname;
+      const btn = el('button', { class: 'primary', onclick: () => {
+        if (!window.RFPNative.googleSignIn) { window.RFPNative.signInWithGoogle(nx); return; }
+        btn.disabled = true; btn.textContent = 'Signing in…';
+        window.rfpGoogleToken = async (token, why) => {
+          if (token) {
+            try {
+              await post('/api/auth/google', { credential: token });
+              D = await get('/api/public/home');
+              if (backTo) { location.href = backTo; return; }
+              if (D.me && D.me.teams) { location.href = '/app'; return; }
+              close(); render(); return;
+            } catch (e) { err.textContent = e.message; err.style.display = ''; }
+          } else if (why && why !== 'cancelled') { window.RFPNative.signInWithGoogle(nx); }
+          btn.disabled = false; btn.textContent = 'Sign in with Google';
+        };
+        window.RFPNative.googleSignIn(D.googleClientId);
+      } }, 'Sign in with Google');
+      holder.replaceChildren(btn);
+      return;
+    }
     loadGsi().then(() => {
       google.accounts.id.initialize({ client_id: D.googleClientId, callback: async (resp) => {
         holder.replaceChildren(el('span', { class: 'sub' }, 'Signing in…'));

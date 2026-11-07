@@ -15,7 +15,19 @@
     // the Android app: Google sign-in in the phone's browser, which hands the app back to here (signed in)
     if (window.RFPNative && window.RFPNative.signInWithGoogle && App.cfg.mode === 'cloud') {
       const nx = new URLSearchParams(location.search).get('next') || '/app' + location.hash;
-      holder.replaceChildren(h('button', { type: 'button', class: 'primary', style: { width: '100%' }, onclick: () => window.RFPNative.signInWithGoogle(nx) }, 'Sign in with Google'));
+      // the phone's own Google account sheet first (no browser); the browser round trip when that is not possible
+      const btn = h('button', { type: 'button', class: 'primary', style: { width: '100%' }, onclick: () => {
+        if (!window.RFPNative.googleSignIn) { window.RFPNative.signInWithGoogle(nx); return; }
+        btn.disabled = true; btn.textContent = busyText || 'Signing in…';
+        window.rfpGoogleToken = async (token, why) => {
+          if (token) {
+            try { await api('POST', '/api/auth/google', { credential: token }); start(); return; } catch (e) { fail(errBox, e); }
+          } else if (why && why !== 'cancelled') { window.RFPNative.signInWithGoogle(nx); }
+          btn.disabled = false; btn.textContent = 'Sign in with Google';
+        };
+        window.RFPNative.googleSignIn(App.cfg.googleClientId);
+      } }, 'Sign in with Google');
+      holder.replaceChildren(btn);
       return true;
     }
     const s = document.createElement('script');

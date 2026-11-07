@@ -230,7 +230,7 @@ function navOn(href) {
 function shell(content) {
   if (ANDROID) return androidShell(content);
   const on = navOn;
-  const root = h('div', { class: 'shell' + (navStore.get('rfp-side-min') === '1' ? ' side-min' : '') },
+  const root = h('div', { class: 'shell' + (navStore.get('rfp-side-min') === '1' && window.innerWidth > 860 ? ' side-min' : '') },
     h('aside', { class: 'side' },
       h('div', { class: 'brand', style: { display: 'flex', alignItems: 'center', gap: '10px' } }, h('img', { class: 'logo', src: '/brand/rfp-logo-sm.png', alt: 'RFP', style: { height: '28px', width: 'auto' } }), h('span', { class: 'brand-name', style: { flex: 1 } }, App.cfg.name), h('button', { class: 'ghost sm no-print side-toggle', title: 'Make the menu narrow or wide', onclick: () => { const n = !root.classList.contains('side-min'); root.classList.toggle('side-min', n); navStore.set('rfp-side-min', n ? '1' : '0'); } }, '«')),
       h('select', { 'aria-label': 'Production team', onchange: async (e) => {
@@ -265,6 +265,33 @@ function shell(content) {
     h('main', { class: 'main' }, h('button', { class: 'menu-btn no-print', style: { marginBottom: '12px' }, onclick: () => root.classList.toggle('open') }, '☰ Menu'), content));
   return root;
 }
+
+// ---- PDFs and other files from the website (quotes, invoices, contracts, call sheets, reports). A phone's browser
+// downloads them without the sign-in ("Sign in first"), so there they are fetched here, signed in, and handed over
+// as a file. The computer opens them in a new tab; the Android app saves them with the person's session.
+const PHONE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && !/RFPManagerAndroid/.test(navigator.userAgent);
+App.openDoc = async (url) => {
+  if (!PHONE) { window.open(url, '_blank'); return; }
+  try {
+    const r = await fetch(url, { credentials: 'same-origin' });
+    if (!r.ok) { let m = 'Could not open it'; try { m = (await r.json()).error || m; } catch (e) { /* not JSON */ } throw new Error(m); }
+    const blob = await r.blob();
+    const cd = r.headers.get('content-disposition') || '';
+    const name = decodeURIComponent((/filename\*=UTF-8''([^;]+)/i.exec(cd) || [])[1] || '') || (/filename="([^"]+)"/i.exec(cd) || [])[1] || url.split('?')[0].split('/').pop() || 'file';
+    const u = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = u; a.download = name; document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 60000);
+  } catch (e) { oops(e); }
+};
+// links to files of the website (/api/…pdf, csv, xml) go the same way on a phone
+document.addEventListener('click', (e) => {
+  if (!PHONE || e.defaultPrevented) return;
+  const a = e.target.closest && e.target.closest('a[href]');
+  if (!a) return;
+  const href = a.getAttribute('href') || '';
+  if (!/^\/(api|media)\//.test(href) || !/(\.pdf|\.csv|\.xml|\/pdf)(\?|$)|^\/media\//.test(href)) return;
+  e.preventDefault(); App.openDoc(href);
+}, true);
 
 // ---- the Android app (RFPManagerAndroid in its user agent): an app bar on top and tabs at the bottom, like an Android
 // app, instead of the side menu. The website and the PC keep the side menu. ?android=1 shows it in a browser (to try).

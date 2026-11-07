@@ -206,7 +206,7 @@
       el.replaceChildren(
         pageHead(h('span', {}, `${kindName(x.kind)} ${x.number} `, pill(x.state)),
           h('a', { class: 'btn', href: '#/money' }, '‹ All'), saveBtn(),
-          h('button', { onclick: async () => { try { if (dirty) await save(); window.open(`/api/invoices/${enc(id)}/pdf?${T()}`, '_blank'); } catch (e) { oops(e); } } }, 'PDF'),
+          h('button', { onclick: async () => { try { if (dirty) await save(); App.openDoc(`/api/invoices/${enc(id)}/pdf?${T()}`); } catch (e) { oops(e); } } }, 'PDF'),
           App.cfg.mail ? h('button', { class: 'primary', onclick: async () => {
             if (dirty) { try { await save(); } catch (e) { return oops(e); } }
             const m = { to: x.clientEmail || (client && (client.data.email || ((client.data.contacts || []).find((c) => c.primary && c.email) || (client.data.contacts || []).find((c) => c.email) || {}).email)) || '', note: '' };
@@ -222,7 +222,7 @@
         x.source && x.source.system === 'invoiceninja' ? h('p', { class: 'pill', style: { whiteSpace: 'normal', marginBottom: '12px' } }, `Imported from Invoice Ninja${Math.abs((x.source.amount || 0) - totals(x).total) > 0.05 ? ` (its total there: ${money(x.source.amount)})` : ''}. `, x.source.pdf ? h('a', { href: '/media/' + x.source.pdf, target: '_blank', rel: 'noopener' }, 'Their PDF ↗') : null) : null,
         s ? h('div', { class: 'card', style: { borderLeft: '4px solid var(--accent)' } }, h('div', { class: 'row' }, s.image ? h('img', { src: s.image, alt: 'Signature', style: { height: '56px', background: '#fff', borderRadius: '4px', padding: '4px' } }) : null,
           h('div', { class: 'grow' }, h('b', {}, `Contract signed by ${s.name}`), h('div', { class: 'dim small' }, `${new Date(s.at).toLocaleString('en-GB')}${s.email ? ' · ' + s.email : ''}${s.ip ? ' · ' + s.ip : ''}${s.method === 'upload' ? ' · picture loaded' : ''}`)),
-            x.contract ? h('button', { onclick: () => window.open(`/api/invoices/${enc(id)}/contract.pdf?${T()}`, '_blank') }, 'Contract (PDF)') : null)) : quote && x.status !== 'Draft' ? h('p', { class: 'pill warn', style: { whiteSpace: 'normal' } }, 'Waiting for the client to sign it in their portal.') : null,
+            x.contract ? h('button', { onclick: () => App.openDoc(`/api/invoices/${enc(id)}/contract.pdf?${T()}`) }, 'Contract (PDF)') : null)) : quote && x.status !== 'Draft' ? h('p', { class: 'pill warn', style: { whiteSpace: 'normal' } }, 'Waiting for the client to sign it in their portal.') : null,
         h('div', { class: 'card' }, h('div', { class: 'form' },
           f('Client', h('select', { onchange: (e) => { x.client = e.target.value; const c = App.docs.get(x.client); if (c) x.clientName = c.data.name; paint(); mark(); } }, h('option', { value: '' }, '— not in Clients —'), clients.map((c) => h('option', { value: c.id, selected: c.id === x.client || null }, c.data.name)))),
           !x.client ? f('Client name', inp('clientName')) : h('div', { class: 'f' }, h('span', { class: 'flabel' }, 'Client'), h('a', { href: '#/edit/client/' + x.client }, (client && client.data.name) || x.clientName), client && Number(client.data.discount) ? h('div', { class: 'help' }, `Their discount: ${client.data.discount}%`) : null),
@@ -315,7 +315,7 @@
           h('tbody', {}, r.releases.map((x) => h('tr', { style: x.withdrawn ? { opacity: 0.55 } : null },
             h('td', {}, h('b', {}, x.minor ? x.minorName : x.name), x.minor ? h('div', { class: 'dim small' }, `child · signed by ${x.name} (${String(x.relation || '').toLowerCase()})`) : null, h('div', { class: 'dim small' }, [x.email, x.phone].filter(Boolean).join(' · ')), x.withdrawn ? h('div', { class: 'pill warn' }, 'Withdrawn ' + new Date(x.withdrawn.at).toLocaleDateString('en-GB')) : null),
             h('td', {}, yes(x.consents.raw)), h('td', {}, yes(x.consents.promo)), h('td', { class: 'small nowrap' }, new Date(x.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })),
-            h('td', { class: 'r nowrap' }, h('button', { class: 'sm', onclick: () => window.open(`/api/releases/${enc(x.id)}/pdf?${T()}`, '_blank') }, 'PDF'), ' ',
+            h('td', { class: 'r nowrap' }, h('button', { class: 'sm', onclick: () => App.openDoc(`/api/releases/${enc(x.id)}/pdf?${T()}`) }, 'PDF'), ' ',
               h('button', { class: 'sm ghost', onclick: async () => { if (!x.withdrawn && !(await confirmBox(`Mark the release of ${x.minor ? x.minorName : x.name} as withdrawn? Their footage may then only be used where it was already published.`, 'Withdraw'))) return; try { await api('POST', `/api/releases/${enc(x.id)}/withdraw?${T()}`, { withdrawn: !x.withdrawn }); paint(); } catch (e) { oops(e); } } }, x.withdrawn ? 'Undo withdraw' : 'Withdrawn'),
               App.can('admin') ? [' ', h('button', { class: 'sm ghost danger', onclick: async () => { if (!(await confirmBox('Delete this signed release for good?'))) return; try { await api('DELETE', `/api/releases/${enc(x.id)}?${T()}`); paint(); } catch (e) { oops(e); } } }, 'Delete')] : null)))))) : h('p', { class: 'dim' }, 'Nobody has signed yet.'));
     }
