@@ -44,7 +44,7 @@
     const t = (k, l, ph, area, rows) => h('label', { class: 'f' + (area ? ' wide' : '') }, h('span', {}, l), area ? h('textarea', { rows: rows || 3, placeholder: ph || '', oninput: (e) => { f[k] = e.target.value; } }, f[k] || '') : h('input', { value: f[k] ?? '', placeholder: ph || '', oninput: (e) => { f[k] = e.target.value; } }));
     const n = (k, l, help) => h('label', { class: 'f' }, h('span', {}, l), h('input', { type: 'number', step: 'any', value: f[k] ?? '', oninput: (e) => { f[k] = e.target.value === '' ? '' : Number(e.target.value); } }), help ? h('div', { class: 'help' }, help) : null);
     const sec = (title) => h('h4', { class: 'wide fgroup' }, title);
-    UI.modal({ title: 'Billing details', wide: true, body: h('div', { class: 'form' },
+    const body = h('div', { class: 'form' },
       sec('Your company'), t('legalName', 'Name on documents', 'RegemarkFP'), t('regNo', 'Registration number'), t('vatNo', 'VAT number (empty if not registered)'), t('email', 'Email'), t('phone', 'Phone'), t('website', 'Website'), t('address', 'Address', 'Street\nTown, Province 0000\nSouth Africa', true),
       n('vatRate', 'VAT %'), n('terms', 'Invoices due after (days)'), n('quoteDays', 'Quotes valid for (days)'),
       sec('Booking fee (first line of every new quote and invoice)'),
@@ -56,13 +56,19 @@
       h('label', { class: 'f' }, h('span', {}, 'Colour of headings and items'), h('input', { type: 'color', value: f.accent || '#1a8cff', oninput: (e) => { f.accent = e.target.value; } })),
       t('docTerms', 'Quote and invoice terms (every document, unless it has its own)', 'Payment is due within 14 days. A 50% deposit confirms the booking.', true, 3),
       t('acknowledge', 'Point out when signing (a second tick box)', 'I have read clauses 4 (cancellations) and 7 (liability), which set cancellation fees and limit liability.', true, 2),
-      t('conditions', 'Terms and conditions (printed after the totals)', 'Lines starting with "1. Title" print bold; lines starting with "- " are bullets.', true, 10), t('notes', 'Small print', '', true, 2)),
-    actions: [{ label: 'Cancel' }, App.can('admin') ? { label: 'Save', primary: true, onClick: async () => {
-      const body = { ...f };
-      if (body.nextQuote === b.nextQuote) delete body.nextQuote;
-      if (body.nextInvoice === b.nextInvoice) delete body.nextInvoice;
-      await api('PUT', `/api/billing?${T()}`, body); toast('Billing details saved');
-    } } : { label: 'Only Admins can change these' }] });
+      t('conditions', 'Terms and conditions (printed after the totals)', 'Lines starting with "1. Title" print bold; lines starting with "- " are bullets.', true, 10), t('notes', 'Small print', '', true, 2));
+    // saves by itself as you type (Admins); the next numbers only when they were changed
+    const status = App.can('admin') ? UI.autosave(body, async () => {
+      const out = { ...f };
+      if (out.nextQuote === b.nextQuote) delete out.nextQuote;
+      if (out.nextInvoice === b.nextInvoice) delete out.nextInvoice;
+      await api('PUT', `/api/billing?${T()}`, out);
+      if (out.nextQuote !== undefined) b.nextQuote = out.nextQuote;
+      if (out.nextInvoice !== undefined) b.nextInvoice = out.nextInvoice;
+    }) : h('span', { class: 'dim small' }, 'Only Admins can change these');
+    if (!App.can('admin')) body.querySelectorAll('input, textarea, select').forEach((x) => { x.disabled = true; });
+    UI.modal({ title: 'Billing details', wide: true, body: h('div', {}, body, h('div', { style: { marginTop: '12px' } }, status)),
+      actions: [{ label: 'Close', primary: true, onClick: () => (status.flush ? status.flush().then(() => true) : true) }] });
   }
 
   // ---- importing from Invoice Ninja

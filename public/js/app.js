@@ -432,7 +432,7 @@ function imageField(value, onChange, kind) {
     const d = value && App.docs.get(value);
     pv.replaceChildren(!d ? 'none' : d.data.mime === 'application/pdf' ? h('a', { href: '/media/' + value, target: '_blank', rel: 'noopener', style: { fontWeight: 700 } }, 'PDF') : h('a', { href: '/media/' + value, target: '_blank', rel: 'noopener' }, h('img', { src: '/media/' + value, alt: '' })));
   };
-  const set = (v) => { value = v; paint(); onChange(v); };
+  const set = (v) => { value = v; paint(); onChange(v); pv.dispatchEvent(new Event('change', { bubbles: true })); };
   const file = h('input', { type: 'file', accept: receipt ? 'image/*,application/pdf' : 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml', class: 'hide', onchange: async () => {
     if (!file.files[0]) return;
     try { set(await App.uploadImage(file.files[0], kind)); toast('Image saved'); } catch (e) { oops(e); }
@@ -538,7 +538,7 @@ function fieldInput(f, value, onChange, ctx = {}) {
 function listField(f, value, onChange, ctx) {
   let rows = Array.isArray(value) ? value.map((r) => ({ ...r })) : [];
   const wrap = h('div', {});
-  const commit = () => onChange(rows);
+  const commit = () => { onChange(rows); wrap.dispatchEvent(new Event('change', { bubbles: true })); };
   const paint = () => {
     const body = rows.map((r, i) => h('tr', {},
       f.fields.map((sf) => h('td', { style: sf.w ? { width: sf.w + 'px' } : {} }, fieldInput(sf, r[sf.k], (v) => { r[sf.k] = v; commit(); }, { form: ctx.form }))),

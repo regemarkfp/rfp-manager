@@ -94,5 +94,26 @@ const UI = (() => {
   const money = (n, cur) => { const v = Number(n) || 0; try { return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: cur || 'ZAR', maximumFractionDigits: v % 1 ? 2 : 0 }).format(v); } catch { return (cur || '') + ' ' + v.toLocaleString(); } };
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
-  return { h, api, toast, oops, modal, confirmBox, promptBox, toHex, contrast, esc, fmtDate, today, money, debounce };
+  // Settings save themselves: any change inside root (typing, a tick, a choice, a picture, a list row) saves after a
+  // short pause, and the little status says so. Returns that status element (put it where the Save button was).
+  // skip(el) leaves some fields out (passwords).
+  function autosave(root, save, { delay = 900, skip } = {}) {
+    const st = h('span', { class: 'autosave dim small' }, 'Changes save by themselves');
+    let timer = null, busy = false, again = false;
+    const run = async () => {
+      if (busy) { again = true; return; }
+      busy = true; st.className = 'autosave dim small'; st.textContent = 'Saving…';
+      try { await save(); st.className = 'autosave ok small'; st.textContent = '✓ Saved'; }
+      catch (e) { st.className = 'autosave bad small'; st.replaceChildren('Not saved: ' + (e.message || e) + ' ', h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); run(); } }, 'Try again')); }
+      busy = false;
+      if (again) { again = false; run(); }
+    };
+    const kick = (e) => { if (skip && e && e.target && skip(e.target)) return; clearTimeout(timer); st.className = 'autosave dim small'; st.textContent = 'Changed…'; timer = setTimeout(run, delay); };
+    root.addEventListener('input', kick);
+    root.addEventListener('change', kick);
+    st.kick = () => kick();
+    st.flush = () => { if (timer) { clearTimeout(timer); timer = null; return run(); } return Promise.resolve(); };
+    return st;
+  }
+  return { h, api, toast, oops, modal, confirmBox, promptBox, toHex, contrast, esc, fmtDate, today, money, debounce, autosave };
 })();

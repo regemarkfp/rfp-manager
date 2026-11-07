@@ -17,7 +17,7 @@
     const form = buildForm('org', App.org(), { fields: TEAM_FIELDS });
     const el = h('div', { class: 'stack' }, h('div', { class: 'card' }, h('h2', {}, 'Production team'), form.el,
       h('p', { class: 'help' }, 'Custom fields appear on that record\'s form. Sports rules are built in and follow each federation; choose the format or variant in the scorer\'s Setup tab.'),
-      admin ? h('div', { style: { marginTop: '14px' } }, h('button', { class: 'primary', onclick: async () => { try { await App.save('org', App.team, { ...App.org(), ...form.data }); applyTheme(); await App.loadMe(); toast('Team settings saved'); route(); } catch (e) { oops(e); } } }, 'Save team settings')) : h('p', { class: 'dim' }, 'Only an Admin can change team settings.')));
+      admin ? h('div', { style: { marginTop: '14px' } }, UI.autosave(form.el, async () => { await App.save('org', App.team, { ...App.org(), ...form.data }); applyTheme(); await App.loadMe(); })) : h('p', { class: 'dim' }, 'Only an Admin can change team settings.')));
     if (!admin) el.querySelectorAll('input, select, textarea, button').forEach((x) => { x.disabled = true; });
     const others = App.teams.filter((t) => t.id !== App.team && t.role === 'Admin');
     if (admin && others.length && !App.cfg.bridge) el.append(mergeCard(others));
@@ -120,8 +120,9 @@
     const linked = App.machine.linked;
     const f = { name: App.me.name, phone: App.me.phone || '', emailOff: !!App.me.emailOff, emailNoNew: !!App.me.emailNoNew, marketingOptOut: !!App.me.marketingOptOut, password: '', currentPassword: '' };
     const anyAdmin = App.cfg.mode === 'cloud' && (App.teams || []).some((t) => t.role === 'Admin');
+    let accForm = null;
     return h('div', { class: 'card' }, h('h2', {}, 'My account'), h('p', {}, h('b', {}, App.me.email), App.me.google ? h('span', { class: 'pill ok', style: { marginLeft: '8px' } }, 'Google') : null, App.me.hasPassword ? h('span', { class: 'pill', style: { marginLeft: '8px' } }, 'Password set') : null),
-      linked ? h('p', { class: 'dim' }, 'This machine is linked to the website, so your name and sign-in are managed there and synced down.') : h('div', {}, h('div', { class: 'form' },
+      linked ? h('p', { class: 'dim' }, 'This machine is linked to the website, so your name and sign-in are managed there and synced down.') : h('div', {}, (accForm = h('div', { class: 'form' },
         h('label', { class: 'f' }, h('span', {}, 'Name'), h('input', { value: f.name, oninput: (e) => { f.name = e.target.value; } })),
         h('label', { class: 'f' }, h('span', {}, 'Phone'), Phone.input(f.phone, (v) => { f.phone = v; }, { make: h, dial: App.cfg.dial })),
         App.cfg.mail ? h('label', { class: 'row', style: { gap: '8px', gridColumn: '1 / -1' } }, h('input', { type: 'checkbox', checked: !f.emailOff, onchange: (e) => { f.emailOff = !e.target.checked; } }), 'Email me: when I am hired (with the call sheet), matches I officiate, results of my teams, expenses') : null,
@@ -131,8 +132,11 @@
         h('div', { class: 'f' }, h('span', { class: 'flabel' }, 'Picture'), h('div', { class: 'row', style: { gap: '10px' } }, App.avatar(App.me.image, App.me.name || App.me.email, 48), h('span', { class: 'dim small' }, App.me.google ? 'Your Google profile picture. Change it in your Google account; it updates here the next time you sign in.' : 'Sign in with Google to use your Google profile picture.'))),
         App.me.hasPassword ? h('label', { class: 'f' }, h('span', {}, 'Current password'), h('input', { type: 'password', autocomplete: 'current-password', oninput: (e) => { f.currentPassword = e.target.value; } })) : null,
         h('label', { class: 'f' }, h('span', {}, App.me.hasPassword ? 'New password (8+ characters)' : 'Set a password (8+ characters)'), h('input', { type: 'password', autocomplete: 'new-password', oninput: (e) => { f.password = e.target.value; } }),
-          App.cfg.mode === 'cloud' ? h('div', { class: 'help' }, 'Your email and this password sign you in to the RFP Manager app on a production PC (Google works there too).') : null)),
-      h('div', { class: 'row', style: { marginTop: '12px' } }, h('button', { class: 'primary', onclick: async () => { try { await api('POST', '/api/me', f); await App.loadMe(); toast('Account saved'); route(); } catch (e) { oops(e); } } }, 'Save'),
+          App.cfg.mode === 'cloud' ? h('div', { class: 'help' }, 'Your email and this password sign you in to the RFP Manager app on a production PC (Google works there too).') : null))),
+      h('div', { class: 'row', style: { marginTop: '12px' } },
+        // name, phone and the email choices save by themselves; a new password only with its own button
+        accForm && UI.autosave(accForm, async () => { const { password, currentPassword, ...rest } = f; await api('POST', '/api/me', rest); await App.loadMe(); }, { skip: (el) => el.type === 'password' }),
+        linked ? null : h('button', { onclick: async () => { if (!f.password) { toast('Type the new password first', 'error'); return; } try { await api('POST', '/api/me', { password: f.password, currentPassword: f.currentPassword }); await App.loadMe(); toast('Password changed'); route(); } catch (e) { oops(e); } } }, App.me.hasPassword ? 'Change password' : 'Set password'),
         App.cfg.mode === 'cloud' ? h('button', { onclick: async (e) => { const b = e.target; b.disabled = true; try { const r = await api('POST', '/api/mail/test'); if (r.ok) toast('Test email sent to ' + App.me.email + ' – check your inbox (and spam)'); else oops(new Error('Email did not go out: ' + r.error)); } catch (x) { oops(x); } b.disabled = false; } }, 'Send me a test email') : null)));
   }
 
@@ -387,10 +391,13 @@
         ...F.groups.map(groupCard),
         h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } }, sm('+ Add a section', () => { const id = 'new-' + Date.now().toString(36); F.groups.push({ id, title: 'New section', sub: '', when: [], questions: [{ label: '', type: 'text', opts: [], ph: '', req: false, wide: false }] }); opener.add(id); paint(); })),
         h('div', { class: 'row', style: { marginTop: '16px', gap: '8px', flexWrap: 'wrap' } },
-          h('button', { class: 'primary', onclick: async () => { try { const r = await api('PUT', '/api/site/booking-form', { form: F }); F = r.form; toast('Booking form saved'); paint(); } catch (e) { oops(e); } } }, 'Save'),
+          bfSaved,
           h('a', { class: 'btn', href: (App.cfg.siteUrl || '') + '/book', target: '_blank', rel: 'noopener' }, 'Open the form ↗'),
           h('button', { class: 'danger sm', onclick: async () => { if (!confirm('Put the booking form back to the standard one? Your changes to it are lost.')) return; try { const r = await api('PUT', '/api/site/booking-form', { reset: true }); F = r.form; toast('Back to the standard form'); paint(); } catch (e) { oops(e); } } }, 'Back to the standard form')));
     }
+    // saves by itself: typing and choices, and the buttons that add, move or remove sections and questions
+    const bfSaved = UI.autosave(box, async () => { await api('PUT', '/api/site/booking-form', { form: F }); });
+    box.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('button[type=button]'); if (b && F) bfSaved.kick(); });
     api('GET', '/api/site/booking-form').then((r) => { F = r.form; meta = r; paint(); }).catch((e) => { box.textContent = e.message; });
     return box;
   }
@@ -412,7 +419,7 @@
           area('complaints', 'How complaints are handled', 'Empty: contact us first; then the Consumer Goods and Services Ombud or the National Consumer Commission.', 3),
           area('terms', 'Terms and conditions', 'Empty: the terms and conditions from the booking team\'s Billing details (the same as on quotes).', 6, 'Leave empty to keep one copy: the one under Quotes & invoices → Billing details.'),
           area('privacy', 'Privacy policy', 'Empty: the standard POPIA privacy policy with your details.', 6, r.shown.privacyStandard ? 'Now showing the standard policy. Type your own here to replace it.' : '')),
-        h('div', { class: 'row', style: { marginTop: '14px' } }, h('button', { class: 'primary', onclick: async () => { try { await api('PUT', '/api/site/legal', f); App.cfg = await api('GET', '/api/config'); toast('Legal & company saved'); } catch (e) { oops(e); } } }, 'Save'),
+        h('div', { class: 'row', style: { marginTop: '14px' } }, UI.autosave(box, async () => { await api('PUT', '/api/site/legal', f); App.cfg = await api('GET', '/api/config'); }),
           h('a', { class: 'btn', href: (App.cfg.siteUrl || '') + '/legal', target: '_blank', rel: 'noopener' }, 'View ↗')));
     }).catch((e) => { box.textContent = e.message; });
     return box;
@@ -437,7 +444,7 @@
           h('label', { class: 'f' }, h('span', {}, 'Booking requests go to'), h('select', { onchange: (e) => { f.bookingTeam = e.target.value; } }, l.teams.map((t) => h('option', { value: t.id, selected: t.id === f.bookingTeam }, t.name))))),
         h('h3', { style: { marginTop: '16px' } }, 'Services'),
         fieldInput({ k: 'services', t: 'list', fields: [{ k: 'title', l: 'Service', t: 'text' }, { k: 'text', l: 'Short description', t: 'text' }] }, f.services, (v) => { f.services = v; }),
-        h('div', { class: 'row', style: { marginTop: '14px' } }, h('button', { class: 'primary', onclick: async () => { try { await api('PUT', '/api/site/landing', f); toast('Home page saved'); } catch (e) { oops(e); } } }, 'Save'),
+        h('div', { class: 'row', style: { marginTop: '14px' } }, UI.autosave(box, async () => { await api('PUT', '/api/site/landing', f); }),
           h('a', { class: 'btn', href: (App.cfg.siteUrl || '') + '/', target: '_blank', rel: 'noopener' }, 'View the home page ↗')));
     }).catch((e) => { box.textContent = e.message; });
     return box;
