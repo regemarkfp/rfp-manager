@@ -900,6 +900,42 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     $('me').replaceChildren(m && m.teams ? el('a', { href: '/app' }, el('button', { class: 'studio' }, 'Studio')) : null,
       m ? el('button', { class: 'icon avatar-btn', title: m.email, onclick: toggle }, avatar(m.image, m.name || m.email)) : signInButton());
   }
+  // ---- legal: /legal (company information), /terms, /privacy, and the footer on every page
+  let legalP = null;
+  const legalInfo = () => legalP || (legalP = get('/api/public/legal').catch((e) => { legalP = null; throw e; }));
+  function legalText(text) {
+    return el('div', { class: 'legal-text' }, String(text || '').split(/\n/).map((raw) => {
+      const l = raw.trim();
+      if (!l) return null;
+      if (/^\d+\.\s+\S/.test(l) && l.length < 80 && !/^\d+\.\d/.test(l)) return el('h3', {}, l);
+      if (/^[-•*]\s+/.test(l)) return el('div', { class: 'bul' }, '• ' + l.replace(/^[-•*]\s+/, ''));
+      return el('p', {}, l);
+    }));
+  }
+  function legalPage(kind) {
+    const box = el('div', { class: 'legal' }, el('div', { class: 'empty' }, 'Loading…'));
+    legalInfo().then((L) => {
+      const tabs = el('div', { class: 'legal-tabs' }, [['/legal', 'Company information'], ['/terms', 'Terms and conditions'], ['/privacy', 'Privacy policy (POPIA)']].map(([href, label]) => el('a', { href, 'data-nav': '', class: location.pathname === href ? 'on' : '' }, label)));
+      const rows = [['Registered name', L.company], L.tradingAs && ['Trading as', L.tradingAs], L.regNo && ['Registration number', L.regNo], L.vatNo && ['VAT number', L.vatNo], L.directors && ['Directors', L.directors],
+        L.address && ['Physical address (also for legal notices)', L.address], L.email && ['Email', L.email], L.phone && ['Phone', L.phone], ['Website', location.origin], L.infoOfficer && ['Information officer (POPIA)', L.infoOfficer]].filter(Boolean);
+      const body = kind === 'terms' ? (L.terms ? legalText(L.terms) : el('p', { class: 'sub' }, 'The terms and conditions are given with every quote.'))
+        : kind === 'privacy' ? legalText(L.privacy)
+        : [el('table', { class: 'legal-info' }, rows.map(([k, v]) => el('tr', {}, el('th', {}, k), el('td', { style: { whiteSpace: 'pre-line' } }, v)))),
+          el('h3', {}, 'Prices, payment and cancellations'),
+          el('p', {}, 'Prices are quoted per booking and include VAT where VAT applies. A quote is accepted by signing it in the client portal. Payments are made by EFT or through PayFast; we do not see or keep card details. Cancellations and refunds are set out in clause 4 of the terms and conditions.'),
+          el('h3', {}, 'Complaints'),
+          el('p', { style: { whiteSpace: 'pre-line' } }, L.complaints || `Contact us first at ${L.email || 'our email address'}; we answer within 5 business days. If we cannot resolve it, you may contact the Consumer Goods and Services Ombud (cgso.org.za) or the National Consumer Commission (thencc.gov.za). For personal information: the Information Regulator (inforegulator.org.za).`)];
+      document.title = { terms: 'Terms and conditions', privacy: 'Privacy policy' }[kind] || 'Company information';
+      box.replaceChildren(el('h1', {}, document.title), tabs, body);
+    }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
+    return box;
+  }
+  function siteFooter() {
+    const year = new Date().getFullYear();
+    const line = el('span', {}, `© ${year} ${D.site || ''}. All rights reserved.`);
+    legalInfo().then((L) => { line.textContent = `© ${L.year} ${L.company}. All rights reserved.`; }).catch(() => {});
+    return el('footer', { class: 'site-foot' }, line, el('nav', {}, el('a', { href: '/terms', 'data-nav': '' }, 'Terms'), el('a', { href: '/privacy', 'data-nav': '' }, 'Privacy'), el('a', { href: '/legal', 'data-nav': '' }, 'Company information')));
+  }
   async function render() {
     side(); meBox();
     const p = location.pathname, params = new URLSearchParams(location.search);
@@ -925,9 +961,10 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     else if (p === '/subscriptions') view = subscriptionsPage();
     else if (p === '/notifications') view = notificationsPage();
     else if (p === '/book') view = await bookPage(params.get('service') || '');
+    else if (p === '/legal' || p === '/terms' || p === '/privacy') view = legalPage(p.slice(1));
     else if (p === '/' || p === '') view = await landingPage();
     else view = home();
-    $('main').replaceChildren(...[view].flat(Infinity).filter(Boolean));
+    $('main').replaceChildren(...[view].flat(Infinity).filter(Boolean), siteFooter());
     document.body.classList.remove('side-open');
   }
   document.addEventListener('click', (e) => {

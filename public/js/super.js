@@ -107,5 +107,6 @@
       show(el('div', { class: 'row', style: 'justify-content:space-between' }, el('h1', {}, 'RegemarkFP overview'), el('button', { class: 'ghost', onclick: load }, 'Refresh')), healthCard(o.health), companiesCard(o.companies));
     } catch (e) { show(el('div', { class: 'card bad' }, e.message)); }
   }
+  fetch('/api/config').then((r) => r.json()).then((c) => { if (c.copyright) $('foot').textContent = c.copyright; }).catch(() => {});
   load();
 })();

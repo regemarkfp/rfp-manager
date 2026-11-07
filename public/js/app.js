@@ -258,6 +258,7 @@ function shell(content) {
       })(),
       h('div', { class: 'foot' },
         h('div', { class: 'dim small', style: { padding: '2px 8px' }, title: 'The version of RFP Manager this PC is running' }, 'RFP Manager ' + (App.cfg.version || '')),
+        App.cfg.copyright ? h('div', { class: 'dim small', style: { padding: '0 8px 4px', fontSize: '11px' } }, App.cfg.copyright) : null,
         h('div', { class: 'sync', id: 'sync' }, h('span', { class: 'led' }), h('span', {}, '')),
         h('div', { class: 'row', style: { padding: '4px 8px', justifyContent: 'space-between', gap: '8px' } }, h('span', { class: 'dim row', style: { gap: '8px', minWidth: 0 }, title: App.me.email }, App.avatar(App.me.image, App.me.name || App.me.email, 26), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis' } }, (App.me.name || App.me.email) + ' · ' + (App.role || ''))),
           h('button', { class: 'ghost sm', onclick: async () => { await api('POST', '/api/auth/logout'); location.hash = ''; location.reload(); } }, 'Sign out')))),
@@ -335,6 +336,7 @@ App.pages.more = () => {
     h('div', { class: 'more-foot' },
       h('div', { class: 'sync', id: 'sync' }, h('span', { class: 'led' }), h('span', {}, '')),
       h('div', { class: 'dim small' }, 'RFP Manager ' + (App.cfg.version || '')),
+      App.cfg.copyright ? h('div', { class: 'dim small' }, App.cfg.copyright) : null,
       h('button', { class: 'danger', onclick: async () => { await api('POST', '/api/auth/logout'); location.hash = ''; location.reload(); } }, 'Sign out'))) };
 };
 

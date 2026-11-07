@@ -395,6 +395,29 @@
     return box;
   }
 
+  // the website's legal pages (/legal, /terms, /privacy): company information (ECTA s43), terms, privacy (POPIA)
+  function legalCard() {
+    const box = h('div', { class: 'card dim' }, 'Loading…');
+    api('GET', '/api/site/legal').then((r) => {
+      const f = { ...r.saved };
+      const text = (k, label, ph, wide) => h('label', { class: 'f', style: wide ? { gridColumn: '1 / -1' } : null }, h('span', {}, label), h('input', { value: f[k] || '', placeholder: ph || '', oninput: (e) => { f[k] = e.target.value; } }));
+      const area = (k, label, ph, rows, help) => h('label', { class: 'f', style: { gridColumn: '1 / -1' } }, h('span', {}, label), h('textarea', { rows, placeholder: ph || '', oninput: (e) => { f[k] = e.target.value; } }, f[k] || ''), help ? h('span', { class: 'dim small' }, help) : null);
+      box.className = 'card';
+      box.replaceChildren(h('h2', {}, 'Legal & company'),
+        h('p', { class: 'dim', style: { marginTop: 0 } }, 'Shown on the website under Company information, Terms and Privacy (linked at the bottom of every page), as the law asks of a business that sells online (ECTA section 43, CPA, POPIA). The copyright line uses the registered name.'),
+        h('div', { class: 'form' },
+          text('company', 'Registered name', r.shown.company), text('tradingAs', 'Trading as', 'Regemark Films+Photography'), text('regNo', 'Registration number', '2026/123456/07'), text('vatNo', 'VAT number (if registered)'),
+          text('directors', 'Directors', 'Full names', true), area('address', 'Physical address (for legal notices)', 'Street, suburb, city, code', 3),
+          text('email', 'Email', r.shown.email), text('phone', 'Phone', r.shown.phone), text('infoOfficer', 'Information officer (POPIA)', 'Name and email', true),
+          area('complaints', 'How complaints are handled', 'Empty: contact us first; then the Consumer Goods and Services Ombud or the National Consumer Commission.', 3),
+          area('terms', 'Terms and conditions', 'Empty: the terms and conditions from the booking team\'s Billing details (the same as on quotes).', 6, 'Leave empty to keep one copy: the one under Quotes & invoices → Billing details.'),
+          area('privacy', 'Privacy policy', 'Empty: the standard POPIA privacy policy with your details.', 6, r.shown.privacyStandard ? 'Now showing the standard policy. Type your own here to replace it.' : '')),
+        h('div', { class: 'row', style: { marginTop: '14px' } }, h('button', { class: 'primary', onclick: async () => { try { await api('PUT', '/api/site/legal', f); App.cfg = await api('GET', '/api/config'); toast('Legal & company saved'); } catch (e) { oops(e); } } }, 'Save'),
+          h('a', { class: 'btn', href: (App.cfg.siteUrl || '') + '/legal', target: '_blank', rel: 'noopener' }, 'View ↗')));
+    }).catch((e) => { box.textContent = e.message; });
+    return box;
+  }
+
   function websiteTab() {
     const box = h('div', { class: 'card dim' }, 'Loading…');
     api('GET', '/api/site/landing').then((l) => {
@@ -456,7 +479,7 @@
       if (window.RFPNotifyUI) window.RFPNotifyUI.settings(inner);
       return box;
     };
-    const body = { notifications: notificationsTab, team: teamTab, members: membersTab, account: () => [accountTab(), verseCard()], connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab, server: App.serverTab, website: () => [websiteTab(), bookingFormCard(), softwareCard(), siteBiblesCard()] }[tab]();
+    const body = { notifications: notificationsTab, team: teamTab, members: membersTab, account: () => [accountTab(), verseCard()], connections: App.connectionsTab, machine: machineTab, keys: keysTab, file: fileTab, server: App.serverTab, website: () => [websiteTab(), legalCard(), bookingFormCard(), softwareCard(), siteBiblesCard()] }[tab]();
     return { el: h('div', {}, pageHead('Settings'), h('div', { class: 'tabs' }, tabs.map(([k, l]) => h('button', { class: k === tab ? 'on' : '', onclick: () => { tab = k; route(); } }, l))), body) };
   };
 })();
