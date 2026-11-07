@@ -18,6 +18,10 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.7
+
+- **NAS access per user** (Universe → NAS → NAS users → Access): the whole NAS read and write, the whole NAS read only, only chosen folders (each read only or read and write; every chosen folder becomes its own share, \\server\FolderName, and people only see the shares they may open), or no access. New users start with "Only folders I choose". Until access is first changed, everyone keeps the whole NAS. The rules are written by the helper to /etc/samba/rfp-nas.conf (the old [NAS] block in smb.conf is replaced by an include the first time), checked with testparm and Samba reloaded; it only accepts NAS users and folders inside the NAS.
+
 ### 1.0.6
 
 - **Universe → NAS → NAS users**: add people to the NAS share (a user name and password that work at home and over Tailscale), change passwords, switch them off or on, remove them. The website runs a small root helper for this (tools/server/nas-users.sh, installed as /usr/local/sbin/rfp-nas-users with a sudoers rule for that one command). Once, on the server: `curl -fsSL https://raw.githubusercontent.com/regemarkfp/rfp-manager/main/tools/server/github-update.sh | sudo bash -s -- --install --force`. From then on rfp-autoupdate also updates itself.
