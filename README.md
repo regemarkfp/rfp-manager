@@ -18,6 +18,11 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.3
+
+- **Select several** clubs, teams or players (tick boxes, Select all): delete, archive or unarchive, change a field for all of them (sport, age group, club, position …), and add players to a team.
+- **Deleting a club deletes its teams** too (the players stay in the players database); the confirmation says how many.
+
 ### 1.0.2
 
 - **Legal pages** on the website, linked at the bottom of every page with the copyright line (© year, registered name, all rights reserved): **Company information** (/legal: registered name, registration and VAT numbers, directors, address for legal notices, contact, information officer, prices and payment, complaints: what ECTA section 43 asks of a business selling online), **Terms and conditions** (/terms: the booking team's Billing details unless typed separately) and **Privacy policy** (/privacy: a standard POPIA policy with your details, or your own). Settings → Website → Legal & company. The copyright line also shows in the Studio and on the Universe page.
