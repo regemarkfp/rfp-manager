@@ -254,3 +254,21 @@ test('legal pages: company information, terms from Billing details, standard POP
   assert.deepEqual([L.company, L.regNo, L.address], ['Test Company (Pty) Ltd', '2026/000000/07', '1 Test Street']);
   assert.match((await client(app.url).get('/api/config')).data.copyright, /Test Company \(Pty\) Ltd/);
 });
+
+test('deleting a club deletes its teams (players stay)', async (t) => {
+  const { admin, team } = await setup(t);
+  const q = (path) => `${path}${path.includes('?') ? '&' : '?'}team=${team}`;
+  await admin.put(q('/api/docs/club/club_del1'), { data: { name: 'Test Club' } });
+  await admin.put(q('/api/docs/club/club_keep'), { data: { name: 'Other Club' } });
+  await admin.put(q('/api/docs/player/plr_one1'), { data: { name: 'Test', surname: 'Player' } });
+  await admin.put(q('/api/docs/squad/sq_del1a'), { data: { club: 'club_del1', sport: 'Rugby', ageGroup: 'U16', players: [{ player: 'plr_one1' }] } });
+  await admin.put(q('/api/docs/squad/sq_del1b'), { data: { club: 'club_del1', sport: 'Hockey', ageGroup: '1st' } });
+  await admin.put(q('/api/docs/squad/sq_keep1'), { data: { club: 'club_keep', sport: 'Rugby', ageGroup: 'U16' } });
+  const r = await admin.del(q('/api/docs/club/club_del1'));
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.data.removed.sort(), ['sq_del1a', 'sq_del1b']);
+  const docs = (await admin.get(q('/api/docs'))).data;
+  const ids = (docs.docs || docs).map ? (docs.docs || docs).map((d) => d.id) : [];
+  assert.ok(!ids.includes('sq_del1a') && !ids.includes('sq_del1b'));
+  assert.ok(ids.includes('sq_keep1') && ids.includes('plr_one1'));
+});
