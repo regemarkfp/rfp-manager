@@ -85,10 +85,64 @@
     }
   }
 
+  // what deleting says: a club takes its teams with it (players stay)
+  const teamsOf = (ids) => App.list('squad').filter((s) => ids.includes(s.data.club));
+  function deleteText(type, ids) {
+    const e = E[type], n = ids.length, what = n === 1 ? `this ${e.label.toLowerCase()}` : `these ${n} ${e.plural.toLowerCase()}`;
+    const t = type === 'club' ? teamsOf(ids).length : 0;
+    return `Delete ${what}${t ? ` and ${n === 1 ? 'its' : 'their'} ${t} team${t === 1 ? '' : 's'}` : ''}? ${t ? 'The players stay in the players database. ' : ''}This cannot be undone.`;
+  }
+  // a few at a time, so a long list does not flood the website
+  async function each(ids, fn, label) {
+    let done = 0, failed = 0;
+    const queue = ids.slice();
+    const work = async () => { while (queue.length) { const id = queue.shift(); try { await fn(id); done++; } catch (e) { failed++; console.warn(label, id, e.message); } } };
+    await Promise.all([work(), work(), work(), work()]);
+    return { done, failed };
+  }
+  // the fields that can be set for several records at once (simple ones: text, choices, yes/no, a link to another record)
+  const bulkFields = (type) => Schema.fieldsFor(type, App.org()).filter((f) => !f.hidden && !f.readonly && !f.inherit && ['text', 'combo', 'select', 'bool', 'ref', 'number', 'date', 'multi'].includes(f.t) && !['name', 'surname', 'abbreviation', 'graphicName', 'fullGraphicName', 'graphicFirstName', 'graphicLastName'].includes(f.k));
+  const MULTI = new Set(['club', 'squad', 'player']);
+  function setField(type, docs, after) {
+    const fields = bulkFields(type);
+    let f = fields[0], value;
+    const slot = h('div', {});
+    const paintInput = () => { value = f.t === 'bool' ? false : f.t === 'multi' ? [] : ''; slot.replaceChildren(fieldInput(f, value, (v) => { value = v; })); };
+    paintInput();
+    UI.modal({ title: `Change a field for ${docs.length} ${E[type].plural.toLowerCase()}`, body: h('div', { class: 'form' },
+      h('label', { class: 'f wide' }, h('span', {}, 'Field'), h('select', { onchange: (ev) => { f = fields.find((x) => x.k === ev.target.value); paintInput(); } }, fields.map((x) => h('option', { value: x.k }, x.l)))),
+      h('div', { class: 'f wide' }, h('span', { class: 'flabel' }, 'New value'), slot),
+      h('p', { class: 'help wide' }, 'Every selected record gets this value. Leave it empty to clear the field.')),
+    actions: [{ label: 'Cancel' }, { label: 'Apply', primary: true, onClick: async () => {
+      if (f.req && (value === '' || value === undefined || (Array.isArray(value) && !value.length))) { toast(`${f.l} cannot be empty`, 'error'); return false; }
+      const r = await each(docs.map((d) => d.id), (id) => { const d = App.docs.get(id); return App.save(type, id, { ...d.data, [f.k]: value }); }, 'Changed');
+      toast(`${f.l} changed on ${r.done}${r.failed ? `, ${r.failed} not` : ''}`); after();
+    } }] });
+  }
+  // players into a team's list (the ones already in it are left as they are)
+  function addToTeam(ids, after) {
+    const squads = App.sorted('squad').filter((s) => !s.data.archived);
+    if (!squads.length) { toast('Make a team first (Sport → Teams)', 'error'); return; }
+    let sq = squads[0].id;
+    UI.modal({ title: `Add ${ids.length} player${ids.length === 1 ? '' : 's'} to a team`, body: h('div', { class: 'form' },
+      h('label', { class: 'f wide' }, h('span', {}, 'Team'), h('select', { onchange: (ev) => { sq = ev.target.value; } }, squads.map((s) => h('option', { value: s.id }, App.title('squad', s.id)))))),
+    actions: [{ label: 'Cancel' }, { label: 'Add', primary: true, onClick: async () => {
+      const d = App.docs.get(sq), rows = (d.data.players || []).slice();
+      const add = ids.filter((id) => !rows.some((r) => r.player === id));
+      for (const id of add) rows.push({ number: '', player: id, position: (App.docs.get(id) || { data: {} }).data.position || '' });
+      await App.save('squad', sq, { ...d.data, players: rows });
+      toast(`${add.length} added to ${App.title('squad', sq)}${ids.length > add.length ? ` (${ids.length - add.length} already in it)` : ''}`); after();
+    } }] });
+  }
+
   App.pages.list = (type) => {
     const e = E[type];
     if (!e) return App.pages.notfound();
     let q = '';
+    const multi = MULTI.has(type) && App.canEdit(type);
+    const picked = new Set();
+    let shown = [];
+    const bar = h('div', { class: 'bulk-bar', style: { display: 'none' } });
     const fields = Schema.fieldsFor(type, App.org());
     const cols = e.cols.map((k) => fields.find((f) => f.k === k)).filter(Boolean);
     const body = h('div', {});
@@ -97,20 +151,46 @@
       const docs = App.sorted(type).filter((d) => !needle || JSON.stringify(d.data).toLowerCase().includes(needle) || App.title(type, d.id).toLowerCase().includes(needle));
       if (type === 'production') docs.sort((a, b) => String(b.data.date || '').localeCompare(String(a.data.date || '')));
       docs.sort((a, b) => (a.data.archived ? 1 : 0) - (b.data.archived ? 1 : 0));                     // archived last, greyed out
+      shown = docs;
+      for (const id of [...picked]) if (!App.docs.get(id)) picked.delete(id);
+      const all = multi && docs.length && docs.every((d) => picked.has(d.id));
+      const tick = (d) => h('td', { class: 'pick', onclick: (ev) => ev.stopPropagation() }, h('input', { type: 'checkbox', checked: picked.has(d.id), 'aria-label': 'Select', onchange: (ev) => { if (ev.target.checked) picked.add(d.id); else picked.delete(d.id); paint(); } }));
       body.replaceChildren(docs.length
-        ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, cols.map((f) => h('th', { class: f.t === 'money' || f.t === 'number' ? 'r' : '' }, f.t === 'image' ? '' : f.l)))),
-          h('tbody', {}, docs.map((d) => h('tr', { class: 'click', tabindex: '0', style: d.data.archived ? { opacity: '.45' } : {}, onclick: () => { location.hash = `#/edit/${type}/${d.id}`; }, onkeydown: (ev) => { if (ev.key === 'Enter') location.hash = `#/edit/${type}/${d.id}`; } },
-            cols.map((f) => h('td', { class: f.t === 'money' || f.t === 'number' ? 'r num' : '' }, cell(type, f, d.data[f.k], d.data))))))))
+        ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, multi ? h('th', { class: 'pick' }, h('input', { type: 'checkbox', checked: all, title: 'Select all shown', 'aria-label': 'Select all', onchange: (ev) => { for (const d of docs) { if (ev.target.checked) picked.add(d.id); else picked.delete(d.id); } paint(); } })) : null, cols.map((f) => h('th', { class: f.t === 'money' || f.t === 'number' ? 'r' : '' }, f.t === 'image' ? '' : f.l)))),
+          h('tbody', {}, docs.map((d) => h('tr', { class: 'click' + (picked.has(d.id) ? ' picked' : ''), tabindex: '0', style: d.data.archived ? { opacity: '.45' } : {}, onclick: () => { location.hash = `#/edit/${type}/${d.id}`; }, onkeydown: (ev) => { if (ev.key === 'Enter') location.hash = `#/edit/${type}/${d.id}`; } },
+            multi ? tick(d) : null, cols.map((f) => h('td', { class: f.t === 'money' || f.t === 'number' ? 'r num' : '' }, cell(type, f, d.data[f.k], d.data))))))))
         : h('div', { class: 'card empty' }, q ? 'Nothing matches that search.' : `No ${e.plural.toLowerCase()} yet.`, ' ', App.canCreate(type) && !q ? h('a', { href: `#/edit/${type}/new` }, 'Add the first one') : null),
       type === 'advert' ? adReport() : null);
+      paintBar();
     };
+    // the bar for the selected ones: delete, archive, set a field, and for players: add to a team
+    function paintBar() {
+      if (!multi || !picked.size) { bar.style.display = 'none'; return; }
+      const ids = [...picked], n = ids.length;
+      const docsOf = () => ids.map((id) => App.docs.get(id)).filter(Boolean);
+      const run = async (label, fn) => { const r = await each(ids, fn, label); picked.clear(); paint(); toast(`${label}: ${r.done} done${r.failed ? `, ${r.failed} not (no permission or in use)` : ''}`); };
+      bar.style.display = '';
+      bar.replaceChildren(h('b', {}, `${n} selected`),
+        h('button', { class: 'sm ghost', onclick: () => { picked.clear(); paint(); } }, 'Clear'),
+        h('button', { class: 'sm', onclick: () => { for (const d of shown) picked.add(d.id); paint(); } }, `Select all ${shown.length}`),
+        h('span', { class: 'grow' }),
+        type === 'player' ? h('button', { class: 'sm', onclick: () => addToTeam(ids, () => { picked.clear(); paint(); }) }, 'Add to team…') : null,
+        bulkFields(type).length ? h('button', { class: 'sm', onclick: () => setField(type, docsOf(), () => { picked.clear(); paint(); }) }, 'Change a field…') : null,
+        h('button', { class: 'sm', onclick: async () => { const off = docsOf().every((d) => d.data.archived); await run(off ? 'Unarchived' : 'Archived', (id) => { const d = App.docs.get(id); return App.save(type, id, { ...d.data, archived: !off }); }); } }, docsOf().every((d) => d.data.archived) ? 'Unarchive' : 'Archive'),
+        h('button', { class: 'sm danger', onclick: async () => {
+          if (!(await confirmBox(deleteText(type, ids)))) return;
+          let teams = 0;
+          await run('Deleted', async (id) => { const r = await App.remove(type, id); teams += ((r && r.removed) || []).length; });
+          if (teams) toast(`Also deleted ${teams} team${teams === 1 ? '' : 's'}`);
+        } }, 'Delete'));
+    }
     paint();
     const el = h('div', {}, pageHead(e.plural,
       h('input', { type: 'search', placeholder: 'Search…', 'aria-label': 'Search', style: { width: '220px' }, oninput: (ev) => { q = ev.target.value; paint(); } }),
       type === 'song' && App.canEdit('song') ? h('button', { title: 'SongSelect lyrics (.txt), SongSelect .usr and ChordPro files', onclick: () => App.importSongs() }, 'Import song files…') : null,
       (type === 'song' || type === 'service') && (App.gfx || App.machine.outputKey) && App.can('score') ? h('a', { class: 'btn', href: '/live/worship.html' }, 'Worship control ↗') : null,
       !App.editable(type) && App.can('edit') ? h('a', { class: 'btn', href: App.onlineUrl(`#/list/${type}`), target: '_blank', rel: 'noopener', title: 'Records are managed on the website' }, 'Manage on the website ↗') : null,
-      App.canCreate(type) ? h('a', { class: 'btn primary', href: `#/edit/${type}/new` }, '+ New ' + e.label.toLowerCase()) : null), body);
+      App.canCreate(type) ? h('a', { class: 'btn primary', href: `#/edit/${type}/new` }, '+ New ' + e.label.toLowerCase()) : null), bar, body);
     return { el, keepScroll: true, onMessage: UI.debounce((m) => { if (m.type === 'doc') paint(); }, 200) };
   };
 
@@ -258,7 +338,7 @@
       } catch (err) { oops(err); }
     };
     const el = h('div', {}, pageHead(h('div', {}, h('a', { class: 'small', href: back }, '← ' + e.plural), h('h1', {}, isNew ? 'New ' + e.label.toLowerCase() : e.title(doc.data, (x) => App.get(x)) || e.label)),
-      !isNew && canEdit ? h('button', { class: 'danger no-print', onclick: async () => { if (await confirmBox(`Delete this ${e.label.toLowerCase()}? This cannot be undone.`)) { try { await App.remove(type, doc.id); toast('Deleted'); location.hash = back; } catch (err) { oops(err); } } } }, 'Delete') : null,
+      !isNew && canEdit ? h('button', { class: 'danger no-print', onclick: async () => { if (await confirmBox(deleteText(type, [doc.id]))) { try { const r = await App.remove(type, doc.id); toast((r && r.removed && r.removed.length) ? `Deleted, with ${r.removed.length} team${r.removed.length === 1 ? '' : 's'}` : 'Deleted'); location.hash = back; } catch (err) { oops(err); } } } }, 'Delete') : null,
       canEdit ? h('button', { class: 'primary no-print', onclick: save }, 'Save') : null),
     type !== 'production' || !canEdit ? panel : null,
     App.limited() && type === 'fixture' ? null : h('div', { class: 'card' }, canEdit ? null : online ? h('div', { class: 'spread', style: { marginBottom: '10px' } }, h('p', { class: 'dim', style: { margin: 0 } }, `${e.plural} are managed on the website. This PC shows them and keeps a copy for when the internet is down.`), App.can('edit') && !isNew ? h('a', { class: 'btn sm', href: App.onlineUrl(`#/edit/${type}/${doc.id}`), target: '_blank', rel: 'noopener' }, 'Edit on the website ↗') : null) : h('p', { class: 'dim' }, 'You can view this but your role cannot change it.'), form.el),

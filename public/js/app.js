@@ -63,7 +63,7 @@ const App = {
     return r.doc;
   },
   // (expenses go through their own address: crew add them too, Producers approve)
-  async remove(type, id) { await api('DELETE', `/api/docs/${type}/${id}?team=${this.team}`); this.docs.delete(id); },
+  async remove(type, id) { const r = await api('DELETE', `/api/docs/${type}/${id}?team=${this.team}`); this.docs.delete(id); for (const x of (r && r.removed) || []) this.docs.delete(x); return r; },
 
   async uploadImage(file, kind) {
     if (file.size > 8 * 1024 * 1024) throw new Error('Images can be up to 8 MB');
