@@ -15,6 +15,7 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
+import android.os.CancellationSignal;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.VibrationEffect;
@@ -50,6 +51,16 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.browser.customtabs.CustomTabColorSchemeParams;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.content.ContextCompat;
+import androidx.credentials.Credential;
+import androidx.credentials.CredentialManager;
+import androidx.credentials.CredentialManagerCallback;
+import androidx.credentials.CustomCredential;
+import androidx.credentials.GetCredentialRequest;
+import androidx.credentials.GetCredentialResponse;
+import androidx.credentials.exceptions.GetCredentialCancellationException;
+import androidx.credentials.exceptions.GetCredentialException;
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 import androidx.core.content.FileProvider;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -311,6 +322,35 @@ public class MainActivity extends AppCompatActivity implements App.TokenListener
         handle(i);
     }
 
+    // ---- Google sign-in in the app (Credential Manager): an ID token for the website's own Google client
+    private void nativeGoogle(String clientId) {
+        try {
+            GetSignInWithGoogleOption option = new GetSignInWithGoogleOption.Builder(clientId).build();
+            GetCredentialRequest request = new GetCredentialRequest.Builder().addCredentialOption(option).build();
+            CredentialManager.create(this).getCredentialAsync(this, request, new CancellationSignal(), ContextCompat.getMainExecutor(this),
+                new CredentialManagerCallback<GetCredentialResponse, GetCredentialException>() {
+                    @Override public void onResult(GetCredentialResponse result) {
+                        Credential c = result.getCredential();
+                        if (c instanceof CustomCredential && GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL.equals(c.getType())) {
+                            try {
+                                String token = GoogleIdTokenCredential.createFrom(((CustomCredential) c).getData()).getIdToken();
+                                js("window.rfpGoogleToken&&rfpGoogleToken(" + JSONObject.quote(token) + ")");
+                                return;
+                            } catch (Exception e) { Log.w("RFPManager", "Google sign-in: " + e.getMessage()); }
+                        }
+                        js("window.rfpGoogleToken&&rfpGoogleToken(null,'unexpected')");
+                    }
+                    @Override public void onError(@NonNull GetCredentialException e) {
+                        String why = e instanceof GetCredentialCancellationException ? "cancelled" : "failed: " + e.getClass().getSimpleName() + (e.getMessage() == null ? "" : " " + e.getMessage());
+                        Log.w("RFPManager", "Google sign-in " + why);
+                        js("window.rfpGoogleToken&&rfpGoogleToken(null," + JSONObject.quote(why) + ")");
+                    }
+                });
+        } catch (Exception e) {
+            js("window.rfpGoogleToken&&rfpGoogleToken(null," + JSONObject.quote("failed: " + e.getMessage()) + ")");
+        }
+    }
+
     private void openTab(Uri u) {
         try {
             new CustomTabsIntent.Builder()
@@ -430,6 +470,12 @@ public class MainActivity extends AppCompatActivity implements App.TokenListener
             });
         }
         @JavascriptInterface public void openNotificationSettings() { runOnUiThread(MainActivity.this::notificationSettings); }
+        /** Google sign-in with the phone's own account sheet: the website gets a Google ID token back through
+         *  window.rfpGoogleToken(token) (or (null, reason): the page then falls back to signInWithGoogle). */
+        @JavascriptInterface public void googleSignIn(String clientId) {
+            if (!allowed() || clientId == null || clientId.isEmpty()) { js("window.rfpGoogleToken&&rfpGoogleToken(null,'unavailable')"); return; }
+            runOnUiThread(() -> nativeGoogle(clientId));
+        }
         @JavascriptInterface public void signInWithGoogle(String next) {
             if (!allowed()) return;
             String n = next == null || !next.startsWith("/") ? "/app" : next;
