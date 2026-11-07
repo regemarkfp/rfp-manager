@@ -237,3 +237,20 @@ test('contracts: clauses pointed out need their own tick', async (t) => {
   assert.equal((await g.post(sign, { name: 'Ack Person', agree: true, acknowledged: true, image: PNG() })).status, 200);
   assert.equal((await app.invoices.one(team, quote.id)).contract.acknowledged, 'I have read clauses 4 and 7.');
 });
+
+test('legal pages: company information, terms from Billing details, standard POPIA privacy policy, copyright line', async (t) => {
+  const { app, admin, team } = await setup(t, { publicName: 'RegemarkFP' });
+  await admin.put(`/api/billing?team=${team}`, { conditions: '1. Bookings\nA booking is confirmed once the quote is signed.' });
+  const cfg = (await client(app.url).get('/api/config')).data;
+  assert.equal(cfg.copyright, `© ${new Date().getFullYear()} RegemarkFP (Pty) Ltd. All rights reserved.`);
+  let L = (await client(app.url).get('/api/public/legal')).data;
+  assert.equal(L.company, 'RegemarkFP (Pty) Ltd');
+  assert.match(L.terms, /confirmed once the quote is signed/, 'the terms come from Billing details');
+  assert.match(L.privacy, /POPIA/);
+  for (const p of ['/legal', '/terms', '/privacy']) assert.equal((await fetch(app.url + p)).status, 200);
+  assert.equal((await client(app.url).put('/api/site/legal', { company: 'X' })).status, 401);
+  await admin.put('/api/site/legal', { company: 'Test Company (Pty) Ltd', regNo: '2026/000000/07', address: '1 Test Street' });
+  L = (await client(app.url).get('/api/public/legal')).data;
+  assert.deepEqual([L.company, L.regNo, L.address], ['Test Company (Pty) Ltd', '2026/000000/07', '1 Test Street']);
+  assert.match((await client(app.url).get('/api/config')).data.copyright, /Test Company \(Pty\) Ltd/);
+});
