@@ -331,6 +331,18 @@
       { k: 'status', l: 'Status', t: 'select', opts: EXPENSE_STATUS, def: 'Submitted', help: 'Producers and Admins approve, reject or mark as paid back.' },
       { k: 'note', l: 'Note', t: 'textarea' }] },
 
+    // release forms: people (or a parent / guardian for a minor) give permission to be filmed and photographed, signed
+    // on their phone at /release/<key>. Signed releases are kept as "release" records (lib/releases.js).
+    releaseForm: { label: 'Release form', plural: 'Release forms', group: 'Productions', title: (d) => d.name, cols: ['name', 'production', 'date', 'active'], fields: [
+      { k: 'name', l: 'Name', t: 'text', req: true, ph: 'Grey College sports day 2027' },
+      { k: 'production', l: 'Production', t: 'ref', ref: 'production', help: 'Shown on the form (name, date and venue).' },
+      { k: 'date', l: 'Date of filming', t: 'date', help: 'The production\'s date if empty.' },
+      { k: 'active', l: 'Open for signing', t: 'bool', def: true, help: 'Untick to close the link.' },
+      { k: 'minors', l: 'Minors may be signed for', t: 'bool', def: true, help: 'A parent or legal guardian signs for a child under 18.' },
+      { k: 'askRaw', l: 'Ask to use raw footage', t: 'bool', def: true, help: 'Raw footage showing a person is only used beyond the final product when they allow it here.' },
+      { k: 'askPromo', l: 'Ask to use in promotion', t: 'bool', def: true, help: 'Showreel, website and social media.' },
+      { k: 'text', l: 'Release wording', t: 'textarea', ph: 'Empty: the standard RegemarkFP release (POPIA, withdrawal, minors).', help: 'Leave empty for the standard wording. Lines starting with "- " are bullets.' },
+      { k: 'key', l: 'Link key', t: 'text', hidden: true }] },
     adSlot: { label: 'Ad space', plural: 'Ad spaces', group: 'Advertising', title: (d) => [d.name, d.sport].filter(Boolean).join(' · '), cols: ['name', 'sport', 'layout', 'width', 'height', 'price', 'period', 'active'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true, ph: 'Rugby lower banner' }, { k: 'sport', l: 'Sport', t: 'combo', opts: ['General', 'Rugby', 'Cricket', 'Soccer', 'Hockey', 'Netball', 'Athletics', 'Tennis', 'Basketball', 'Water polo', 'Church'], def: 'General', help: 'Clients see the spaces for General and for the sports of their productions.' },
       { k: 'active', l: 'Offered to clients', t: 'bool', def: true },
@@ -352,7 +364,7 @@
   // Everything else is managed on the website.
   const PC_EDIT = ['graphic', 'theme', 'dashboard', 'timeline', 'variable', 'gametrigger'];
 
-  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'musicuse', 'songuse', 'bible', 'product', 'user', 'machinekey', 'purchase', 'streamclip', 'comment', 'viewstat', 'streamvideo', 'mcr', 'videoad', 'adpreset', 'pushdevice', 'notification', 'invoice'];
+  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'musicuse', 'songuse', 'bible', 'product', 'user', 'machinekey', 'purchase', 'streamclip', 'comment', 'viewstat', 'streamvideo', 'mcr', 'videoad', 'adpreset', 'pushdevice', 'notification', 'invoice', 'release'];
   const ALL_TYPES = [...Object.keys(E), ...SYSTEM_TYPES];
 
   const has = (v) => v !== undefined && v !== null && v !== '';
