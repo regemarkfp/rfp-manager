@@ -32,6 +32,18 @@
     .scroll { overflow-x: auto; }
     .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .msg { margin: 8px 0; } a { color: var(--acc); }
+    .tabs { display: flex; gap: 8px; margin: 0 0 16px; }
+    .tabs a { padding: 8px 18px; background: #222; color: var(--txt); text-decoration: none; font-weight: 600; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
+    .tabs a.on { background: var(--acc); color: #000; }
+    .meter { height: 10px; background: #2a2a2a; margin-top: 14px; overflow: hidden; } .meter.thin { height: 8px; margin: 0; } .meter span { display: block; height: 100%; }
+    .co { display: flex; gap: 10px; align-items: center; } .logo { width: 36px; height: 36px; object-fit: contain; background: #fff1; flex: none; }
+    .logo.ph { display: grid; place-items: center; background: var(--acc); color: #000; font-weight: 700; }
+    .crumbs { font-weight: 600; } .crumbs a { color: var(--txt); text-decoration: none; } .crumbs a:hover { color: var(--acc); }
+    .drop.over { outline: 2px dashed var(--acc); outline-offset: -6px; }
+    .up { display: flex; gap: 10px; align-items: center; margin: 4px 0; } .up > span { min-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    button.sm, .btn.sm { padding: 5px 12px; font-size: 13px; }
+    pre.code { background: #111; border: 1px solid var(--line); padding: 10px 12px; overflow-x: auto; font-size: 12.5px; white-space: pre-wrap; word-break: break-all; }
+    td a { color: var(--txt); } td a:hover { color: var(--acc); }
     .pill { display: inline-block; padding: 1px 8px; background: #2a2a2a; font-size: 12px; margin: 0 4px 4px 0; }
   </style>
 </head>
