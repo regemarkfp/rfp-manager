@@ -70,6 +70,18 @@ for f in public/app/rfp-manager.apk public/app/rfp-manager.json; do [ -f "$APP/$
 rm -rf "$APP.old"; mv "$APP" "$APP.old"; mv "$TMP/new" "$APP"
 chown -R root:root "$APP"; chown -R "$SVC:$SVC" "$DATA" 2>/dev/null || true
 
+# this updater keeps itself up to date (later fixes reach the server without --install)
+if [ -f "$APP/tools/server/github-update.sh" ] && ! cmp -s "$APP/tools/server/github-update.sh" /usr/local/bin/rfp-autoupdate; then
+  install -m 755 "$APP/tools/server/github-update.sh" /usr/local/bin/rfp-autoupdate
+fi
+# the NAS's Samba users from the Universe page: a small root helper the website may run, and nothing else
+if [ -f "$APP/tools/server/nas-users.sh" ] && { [ -f "$ETC/nas" ] || grep -q "^\[NAS\]" /etc/samba/smb.conf 2>/dev/null; } && command -v smbpasswd >/dev/null; then
+  install -m 755 -o root -g root "$APP/tools/server/nas-users.sh" /usr/local/sbin/rfp-nas-users
+  echo "$SVC ALL=(root) NOPASSWD: /usr/local/sbin/rfp-nas-users" > /etc/sudoers.d/rfp-nas.tmp
+  chmod 440 /etc/sudoers.d/rfp-nas.tmp
+  if visudo -cf /etc/sudoers.d/rfp-nas.tmp >/dev/null; then mv /etc/sudoers.d/rfp-nas.tmp /etc/sudoers.d/rfp-nas; else rm -f /etc/sudoers.d/rfp-nas.tmp; fi
+fi
+
 # the encoders' address can change without a setup command: /etc/rfp-manager/stream-host
 if [ -f "$ETC/stream-host" ] && [ -f "$ETC/env" ]; then
   SH="$(cat "$ETC/stream-host")"
