@@ -315,7 +315,8 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       const tabLoad = el('button', { type: 'button', class: 'sm', onclick: () => file.click() }, 'Load a picture');
       const paintTabs = () => { tabDraw.className = 'sm' + (mode === 'draw' ? ' primary' : ''); tabLoad.className = 'sm' + (mode === 'upload' ? ' primary' : ''); };
       paintTabs();
-      const f = { name: '', agree: false };
+      const f = { name: '', agree: false, ack: false };
+      const ackText = (terms && terms.acknowledge) || '';
       const err = el('p', { class: 'err', style: { display: 'none' } });
       const docTerms = x.terms || (terms && terms.docTerms) || '', cond = (terms && terms.conditions) || '';
       const btn = el('button', { class: 'primary', onclick: async () => {
@@ -323,8 +324,9 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
         if (f.name.trim().length < 2) { err.textContent = 'Type your full name.'; err.style.display = ''; return; }
         if (!drawn) { err.textContent = 'Sign in the white box, or load a picture of your signature.'; err.style.display = ''; return; }
         if (!f.agree) { err.textContent = 'Tick that you accept the quote and the terms and conditions.'; err.style.display = ''; return; }
+        if (ackText && !f.ack) { err.textContent = 'Tick that you have read the clauses pointed out.'; err.style.display = ''; return; }
         btn.disabled = true;
-        try { await post(x.sign, { name: f.name, agree: true, method: mode, image: cv.toDataURL('image/png') }); wrap.remove(); say('Signed. Thank you: the production is confirmed. Your signed contract is with the quote.'); after(); } catch (e) { err.textContent = e.message; err.style.display = ''; btn.disabled = false; }
+        try { await post(x.sign, { name: f.name, agree: true, acknowledged: f.ack, method: mode, image: cv.toDataURL('image/png') }); wrap.remove(); say('Signed. Thank you: the production is confirmed. Your signed contract is with the quote.'); after(); } catch (e) { err.textContent = e.message; err.style.display = ''; btn.disabled = false; }
       } }, 'Sign the contract');
       const wrap = modal(`Sign quote ${x.number}`,
         el('p', { class: 'sub' }, `${x.title ? x.title + ' · ' : ''}${zar(x.total)}. `, el('a', { href: x.pdf, target: '_blank', rel: 'noopener' }, 'Read the quote (PDF)')),
@@ -333,6 +335,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
         el('div', { class: 'fld' }, el('div', { class: 'row', style: { display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '6px' } }, el('span', { style: { flex: 1 } }, 'Your signature'), tabDraw, tabLoad), cv, file,
           el('button', { class: 'sm', type: 'button', onclick: () => { mode = 'draw'; clear(); paintTabs(); }, style: { marginTop: '6px' } }, 'Clear')),
         el('label', { class: 'row', style: { display: 'flex', gap: '8px', alignItems: 'flex-start', margin: '12px 0' } }, el('input', { type: 'checkbox', onchange: (e) => { f.agree = e.target.checked; } }), el('span', {}, 'I accept this quote and the terms and conditions above on behalf of the client. My signature is kept as our contract.')),
+        ackText ? el('label', { class: 'row', style: { display: 'flex', gap: '8px', alignItems: 'flex-start', margin: '0 0 12px' } }, el('input', { type: 'checkbox', onchange: (e) => { f.ack = e.target.checked; } }), el('b', {}, ackText)) : null,
         err, btn);
     }
     // the account behind this link: sign in with Google, with a password, or create one
@@ -426,6 +429,78 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
     }
     render2();
+    return box;
+  }
+  // ---- a release form (/release/<key>): permission to be filmed, signed on the phone; a parent or guardian signs for a child
+  function releasePage(key) {
+    const box = el('div', { class: 'portal release' }, el('div', { class: 'empty' }, 'Loading…'));
+    const api0 = '/api/public/release/' + encodeURIComponent(key);
+    get(api0).then((r) => {
+      const F = r.form;
+      document.title = `Release form – ${r.company.name}`;
+      if (!F.open) { box.replaceChildren(el('div', { class: 'empty' }, `This release form is closed. Questions? ${r.company.email || ''}`)); return; }
+      const f = { name: '', email: '', phone: '', minor: false, minorName: '', relation: 'Parent', raw: false, promo: false, agree: false };
+      // the signature: drawn with a finger or mouse, or a picture of it
+      const cv = el('canvas', { width: 520, height: 170, class: 'sign-pad' });
+      const ctx = cv.getContext('2d');
+      let drawn = false, down = false, mode = 'draw';
+      const clear = () => { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.strokeStyle = '#0b1b3a'; ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; drawn = false; };
+      const at = (e) => { const b = cv.getBoundingClientRect(); return [(e.clientX - b.left) * cv.width / b.width, (e.clientY - b.top) * cv.height / b.height]; };
+      cv.addEventListener('pointerdown', (e) => { if (mode !== 'draw') return; down = true; cv.setPointerCapture(e.pointerId); const [px, py] = at(e); ctx.beginPath(); ctx.moveTo(px, py); e.preventDefault(); });
+      cv.addEventListener('pointermove', (e) => { if (!down) return; const [px, py] = at(e); ctx.lineTo(px, py); ctx.stroke(); drawn = true; e.preventDefault(); });
+      ['pointerup', 'pointercancel', 'pointerleave'].forEach((k) => cv.addEventListener(k, () => { down = false; }));
+      clear();
+      const err = el('p', { class: 'err', style: { display: 'none' } });
+      const fail = (t) => { err.textContent = t; err.style.display = ''; err.scrollIntoView({ block: 'center' }); };
+      const file = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', style: { display: 'none' }, onchange: () => {
+        const fl = file.files[0]; if (!fl) return;
+        const im = new Image();
+        im.onload = () => { clear(); const sc = Math.min((cv.width - 20) / im.width, (cv.height - 20) / im.height); const w = im.width * sc, hh = im.height * sc; ctx.drawImage(im, (cv.width - w) / 2, (cv.height - hh) / 2, w, hh); drawn = true; mode = 'upload'; tabs(); URL.revokeObjectURL(im.src); };
+        im.onerror = () => fail('That picture could not be read.');
+        im.src = URL.createObjectURL(fl); file.value = '';
+      } });
+      const tDraw = el('button', { type: 'button', class: 'sm', onclick: () => { mode = 'draw'; clear(); tabs(); } }, 'Draw');
+      const tLoad = el('button', { type: 'button', class: 'sm', onclick: () => file.click() }, 'Load a picture');
+      const tabs = () => { tDraw.className = 'sm' + (mode === 'draw' ? ' primary' : ''); tLoad.className = 'sm' + (mode === 'upload' ? ' primary' : ''); };
+      tabs();
+      const inp = (k, label, attrs = {}) => el('label', { class: 'fld' }, el('span', {}, label), el('input', { ...attrs, oninput: (e) => { f[k] = e.target.value; } }));
+      const childBox = el('div', { style: { display: 'none' } }, inp('minorName', 'Name of the child'),
+        el('label', { class: 'fld' }, el('span', {}, 'You are their'), el('select', { onchange: (e) => { f.relation = e.target.value; } }, ['Parent', 'Legal guardian'].map((x) => el('option', {}, x)))));
+      const tick = (k, text, strong) => el('label', { class: 'tick' }, el('input', { type: 'checkbox', onchange: (e) => { f[k] = e.target.checked; } }), strong ? el('b', {}, text) : el('span', {}, text));
+      const lines = String(F.text || '').split(/\n/);
+      const btn = el('button', { class: 'primary big', onclick: async () => {
+        err.style.display = 'none';
+        if (f.name.trim().length < 2) return fail('Type your full name.');
+        if (f.minor && f.minorName.trim().length < 2) return fail('Type the name of the child.');
+        if (!f.agree) return fail('Tick that you give permission for the final production.');
+        if (!drawn) return fail('Sign in the white box, or load a picture of your signature.');
+        btn.disabled = true;
+        try {
+          const res = await post(api0, { ...f, method: mode, image: cv.toDataURL('image/png') });
+          box.replaceChildren(el('div', { class: 'release-done' }, el('div', { class: 'big-tick' }, '✓'), el('h1', {}, 'Thank you!'),
+            el('p', {}, `Your release for ${F.production || F.name} is signed. It allows: ${res.allows}.`),
+            f.email ? el('p', { class: 'sub' }, `A signed copy is on its way to ${f.email}.`) : el('p', { class: 'sub' }, 'You can close this page.'),
+            el('p', { class: 'sub small' }, `To withdraw it later, contact ${r.company.name}${r.company.email ? ' at ' + r.company.email : ''}.`)));
+          window.scrollTo(0, 0);
+        } catch (e) { fail(e.message); btn.disabled = false; }
+      } }, 'Sign the release');
+      box.replaceChildren(
+        el('div', { class: 'thead' }, r.company.logo ? el('img', { class: 'tlogo big', src: img(r.company.logo), alt: '' }) : null,
+          el('div', { class: 'grow' }, el('div', { class: 'sub' }, `Release form · ${r.company.name}`), el('h1', {}, F.production || F.name),
+            el('div', { class: 'sub' }, [F.date, F.where].filter(Boolean).join(' · ')))),
+        el('p', {}, 'Please give your permission to be filmed and photographed. It takes a minute and nothing needs printing.'),
+        el('div', { class: 'terms-box', style: { maxHeight: 'none' } }, lines.map((l) => (/^\s*[-•*]\s+/.test(l) ? el('div', { class: 'bul' }, '• ' + l.replace(/^\s*[-•*]\s+/, '')) : l.trim() ? el('p', {}, l) : null))),
+        section('You', el('div', { class: 'portal-details' }, inp('name', 'Your full name', { autocomplete: 'name' }), inp('email', 'Email (for your copy)', { type: 'email', autocomplete: 'email' }), inp('phone', 'Phone (optional)', { type: 'tel', autocomplete: 'tel' }))),
+        F.minors ? el('div', {}, el('label', { class: 'tick' }, el('input', { type: 'checkbox', onchange: (e) => { f.minor = e.target.checked; childBox.style.display = f.minor ? '' : 'none'; } }), el('span', {}, 'I am signing for a child under 18')), childBox) : null,
+        section('Your permission', el('div', { class: 'ticks' },
+          tick('agree', 'I give permission to appear in the final production (required).', true),
+          F.askRaw ? tick('raw', `Raw footage in which I (or the child) can be identified may also be kept and used, edited, licensed or sold by ${r.company.name} in other productions, stock footage and archives.`) : null,
+          F.askPromo ? tick('promo', `Clips and photos may be used to promote ${r.company.name} (showreel, website, social media).`) : null)),
+        section('Your signature', el('div', { class: 'fld' }, el('div', { class: 'row', style: { display: 'flex', gap: '6px', marginBottom: '6px' } }, tDraw, tLoad), cv, file,
+          el('button', { type: 'button', class: 'sm', style: { marginTop: '6px' }, onclick: () => { mode = 'draw'; clear(); tabs(); } }, 'Clear'))),
+        err, btn,
+        el('p', { class: 'sub small', style: { marginTop: '18px' } }, `Your details are used only for this release, under POPIA. Questions? ${r.company.email || ''}`));
+    }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
     return box;
   }
   // ---- a booking followed by the client (/track/<key>): its steps, like a parcel, and the conversation
@@ -834,6 +909,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     if (centre && !p.startsWith('/match/')) { centre.stop(); centre = null; }
     if (p.startsWith('/client/')) view = clientPage(decodeURIComponent(p.slice(8).replace(/\/$/, '')));
     else if (p.startsWith('/portal/')) view = portalPage(decodeURIComponent(p.slice(8).replace(/\/$/, '')));
+    else if (p.startsWith('/release/')) view = releasePage(decodeURIComponent(p.slice(9).replace(/\/$/, '')));
     else if (p.startsWith('/track/')) view = trackPage(decodeURIComponent(p.slice(7).replace(/\/$/, '')));
     else if (p.startsWith('/player/')) view = playerPage(decodeURIComponent(p.slice(8).replace(/\/$/, '')));
     else if (p === '/software') view = softwarePage();

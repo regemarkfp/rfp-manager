@@ -209,7 +209,7 @@ function navFor() {
   return [
     ['', ifs(['#/', 'Dashboard'], web && ['#/notifications', 'Notifications' + n(App.unread)])],
     money ? ['Clients & sales', [['#/list/booking', 'Booking requests' + n(App.waitingBookings && App.waitingBookings().length)], ['#/list/client', 'Clients'], ['#/money', 'Quotes & invoices'], ['#/list/service', 'Products & services'], ['#/ratings', 'Ratings']]] : null,
-    ['Productions', ifs(['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment'], ['#/list/expense', ed ? 'Expenses' : 'My expenses'], web && ['#/availability', 'My availability'])],
+    ['Productions', ifs(['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment'], money && ['#/list/releaseForm', 'Release forms'], ['#/list/expense', ed ? 'Expenses' : 'My expenses'], web && ['#/availability', 'My availability'])],
     ['Sport', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions'], ['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues']]],
     ['Live & graphics', ifs(App.pcs && ['#/pcs', 'Production PCs'], pc && ['#/monitors', 'Monitors'], pc && ['#/templates', 'Templates'], ['#/list/theme', 'Themes'], pc && ['#/adverts', 'Advert playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'])],
     web ? ['Streaming', ifs(['#/list/channel', 'Channels'], ed && ['#/streams', 'Live streams'], ed && ['#/analytics', 'Analytics'], ed && ['#/sales', 'Ticket sales'], ['#/streamads', 'Stream adverts'])] : null,

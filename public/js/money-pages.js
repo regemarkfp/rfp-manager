@@ -55,6 +55,7 @@
       sec('On the document'), t('bank', 'Banking details', 'Bank Name: …\nBranch Code: …\nAccount Name: …\nAccount Number: …', true, 5), t('tagline', 'Tagline', 'Capturing life in motion'),
       h('label', { class: 'f' }, h('span', {}, 'Colour of headings and items'), h('input', { type: 'color', value: f.accent || '#1a8cff', oninput: (e) => { f.accent = e.target.value; } })),
       t('docTerms', 'Quote and invoice terms (every document, unless it has its own)', 'Payment is due within 14 days. A 50% deposit confirms the booking.', true, 3),
+      t('acknowledge', 'Point out when signing (a second tick box)', 'I have read clauses 4 (cancellations) and 7 (liability), which set cancellation fees and limit liability.', true, 2),
       t('conditions', 'Terms and conditions (printed after the totals)', 'Lines starting with "1. Title" print bold; lines starting with "- " are bullets.', true, 10), t('notes', 'Small print', '', true, 2)),
     actions: [{ label: 'Cancel' }, App.can('admin') ? { label: 'Save', primary: true, onClick: async () => {
       const body = { ...f };
@@ -284,6 +285,39 @@
           : h('p', { class: 'dim' }, 'Nobody on it yet.'),
         h('div', { class: 'row', style: { marginTop: '10px', flexWrap: 'wrap' } }, h('input', { type: 'email', placeholder: 'Email', style: { width: '240px' }, oninput: (e) => { f.email = e.target.value; } }), h('input', { placeholder: 'Name', style: { width: '180px' }, oninput: (e) => { f.name = e.target.value; } }),
           h('button', { class: 'primary', onclick: async () => { try { await api('POST', `/api/clients/${enc(doc.id)}/portal?${T()}`, f); toast('Invited: they got an email with their link'); paint(); } catch (e) { oops(e); } } }, 'Invite to the portal')));
+    }
+    paint();
+    return box;
+  };
+  // ---- on a release form's page: its link (copy, WhatsApp, email) and everyone who signed
+  App.panels.releaseForm = (doc) => {
+    const box = h('div', { class: 'card' }, h('div', { class: 'dim' }, 'Loading…'));
+    if (!doc || !doc.id || !doc.data || !doc.data.key) return h('div', { class: 'card dim' }, 'Save the release form to get its link.');
+    const yes = (b) => h('span', { class: 'pill' + (b ? ' ok' : '') }, b ? 'Yes' : 'No');
+    async function paint() {
+      let r;
+      try { r = await api('GET', `/api/releases/form/${enc(doc.id)}?${T()}`); } catch (e) { box.replaceChildren(h('div', { class: 'dim' }, e.message)); return; }
+      const m = { to: '', note: '' };
+      const live = r.releases.filter((x) => !x.withdrawn);
+      box.replaceChildren(
+        h('h2', { style: { marginTop: 0 } }, 'Send the form'),
+        h('p', { class: 'dim', style: { marginTop: 0 } }, r.open ? 'People open the link on their phone, fill it in and sign with a finger (or load a picture of their signature). Parents and guardians sign for children.' : 'This form is closed: tick "Open for signing" to use the link.'),
+        h('div', { class: 'row', style: { flexWrap: 'wrap' } }, h('input', { value: r.link, readonly: true, style: { width: '360px', maxWidth: '100%' }, onclick: (e) => e.target.select() }),
+          h('button', { class: 'primary', onclick: async () => { await navigator.clipboard.writeText(r.link).catch(() => {}); toast('Link copied'); } }, 'Copy link'),
+          h('a', { class: 'btn', href: 'https://wa.me/?text=' + enc(`Please sign the filming release for ${doc.data.name}: ${r.link}`), target: '_blank', rel: 'noopener' }, 'Share on WhatsApp'),
+          h('a', { class: 'btn', href: r.link, target: '_blank', rel: 'noopener' }, 'Open the form')),
+        App.cfg.mail ? h('div', { class: 'form', style: { marginTop: '12px' } },
+          h('label', { class: 'f wide' }, h('span', {}, 'Email it to (one or more, separated by commas)'), h('textarea', { rows: 2, placeholder: 'parent@example.com, player@example.com', oninput: (e) => { m.to = e.target.value; } })),
+          h('label', { class: 'f wide' }, h('span', {}, 'Message (optional)'), h('input', { oninput: (e) => { m.note = e.target.value; } })),
+          h('div', { class: 'wide' }, h('button', { onclick: async () => { try { const x = await api('POST', `/api/releases/form/${enc(doc.id)}/send?${T()}`, m); toast(`Sent to ${x.sent}`); } catch (e) { oops(e); } } }, 'Email the form'))) : null,
+        h('h2', { style: { marginTop: '18px' } }, `Signed (${live.length})`, r.releases.length > live.length ? h('span', { class: 'dim small' }, ` · ${r.releases.length - live.length} withdrawn`) : null),
+        r.releases.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, h('th', {}, 'Person'), h('th', {}, 'Raw footage'), h('th', {}, 'Promotion'), h('th', {}, 'Signed'), h('th', {}))),
+          h('tbody', {}, r.releases.map((x) => h('tr', { style: x.withdrawn ? { opacity: 0.55 } : null },
+            h('td', {}, h('b', {}, x.minor ? x.minorName : x.name), x.minor ? h('div', { class: 'dim small' }, `child · signed by ${x.name} (${String(x.relation || '').toLowerCase()})`) : null, h('div', { class: 'dim small' }, [x.email, x.phone].filter(Boolean).join(' · ')), x.withdrawn ? h('div', { class: 'pill warn' }, 'Withdrawn ' + new Date(x.withdrawn.at).toLocaleDateString('en-GB')) : null),
+            h('td', {}, yes(x.consents.raw)), h('td', {}, yes(x.consents.promo)), h('td', { class: 'small nowrap' }, new Date(x.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })),
+            h('td', { class: 'r nowrap' }, h('button', { class: 'sm', onclick: () => window.open(`/api/releases/${enc(x.id)}/pdf?${T()}`, '_blank') }, 'PDF'), ' ',
+              h('button', { class: 'sm ghost', onclick: async () => { if (!x.withdrawn && !(await confirmBox(`Mark the release of ${x.minor ? x.minorName : x.name} as withdrawn? Their footage may then only be used where it was already published.`, 'Withdraw'))) return; try { await api('POST', `/api/releases/${enc(x.id)}/withdraw?${T()}`, { withdrawn: !x.withdrawn }); paint(); } catch (e) { oops(e); } } }, x.withdrawn ? 'Undo withdraw' : 'Withdrawn'),
+              App.can('admin') ? [' ', h('button', { class: 'sm ghost danger', onclick: async () => { if (!(await confirmBox('Delete this signed release for good?'))) return; try { await api('DELETE', `/api/releases/${enc(x.id)}?${T()}`); paint(); } catch (e) { oops(e); } } }, 'Delete')] : null)))))) : h('p', { class: 'dim' }, 'Nobody has signed yet.'));
     }
     paint();
     return box;
