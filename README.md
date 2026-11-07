@@ -18,6 +18,11 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.1
+
+- **Release forms** (Productions → Release forms): one link per form (copy, WhatsApp, email). People sign on their phone with a finger or a picture of their signature; a parent or legal guardian signs for a child under 18. They give permission for the final production and choose whether raw footage in which they can be identified, and promotion, are allowed. Each signed release keeps its wording, choices, signature, time and a fingerprint; the signer gets a PDF copy; Producers and Admins see who signed, the PDF, and can mark one withdrawn (POPIA). Signed releases stay on the website and are not synced to production PCs.
+- **Point out when signing** (Billing details): a second tick box in the quote signing popup for the clauses that must be drawn to the client's attention (cancellation fees, liability); the contract PDF records it.
+
 ### 1.0.0
 
 - **Menu** grouped by what you do: Clients & sales, Productions, Sport, Live & graphics, Streaming, Adverts & sponsors, Media & music, Worship.
