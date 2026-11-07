@@ -376,3 +376,6 @@ table.t td.pick input, table.t th.pick input { width: 18px; height: 18px; cursor
 table.t tr.picked td { background: rgba(0, 255, 130, 0.08); }
 /* on a phone the side menu is a drawer: never the narrow (collapsed) version (app.js), and no collapse button */
 @media (max-width: 860px) { .shell .side .side-toggle { display: none; } }
+/* settings save by themselves: the little status where the Save button was */
+.autosave { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; }
+.autosave.ok { color: var(--ok, #00d26a); } .autosave.bad { color: var(--bad, #ff5c5c); }
