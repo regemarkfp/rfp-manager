@@ -18,6 +18,10 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.4
+
+- **WhatsApp stays WhatsApp**: a WhatsApp message only goes into a booking when the client replies to (quotes) a message sent from the app. Everything else people send on WhatsApp is not copied. WhatsApp replies give a notification, not an email (answers on the tracking page still email the Admins).
+
 ### 1.0.3
 
 - **Select several** clubs, teams or players (tick boxes, Select all): delete, archive or unarchive, change a field for all of them (sport, age group, club, position …), and add players to a team.
