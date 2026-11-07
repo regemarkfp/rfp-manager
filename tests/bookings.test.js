@@ -91,14 +91,19 @@ test('booking tracking, replies by email + WhatsApp, answers back', async (t) =>
   const hook = (value, headers = {}) => fetch(app.url + '/api/whatsapp/webhook', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ object: 'whatsapp_business_account', entry: [{ changes: [{ field: 'messages', value }] }] }) });
   assert.equal((await hook({ statuses: [{ id: m.whatsapp.id, status: 'delivered', recipient_id: '27820000000' }] })).status, 200);
   assert.equal((await hook({ statuses: [{ id: m.whatsapp.id, status: 'sent', recipient_id: '27820000000' }] })).status, 200, 'a late "sent" does not undo "delivered"');
-  assert.equal((await hook({ contacts: [{ wa_id: '27820000000', profile: { name: 'Sam' } }], messages: [{ from: '27820000000', id: 'wamid.in1', timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: 'The one on Main Street' } }] })).status, 200);
+  // an ordinary WhatsApp message (not a reply to ours) stays in WhatsApp
+  assert.equal((await hook({ contacts: [{ wa_id: '27820000000', profile: { name: 'Sam' } }], messages: [{ from: '27820000000', id: 'wamid.in0', timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: 'Just chatting' } }] })).status, 200);
+  // a reply to the message we sent goes to the booking
+  assert.equal((await hook({ contacts: [{ wa_id: '27820000000', profile: { name: 'Sam' } }], messages: [{ from: '27820000000', id: 'wamid.in1', context: { id: m.whatsapp.id }, timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: 'The one on Main Street' } }] })).status, 200);
   await settle();
   let d = (await app.store.get(b.id)).data;
   assert.equal(d.messages.find((x) => x.id === m.id).whatsapp.status, 'delivered');
   const ans = d.messages.slice(-1)[0];
   assert.deepEqual([ans.from, ans.via, ans.text], ['client', 'whatsapp', 'The one on Main Street']);
   assert.equal(d.unread, true);
-  assert.ok(app.mail.outbox.find((x) => x.to.includes('admin@example.com') && /Sam Client replied/.test(x.subject)), 'the Producer hears of it');
+  assert.ok(!d.messages.some((x) => x.text === 'Just chatting'), 'ordinary WhatsApp chat is not copied');
+  assert.ok(!app.mail.outbox.find((x) => x.to.includes('admin@example.com') && /Sam Client replied/.test(x.subject)), 'no email for a WhatsApp reply');
+  assert.ok((await app.push.inbox(await app.auth.userByEmail('admin@example.com'))).list.some((n) => /Sam Client replied/.test(n.title)), 'the Admin gets a notification');
   // inside the 24 hours: a normal message, not the template; the reply clears "unread"
   const r2 = await admin.post(`/api/bookings/${b.id}/reply?team=${team}`, { text: 'Thanks, noted', email: false });
   m = r2.data.doc.data.messages.slice(-1)[0];
@@ -235,7 +240,8 @@ test('whatsapp linked like WhatsApp Web (Baileys, faked here): link, send, repli
   assert.deepEqual([m.whatsapp.ok, m.whatsapp.kind, m.whatsapp.id], [true, 'linked', 'LNK2']);
 
   // the client answers from a "@lid" address WhatsApp now uses: matched to the phone number, then to the booking
-  s.ev.emit('messages.upsert', { type: 'notify', messages: [{ key: { remoteJid: '999@lid', id: 'IN1', fromMe: false }, pushName: 'Sam', messageTimestamp: 1, message: { conversation: 'Hello back' } }] });
+  s.ev.emit('messages.upsert', { type: 'notify', messages: [{ key: { remoteJid: '999@lid', id: 'IN0', fromMe: false }, pushName: 'Sam', messageTimestamp: 1, message: { conversation: 'Not a reply' } }] });
+  s.ev.emit('messages.upsert', { type: 'notify', messages: [{ key: { remoteJid: '999@lid', id: 'IN1', fromMe: false }, pushName: 'Sam', messageTimestamp: 1, message: { extendedTextMessage: { text: 'Hello back', contextInfo: { stanzaId: 'LNK2' } } } }] });
   s.ev.emit('messages.upsert', { type: 'notify', messages: [{ key: { remoteJid: '123@g.us', id: 'G1', fromMe: false }, message: { conversation: 'group chatter' } }] });
   s.ev.emit('messages.update', [{ key: { id: 'LNK2', fromMe: true, remoteJid: '999@lid' }, update: { status: 4 } }]);
   await settle();
