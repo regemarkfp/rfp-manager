@@ -135,8 +135,7 @@ test('quotes as contracts: universal terms, a signature loaded as a picture, the
   await admin.post(q(`/api/invoices/${quote.id}/send`), {});
   const guest = client(app.url);
   let pv = (await guest.get('/api/portal/' + key)).data;
-  assert.ok(pv.terms, JSON.stringify(pv));
-  assert.deepEqual(pv.terms, { docTerms: 'Payment within 7 days of the event.', conditions: '1. Bookings\nA booking is confirmed once the quote is signed.' });
+  assert.deepEqual(pv.terms, { docTerms: 'Payment within 7 days of the event.', conditions: '1. Bookings\nA booking is confirmed once the quote is signed.', acknowledge: '' });
   const doc = pv.docs.find((d) => d.id === quote.id);
   // a picture of a signature (JPEG or PNG) is fine too
   assert.equal((await guest.post(doc.sign, { name: 'Test Bursar', agree: true, method: 'upload', image: 'data:image/gif;base64,R0lGOD' })).status, 400);
@@ -171,4 +170,70 @@ test('quotes as contracts: universal terms, a signature loaded as a picture, the
   assert.deepEqual((await again.get('/api/public/my-portals')).data.portals.map((p) => p.client), ['Park High School']);
   // someone else signed in does not count as the person of this link
   assert.equal((await admin.put(`/api/portal/${key}/details`, { phone: '1' })).status, 401);
+});
+
+test('release forms: a link per form, signed on the phone (adult or for a child), choices kept, withdrawn, only for the team', async (t) => {
+  const { app, admin, team } = await setup(t);
+  const q = (path) => `${path}${path.includes('?') ? '&' : '?'}team=${team}`;
+  await admin.put(q('/api/docs/production/prod_rel1'), { data: { name: 'Schools derby', date: '2099-04-01' } });
+  const saved = (await admin.put(q('/api/docs/releaseForm/rform_one'), { data: { name: 'Derby release', production: 'prod_rel1', active: true, minors: true, askRaw: true, askPromo: true } })).data.doc;
+  const key = saved.data.key;
+  assert.match(key, /^[\w-]{12,40}$/);
+  // editing keeps the link
+  assert.equal((await admin.put(q('/api/docs/releaseForm/rform_one'), { data: { ...saved.data, key: 'someone-elses-key' } })).data.doc.data.key, key);
+  const page = await fetch(app.url + '/release/' + key);
+  assert.equal(page.status, 200);
+  const anon = client(app.url);
+  const v = (await anon.get('/api/public/release/' + key)).data;
+  assert.equal(v.form.production, 'Schools derby');
+  assert.match(v.form.text, /POPIA/);
+  assert.match(v.form.text, /nobody can be identified/);
+  // the final production is required; a signature is required
+  assert.equal((await anon.post('/api/public/release/' + key, { name: 'Test Adult', image: PNG() })).status, 400);
+  assert.equal((await anon.post('/api/public/release/' + key, { name: 'Test Adult', agree: true })).status, 400);
+  const a = await anon.post('/api/public/release/' + key, { name: 'Test Adult', email: 'adult@example.com', agree: true, raw: true, promo: false, image: PNG() });
+  assert.equal(a.status, 200, JSON.stringify(a.data));
+  assert.equal(a.data.allows, 'final production, raw footage');
+  // a parent signs for a child, uploaded signature
+  assert.equal((await anon.post('/api/public/release/' + key, { name: 'Test Parent', minor: true, agree: true, image: PNG() })).status, 400, 'the child\'s name is needed');
+  assert.equal((await anon.post('/api/public/release/' + key, { name: 'Test Parent', minor: true, minorName: 'Test Child', relation: 'Legal guardian', agree: true, promo: true, method: 'upload', image: PNG() })).status, 200);
+  await app.notify.idle();
+  const copy = app.mail.outbox.find((m) => m.to.includes('adult@example.com'));
+  assert.ok(copy && copy.attachments[0].filename.endsWith('.pdf'), 'the signer gets a PDF copy');
+  // the team sees them; nobody else does, and they never travel as records
+  let list = (await admin.get(q('/api/releases/form/rform_one'))).data;
+  assert.equal(list.link, app.config.publicUrl.replace(/\/+$/, '') + '/release/' + key);
+  assert.equal(list.releases.length, 2);
+  const child = list.releases.find((x) => x.minor);
+  assert.deepEqual([child.minorName, child.relation, child.consents.raw, child.consents.promo, child.method], ['Test Child', 'Legal guardian', false, true, 'upload']);
+  const crew = await member(app, admin, team, 'crewrel@example.com', 'Crew');
+  assert.equal((await crew.get(q('/api/releases/form/rform_one'))).status, 403);
+  assert.ok(!(await admin.get(q('/api/docs'))).data.docs?.some?.((d) => d.type === 'release'));
+  const pdf = await fetch(app.url + q(`/api/releases/${child.id}/pdf`), { headers: { cookie: admin.cookie() } });
+  assert.equal(pdf.status, 200);
+  // withdrawn: kept, marked; closing the form stops new signatures
+  await admin.post(q(`/api/releases/${child.id}/withdraw`), { withdrawn: true });
+  list = (await admin.get(q('/api/releases/form/rform_one'))).data;
+  assert.ok(list.releases.find((x) => x.id === child.id).withdrawn);
+  assert.equal((await admin.get(q('/api/releases/production/prod_rel1'))).data.releases.length, 1, 'withdrawn releases are not counted for the production');
+  await admin.put(q('/api/docs/releaseForm/rform_one'), { data: { ...saved.data, active: false } });
+  assert.equal((await anon.post('/api/public/release/' + key, { name: 'Late Person', agree: true, image: PNG() })).status, 409);
+  assert.equal((await client(app.url).post('/api/public/release/notarealkey123', { name: 'X', agree: true, image: PNG() })).status, 404);
+});
+
+test('contracts: clauses pointed out need their own tick', async (t) => {
+  const { app, admin, team } = await setup(t);
+  const q = (path) => `${path}${path.includes('?') ? '&' : '?'}team=${team}`;
+  await admin.put(q('/api/billing'), { acknowledge: 'I have read clauses 4 and 7.' });
+  await admin.put(q('/api/docs/client/cli_ack1'), { data: { name: 'Ack Client', email: 'ack@client.example' } });
+  const quote = (await admin.post(q('/api/invoices'), { kind: 'quote', client: 'cli_ack1', lines: [{ item: 'Stream', rate: 1000, qty: 1 }] })).data.doc;
+  const sent = (await admin.post(q(`/api/invoices/${quote.id}/send`), {})).data;
+  const key = sent.portal.split('/portal/')[1];
+  const g = client(app.url);
+  const pv = (await g.get('/api/portal/' + key)).data;
+  assert.equal(pv.terms.acknowledge, 'I have read clauses 4 and 7.');
+  const sign = pv.docs.find((d) => d.id === quote.id).sign;
+  assert.equal((await g.post(sign, { name: 'Ack Person', agree: true, image: PNG() })).status, 400);
+  assert.equal((await g.post(sign, { name: 'Ack Person', agree: true, acknowledged: true, image: PNG() })).status, 200);
+  assert.equal((await app.invoices.one(team, quote.id)).contract.acknowledged, 'I have read clauses 4 and 7.');
 });
