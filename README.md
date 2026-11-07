@@ -18,6 +18,12 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.8
+
+- **Android app: Google sign-in in the app** with the phone's own Google account sheet (Credential Manager), no browser round trip. Needs, once, an **Android OAuth client** in the Google Cloud project of the website's GOOGLE_CLIENT_ID: package `com.regemarkfp.rfpmanager`, SHA-1 of the release key (`keytool -list -v -keystore android/rfp-release.keystore -alias rfp`). Without it (or on an older app) the browser sign-in is used as before.
+- **PDFs on a phone's browser** (quotes, invoices, contracts, releases, reports) are fetched signed in and saved as a file, instead of opening a tab that says "Sign in first".
+- On a phone the side menu never opens in its narrow (collapsed) form.
+
 ### 1.0.7
 
 - **NAS access per user** (Universe → NAS → NAS users → Access): the whole NAS read and write, the whole NAS read only, only chosen folders (each read only or read and write; every chosen folder becomes its own share, \\server\FolderName, and people only see the shares they may open), or no access. New users start with "Only folders I choose". Until access is first changed, everyone keeps the whole NAS. The rules are written by the helper to /etc/samba/rfp-nas.conf (the old [NAS] block in smb.conf is replaced by an include the first time), checked with testparm and Samba reloaded; it only accepts NAS users and folders inside the NAS.
