@@ -272,3 +272,77 @@ test('deleting a club deletes its teams (players stay)', async (t) => {
   assert.ok(!ids.includes('sq_del1a') && !ids.includes('sq_del1b'));
   assert.ok(ids.includes('sq_keep1') && ids.includes('plr_one1'));
 });
+
+test('Universe: NAS tab (space, mirror, folders) and company logos', async (t) => {
+  const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nas-'));
+  fs.mkdirSync(path.join(dir, 'assets')); fs.writeFileSync(path.join(dir, 'assets', 'a.bin'), Buffer.alloc(200000));
+  fs.mkdirSync(path.join(dir, 'software')); fs.writeFileSync(path.join(dir, 'software', 'b.bin'), Buffer.alloc(50000));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const { app, admin, team } = await setup(t, { nasDir: dir });
+  await admin.put('/api/docs/org/' + team + '?team=' + team, { data: { name: 'Test Team', image: 'https://example.com/logo.png' } });
+  const su = client(app.url);
+  assert.equal((await su.get('/api/super/nas')).status, 401);
+  await su.post('/api/super/reset', { email: 'boss@site.example' });
+  const token = /\?set=([\w-]+)/.exec(app.mail.outbox.find((m) => m.to.includes('boss@site.example')).text)[1];
+  await su.post('/api/super/password', { token, password: 'a long enough secret' });
+  let n = (await su.get('/api/super/nas')).data;
+  assert.equal(n.path, dir); assert.equal(n.exists, true); assert.ok(n.total > 0 && n.free > 0);
+  for (let i = 0; i < 50 && !(n.folders || []).length; i++) { await new Promise((r) => setTimeout(r, 100)); n = (await su.get('/api/super/nas')).data; }
+  assert.deepEqual(n.folders.map((f) => f.name), ['assets', 'software'], 'biggest first');
+  const co = (await su.get('/api/super/overview')).data.companies.find((c) => c.id === team);
+  assert.equal(co.logo, 'https://example.com/logo.png');
+  const { parseMdstat } = require('../lib/super');
+  const r = parseMdstat('md0 : active raid1 sdb1[0] sdc1[1](F)\n      976630464 blocks super 1.2 [2/1] [U_]\n', '/dev/md0');
+  assert.deepEqual([r.healthy, r.working, r.wanted, r.disks[1].failed], [false, 1, 2, true]);
+});
+
+test('Universe: NAS users through the helper, and the file browser stays inside the NAS', async (t) => {
+  const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nas-')), outside = fs.mkdtempSync(path.join(os.tmpdir(), 'out-'));
+  fs.writeFileSync(path.join(outside, 'secret.txt'), 'no');
+  fs.symlinkSync(outside, path.join(dir, 'escape'));
+  // a stand-in for /usr/local/sbin/rfp-nas-users: remembers what it was asked
+  const log = path.join(dir, '..', path.basename(dir) + '-helper.log');
+  const helper = path.join(os.tmpdir(), 'fake-nas-users-' + process.pid + '.sh');
+  fs.writeFileSync(helper, `#!/bin/sh\ncase "$1" in\n list) printf 'ruan\\tenabled\\tmade-here\\nguest\\tdisabled\\texisting\\n' ;;\n info) printf 'rfp-server\\trfp-server.tail.ts.net\\t100.1.2.3\\t${dir}\\n' ;;\n *) read pw; echo "$1 $2 \${#pw}" >> ${log} ;;\nesac\n`, { mode: 0o755 });
+  t.after(() => { for (const p of [dir, outside, log, helper]) fs.rmSync(p, { recursive: true, force: true }); });
+  const { app } = await setup(t, { nasDir: dir, nasUsersHelper: helper });
+  const su = client(app.url);
+  await su.post('/api/super/reset', { email: 'boss@site.example' });
+  const token = /\?set=([\w-]+)/.exec(app.mail.outbox.find((m) => m.to.includes('boss@site.example')).text)[1];
+  await su.post('/api/super/password', { token, password: 'a long enough secret' });
+  // users
+  let u = (await su.get('/api/super/nas/users')).data;
+  assert.equal(u.ready, true);
+  assert.deepEqual(u.users, [{ name: 'ruan', enabled: true, madeHere: true }, { name: 'guest', enabled: false, madeHere: false }]);
+  assert.equal(u.info.tailscale, 'rfp-server.tail.ts.net');
+  assert.equal((await su.post('/api/super/nas/users/add', { name: 'Bad Name!', password: 'longenough' })).status, 400);
+  assert.equal((await su.post('/api/super/nas/users/add', { name: 'tiaan', password: 'short' })).status, 400);
+  assert.equal((await su.post('/api/super/nas/users/add', { name: 'tiaan', password: 'longenough1' })).status, 200);
+  assert.equal((await su.post('/api/super/nas/users/disable', { name: 'tiaan' })).status, 200);
+  assert.equal((await su.post('/api/super/nas/users/format', { name: 'tiaan' })).status, 400);
+  assert.match(fs.readFileSync(log, 'utf8'), /^add tiaan 11\n/);
+  assert.equal((await client(app.url).get('/api/super/nas/users')).status, 401);
+  // files: make, upload, list, download, rename, delete
+  assert.equal((await su.post('/api/super/files/mkdir', { path: '', name: 'clips' })).status, 200);
+  const up = await fetch(app.url + '/api/super/files/upload?path=clips&name=hello.txt', { method: 'POST', headers: { cookie: su.cookie(), 'x-rfp': '1' }, body: 'hello nas' });
+  assert.equal(up.status, 200);
+  let l = (await su.get('/api/super/files?path=clips')).data;
+  assert.deepEqual(l.items.map((x) => [x.name, x.size]), [['hello.txt', 9]]);
+  const dl = await fetch(app.url + '/api/super/files/get?path=clips/hello.txt', { headers: { cookie: su.cookie() } });
+  assert.equal(await dl.text(), 'hello nas');
+  assert.match(dl.headers.get('content-disposition'), /attachment/);
+  const part = await fetch(app.url + '/api/super/files/get?path=clips/hello.txt', { headers: { cookie: su.cookie(), range: 'bytes=6-' } });
+  assert.equal(part.status, 206); assert.equal(await part.text(), 'nas');
+  assert.equal((await su.post('/api/super/files/rename', { path: 'clips/hello.txt', to: 'hi.txt' })).status, 200);
+  assert.equal((await su.post('/api/super/files/rename', { path: 'clips/hi.txt', to: '../x.txt' })).status, 400);
+  // never outside the NAS: .. and symlinks out are refused
+  assert.equal((await su.get('/api/super/files?path=..')).status, 400);
+  assert.equal((await su.get('/api/super/files?path=escape')).status, 403);
+  assert.equal((await fetch(app.url + '/api/super/files/get?path=escape/secret.txt', { headers: { cookie: su.cookie() } })).status, 403);
+  assert.equal((await su.post('/api/super/files/delete', { path: '' })).status, 400, 'not the NAS itself');
+  assert.equal((await su.post('/api/super/files/delete', { path: 'clips' })).status, 200);
+  assert.ok(!fs.existsSync(path.join(dir, 'clips')));
+  assert.equal((await client(app.url).get('/api/super/files')).status, 401);
+});
