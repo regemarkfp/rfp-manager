@@ -18,6 +18,16 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.6
+
+- **Universe → NAS → NAS users**: add people to the NAS share (a user name and password that work at home and over Tailscale), change passwords, switch them off or on, remove them. The website runs a small root helper for this (tools/server/nas-users.sh, installed as /usr/local/sbin/rfp-nas-users with a sudoers rule for that one command). Once, on the server: `curl -fsSL https://raw.githubusercontent.com/regemarkfp/rfp-manager/main/tools/server/github-update.sh | sudo bash -s -- --install --force`. From then on rfp-autoupdate also updates itself.
+- **Universe → Files**: browse the NAS folder, open or download files (video and audio can be scrubbed), upload (button or drag and drop; up to 100 MB per file through Cloudflare), new folder, rename, delete. Never outside the NAS folder.
+- Auto refresh waits while you are typing.
+
+### 1.0.5
+
+- **Universe page**: a **NAS** tab (free and used space, the RAID 1 mirror from /proc/mdstat: healthy or degraded, which disks, a rebuild in progress; and which folders take the room, measured at most every 15 minutes). The folder is NAS_DIR, else two levels up from MEDIA_DIR (…/assets/images), else /srv/nas. Production companies show their logos. The page refreshes itself every 30 seconds (untick "Auto refresh" to stop it).
+
 ### 1.0.4
 
 - **WhatsApp stays WhatsApp**: a WhatsApp message only goes into a booking when the client replies to (quotes) a message sent from the app. Everything else people send on WhatsApp is not copied. WhatsApp replies give a notification, not an email (answers on the tracking page still email the Admins).
