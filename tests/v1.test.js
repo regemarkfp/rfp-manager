@@ -305,7 +305,7 @@ test('Universe: NAS users through the helper, and the file browser stays inside 
   // a stand-in for /usr/local/sbin/rfp-nas-users: remembers what it was asked
   const log = path.join(dir, '..', path.basename(dir) + '-helper.log');
   const helper = path.join(os.tmpdir(), 'fake-nas-users-' + process.pid + '.sh');
-  fs.writeFileSync(helper, `#!/bin/sh\ncase "$1" in\n list) printf 'ruan\\tenabled\\tmade-here\\nguest\\tdisabled\\texisting\\n' ;;\n info) printf 'rfp-server\\trfp-server.tail.ts.net\\t100.1.2.3\\t${dir}\\n' ;;\n *) read pw; echo "$1 $2 \${#pw}" >> ${log} ;;\nesac\n`, { mode: 0o755 });
+  fs.writeFileSync(helper, `#!/bin/sh\ncase "$1" in\n list) printf 'ruan\\tenabled\\tmade-here\\nguest\\tdisabled\\texisting\\n' ;;\n info) printf 'rfp-server\\trfp-server.tail.ts.net\\t100.1.2.3\\t${dir}\\n' ;;\n folders) printf 'assets\\nassets/images\\nsoftware\\n' ;;\n apply) echo APPLY >> ${log}; cat >> ${log}; echo >> ${log} ;;\n *) read pw; echo "$1 $2 \${#pw}" >> ${log} ;;\nesac\n`, { mode: 0o755 });
   t.after(() => { for (const p of [dir, outside, log, helper]) fs.rmSync(p, { recursive: true, force: true }); });
   const { app } = await setup(t, { nasDir: dir, nasUsersHelper: helper });
   const su = client(app.url);
@@ -315,11 +315,23 @@ test('Universe: NAS users through the helper, and the file browser stays inside 
   // users
   let u = (await su.get('/api/super/nas/users')).data;
   assert.equal(u.ready, true);
-  assert.deepEqual(u.users, [{ name: 'ruan', enabled: true, madeHere: true }, { name: 'guest', enabled: false, madeHere: false }]);
+  assert.deepEqual(u.users.map(({ access, ...x }) => x), [{ name: 'ruan', enabled: true, madeHere: true }, { name: 'guest', enabled: false, madeHere: false }]);
   assert.equal(u.info.tailscale, 'rfp-server.tail.ts.net');
   assert.equal((await su.post('/api/super/nas/users/add', { name: 'Bad Name!', password: 'longenough' })).status, 400);
   assert.equal((await su.post('/api/super/nas/users/add', { name: 'tiaan', password: 'short' })).status, 400);
-  assert.equal((await su.post('/api/super/nas/users/add', { name: 'tiaan', password: 'longenough1' })).status, 200);
+  assert.equal(u.managed, false);
+  assert.deepEqual(u.users[0].access.mode, 'full', 'until access is first set, everyone has the whole NAS');
+  assert.deepEqual(u.folders, ['assets', 'assets/images', 'software']);
+  assert.equal((await su.post('/api/super/nas/users/add', { name: 'tiaan', password: 'longenough1', access: { mode: 'folders', folders: { 'assets/images': 'write', software: 'read' } } })).status, 200);
+  let rules = fs.readFileSync(log, 'utf8');
+  assert.match(rules, /APPLY\nfull\truan,guest\nread\t-\nshare\timages\tassets\/images\t-\ttiaan\nshare\tsoftware\tsoftware\ttiaan\t-/);
+  u = (await su.get('/api/super/nas/users')).data;
+  assert.equal(u.managed, true);
+  assert.equal((await su.post('/api/super/nas/users/access', { name: 'guest', access: { mode: 'read' } })).status, 200);
+  assert.equal((await su.post('/api/super/nas/users/access', { name: 'ruan', access: { mode: 'folders', folders: { '../etc': 'write' } } })).status, 400);
+  assert.equal((await su.post('/api/super/nas/users/access', { name: 'ruan', access: { mode: 'folders', folders: { software: 'write' } } })).status, 200);
+  rules = fs.readFileSync(log, 'utf8').split('APPLY').pop();
+  assert.match(rules, /full\t-\nread\tguest\nshare\timages\tassets\/images\t-\ttiaan\nshare\tsoftware\tsoftware\ttiaan\truan/);
   assert.equal((await su.post('/api/super/nas/users/disable', { name: 'tiaan' })).status, 200);
   assert.equal((await su.post('/api/super/nas/users/format', { name: 'tiaan' })).status, 400);
   assert.match(fs.readFileSync(log, 'utf8'), /^add tiaan 11\n/);
