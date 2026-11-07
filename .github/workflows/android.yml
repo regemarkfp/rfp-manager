@@ -11,6 +11,11 @@ on:
 permissions:
   contents: write
 
+# one build at a time; a newer push replaces a build still running (the newest app wins)
+concurrency:
+  group: android-app
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -32,6 +37,9 @@ jobs:
 
       - name: Put the APK on the website
         run: |
+          # start from the newest main (another build or commit may have landed while this one ran)
+          git fetch origin main
+          git reset --hard origin/main
           mkdir -p public/app
           cp android/app/build/outputs/apk/release/app-release.apk public/app/rfp-manager.apk
           echo "{\"versionCode\": $((100 + ${{ github.run_number }})), \"versionName\": \"2.0.${{ github.run_number }}\"}" > public/app/rfp-manager.json
@@ -39,7 +47,6 @@ jobs:
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
           git add public/app/rfp-manager.apk public/app/rfp-manager.json
           git commit -m "Android app, build ${{ github.run_number }}" || echo "Nothing new to commit"
-          git pull --rebase
           git push
 
       - uses: actions/upload-artifact@v4
