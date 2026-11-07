@@ -18,6 +18,11 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.9
+
+- **Settings save by themselves**: Production team, My account (name, phone, email choices; a new password still has its own button), Website home page, Legal & company, the booking form and Billing details save a moment after you change something, with a small "✓ Saved" (or "Not saved … Try again") where the Save button was.
+- The Android build on GitHub no longer fails when two builds finish close together (one build at a time; it commits on top of the newest main).
+
 ### 1.0.8
 
 - **Android app: Google sign-in in the app** with the phone's own Google account sheet (Credential Manager), no browser round trip. Needs, once, an **Android OAuth client** in the Google Cloud project of the website's GOOGLE_CLIENT_ID: package `com.regemarkfp.rfpmanager`, SHA-1 of the release key (`keytool -list -v -keystore android/rfp-release.keystore -alias rfp`). Without it (or on an older app) the browser sign-in is used as before.
