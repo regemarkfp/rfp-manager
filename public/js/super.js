@@ -133,35 +133,76 @@
   }
 
   // ---- NAS users (Samba): the same login on the house network and over Tailscale
+  // access: the whole NAS (read and write / read only), only chosen folders (each read, or read and write), or nothing
+  const MODE_OPTS = [['full', 'Whole NAS: read and write'], ['read', 'Whole NAS: read only'], ['folders', 'Only folders I choose'], ['none', 'No access']];
+  let openAccess = '';
+  const drafts = {};
+  function accessText(x) {
+    const a = x.access || { mode: 'full' };
+    if (a.mode === 'full') return 'Whole NAS · read and write';
+    if (a.mode === 'read') return 'Whole NAS · read only';
+    if (a.mode === 'none') return el('span', { class: 'dim' }, 'No access');
+    const f = Object.entries(a.folders || {});
+    if (!f.length) return el('span', { class: 'warn' }, 'No folders chosen yet');
+    return f.map(([rel, lv], i) => [i ? ', ' : '', el('b', {}, rel), lv === 'write' ? '' : ' (read)']);
+  }
+  function accessEditor(x, u, act) {
+    const d = drafts[x.name] || (drafts[x.name] = { mode: (x.access || {}).mode || 'full', folders: { ...((x.access || {}).folders || {}) } });
+    const all = [...new Set([...(u.folders || []), ...Object.keys(d.folders)])].sort((a, b) => a.localeCompare(b));
+    const box = el('div', { class: 'access' });
+    const paint = () => {
+      const list = d.mode === 'folders' ? el('div', { class: 'acc-folders' },
+        all.length ? all.map((rel) => el('div', { class: 'acc-row' + (rel.includes('/') ? ' sub' : '') },
+          el('span', {}, rel.includes('/') ? '↳ ' + rel.split('/').pop() : rel),
+          el('select', { class: 'sel', onchange: (e) => { if (e.target.value) d.folders[rel] = e.target.value; else delete d.folders[rel]; } },
+            [['', 'No access'], ['read', 'Read only'], ['write', 'Read and write']].map(([v, l]) => el('option', { value: v, selected: (d.folders[rel] || '') === v ? '' : null }, l))))) : el('p', { class: 'dim small' }, 'No folders on the NAS yet (make them under Files).'),
+        el('p', { class: 'dim small', style: 'margin:8px 0 0' }, 'Each chosen folder is its own share: they open \\\\server\\FolderName and only see the folders they may use. A folder deeper than two levels: make it under Files first.')) : null;
+      box.replaceChildren(
+        el('div', { class: 'row' }, el('b', {}, `Access for ${x.name}`),
+          el('select', { class: 'sel', onchange: (e) => { d.mode = e.target.value; paint(); } }, MODE_OPTS.map(([v, l]) => el('option', { value: v, selected: v === d.mode ? '' : null }, l)))),
+        list,
+        el('div', { class: 'row', style: 'margin-top:10px' },
+          el('button', { onclick: () => act('access', { name: x.name, access: { mode: d.mode, folders: d.mode === 'folders' ? d.folders : {} } }, `Access saved for ${x.name}`).then(() => { openAccess = ''; load(true); }).catch(() => {}) }, 'Save access'),
+          el('button', { class: 'ghost', onclick: () => { delete drafts[x.name]; openAccess = ''; load(true); } }, 'Cancel')));
+    };
+    paint();
+    return box;
+  }
+
   function usersCard(u) {
     const box = el('div', { class: 'card' }, el('h2', {}, 'NAS users'));
     if (!u.ready) {
       box.append(el('p', { class: 'small' }, 'User management needs a small helper on the server. Run this once on rfp-server, then refresh:'),
         el('pre', { class: 'code' }, 'curl -fsSL https://raw.githubusercontent.com/regemarkfp/rfp-manager/main/tools/server/github-update.sh | sudo bash -s -- --install --force'),
-        u.info && u.info.error ? el('p', { class: 'dim small' }, u.info.error) : null);
+        u.info && u.info.error ? el('p', { class: 'dim small' }, u.info.error) : '');
       return box;
     }
     const i = u.info, msg = el('div', { class: 'msg small' });
-    const act = async (action, body, done) => { msg.className = 'msg small'; msg.textContent = 'Working…'; try { await api('POST', '/api/super/nas/users/' + action, body); msg.className = 'msg small ok'; msg.textContent = done; load(true); } catch (e) { msg.className = 'msg small bad'; msg.textContent = e.message; } };
+    const act = async (action, body, done) => { msg.className = 'msg small'; msg.textContent = 'Working…'; try { await api('POST', '/api/super/nas/users/' + action, body); msg.className = 'msg small ok'; msg.textContent = done; delete drafts[body.name]; load(true); } catch (e) { msg.className = 'msg small bad'; msg.textContent = e.message; throw e; } };
     const ask = (q) => { const v = prompt(q); return v === null ? null : v; };
-    const nu = { name: '', password: '' };
+    const nu = { name: '', password: '', mode: 'folders' };
     box.append(
       el('p', { class: 'small dim', style: 'margin-top:0' }, 'Connect from Windows File Explorer (\\\\name\\NAS), a Mac (smb://name/NAS) or a phone file app. The same user name and password work at home and over Tailscale.'),
       el('div', { class: 'tiles' },
         el('div', { class: 'tile' }, el('b', { style: 'font-size:15px' }, `\\\\${i.host}\\NAS`), el('span', {}, 'At home (house network)')),
         i.tailscale ? el('div', { class: 'tile' }, el('b', { style: 'font-size:15px;word-break:break-all' }, `\\\\${i.tailscale}\\NAS`), el('span', {}, 'Over Tailscale')) : null,
         i.tailscaleIp ? el('div', { class: 'tile' }, el('b', { style: 'font-size:15px' }, `\\\\${i.tailscaleIp}\\NAS`), el('span', {}, 'Over Tailscale (IP)')) : null),
-      el('table', { style: 'margin-top:12px' }, el('tbody', {}, u.users.length ? u.users.map((x) => el('tr', {},
+      el('table', { style: 'margin-top:12px' }, el('tbody', {}, u.users.length ? u.users.map((x) => [el('tr', {},
         el('td', {}, el('b', {}, x.name), x.madeHere ? null : el('span', { class: 'dim small' }, ' · also a login on the server')),
         el('td', {}, el('span', { class: x.enabled ? 'ok' : 'bad' }, x.enabled ? 'Active' : 'Switched off')),
+        el('td', { class: 'small' }, accessText(x)),
         el('td', { class: 'n' },
+          el('button', { class: 'ghost sm' + (openAccess === x.name ? ' on' : ''), onclick: () => { openAccess = openAccess === x.name ? '' : x.name; load(true); } }, 'Access'), ' ',
           el('button', { class: 'ghost sm', onclick: () => { const pw = ask(`New password for ${x.name} (8+ characters)`); if (pw) act('passwd', { name: x.name, password: pw }, `Password changed for ${x.name}`); } }, 'Password'), ' ',
           el('button', { class: 'ghost sm', onclick: () => act(x.enabled ? 'disable' : 'enable', { name: x.name }, `${x.name} ${x.enabled ? 'switched off' : 'switched on'}`) }, x.enabled ? 'Switch off' : 'Switch on'), ' ',
-          el('button', { class: 'ghost sm', onclick: () => { if (confirm(`Take ${x.name} off the NAS?${x.madeHere ? '' : ' Their login on the server itself stays.'}`)) act('remove', { name: x.name }, `${x.name} removed`); } }, 'Remove')))) : el('tr', {}, el('td', { class: 'dim' }, 'No NAS users yet.')))),
+          el('button', { class: 'ghost sm', onclick: () => { if (confirm(`Take ${x.name} off the NAS?${x.madeHere ? '' : ' Their login on the server itself stays.'}`)) act('remove', { name: x.name }, `${x.name} removed`); } }, 'Remove'))),
+        openAccess === x.name ? el('tr', {}, el('td', { colspan: '4' }, accessEditor(x, u, act))) : null]) : el('tr', {}, el('td', { class: 'dim' }, 'No NAS users yet.')))),
       el('div', { class: 'row', style: 'margin-top:12px' },
         el('input', { placeholder: 'user name (e.g. ruan)', autocomplete: 'off', style: 'max-width:220px;margin:0', oninput: (e) => { nu.name = e.target.value; } }),
         el('input', { type: 'password', placeholder: 'password (8+ characters)', autocomplete: 'new-password', style: 'max-width:240px;margin:0', oninput: (e) => { nu.password = e.target.value; } }),
-        el('button', { onclick: () => act('add', nu, `${nu.name} can now open the NAS`) }, 'Add user')),
+        el('select', { class: 'sel', onchange: (e) => { nu.mode = e.target.value; } }, MODE_OPTS.map(([v, l]) => el('option', { value: v, selected: v === nu.mode ? '' : null }, l))),
+        el('button', { onclick: () => act('add', { name: nu.name, password: nu.password, access: { mode: nu.mode, folders: {} } }, nu.mode === 'folders' ? `${nu.name} added: choose their folders under Access` : `${nu.name} can now open the NAS`).then(() => { if (nu.mode === 'folders') { openAccess = nu.name.trim().toLowerCase(); load(true); } }).catch(() => {}) }, 'Add user')),
+      u.managed ? '' : el('p', { class: 'dim small' }, 'Until you change someone\'s access, every NAS user can open the whole NAS (as it was set up).'),
       msg);
     return box;
   }
