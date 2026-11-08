@@ -405,12 +405,57 @@ function offerApp() {
     h('p', { class: 'dim small' }, 'After downloading, open the file and allow installing from your browser if Android asks.')),
   actions: [{ label: 'Not now', onClick: APP_OFFER.later }, { label: '⬇ Download the app', primary: true, onClick: () => { APP_OFFER.later(); location.href = '/app/rfp-manager.apk'; } }] });
 }
+// ---- page sections as sub-tabs: a page that stacks 3+ titled cards gets a sticky row of chips (one card at a time,
+// or All), so nothing is missed further down. Live tools (scorer, graphics control, rundown …) are left as they are.
+const SECTION_SKIP = new Set(['dashboard', 'score', 'control', 'rundown', 'callsheet', 'monitors', 'calendar', 'doc', 'more', 'complete', 'report']);
+const sectionMemo = {};
+let sectionBusy = false, sectionTimer = null;
+function sectionTitle(card) {
+  // the card's own title: an h2/h3 near the top, or the h2 that starts a small header row
+  let hd = null;
+  for (const x of [...card.children].slice(0, 3)) {
+    if (/^H[23]$/.test(x.tagName)) { hd = x; break; }
+    if (x.tagName === 'DIV' && x.children.length <= 4 && x.firstElementChild && x.firstElementChild.tagName === 'H2') { hd = x.firstElementChild; break; }
+  }
+  const t = hd ? hd.textContent.trim() : '';
+  return t.length > 34 ? t.slice(0, 32).trim() + '…' : t;
+}
+function applySections() {
+  const page = ((location.hash || '#/').slice(2).split('/')[0]) || 'dashboard';
+  const root = document.querySelector('#app main') || document.getElementById('app');
+  if (!root || SECTION_SKIP.has(page)) return;
+  sectionBusy = true;
+  try {
+    const parents = new Set([...root.querySelectorAll('.card')].map((c) => c.parentElement));
+    let idx = 0;
+    for (const box of parents) {
+      if (!box || box.closest('.modal, .form, [data-nosubnav]') || box.classList.contains('two') || getComputedStyle(box).display === 'grid') continue;
+      const cards = [...box.children].filter((c) => c.classList.contains('card') && !c.classList.contains('subnav-skip'));
+      const titled = cards.map((c) => ({ c, t: sectionTitle(c) })).filter((x) => x.t);
+      const old = [...box.children].find((x) => x.classList.contains('subnav'));
+      if (titled.length < 3 || titled.length > 14 || new Set(titled.map((x) => x.t)).size !== titled.length) { if (old) old.remove(); cards.forEach((c) => c.classList.remove('shide')); continue; }
+      const key = location.hash + '|' + (idx++);
+      let on = sectionMemo[key];
+      if (on !== '*' && !titled.some((x) => x.t === on)) on = titled[0].t;
+      const bar = h('div', { class: 'subnav', role: 'tablist' }, [...titled.map((x) => x.t), '*'].map((t) => h('button', { type: 'button', class: t === on ? 'on' : '',
+        onclick: () => { sectionMemo[key] = t; applySections(); const b = box.querySelector('.subnav'); if (b && b.getBoundingClientRect().top < 0) b.scrollIntoView({ block: 'start' }); } }, t === '*' ? 'All' : t)));
+      if (old) old.replaceWith(bar); else box.insertBefore(bar, titled[0].c);
+      for (const x of titled) x.c.classList.toggle('shide', on !== '*' && x.t !== on);
+    }
+  } finally { setTimeout(() => { sectionBusy = false; }, 0); }
+}
+App.applySections = applySections;
+new MutationObserver(() => { if (sectionBusy) return; clearTimeout(sectionTimer); sectionTimer = setTimeout(applySections, 120); })
+  .observe(document.getElementById('app') || document.body, { childList: true, subtree: true });
+
 window.addEventListener('hashchange', () => { if (App.me && App.team) route(); });
 App.pages.notfound = () => ({ el: h('div', { class: 'card' }, 'That page does not exist. ', h('a', { href: '#/' }, 'Go to the dashboard')) });
 
 // ---- form widgets ---------------------------------------------------------------------------
-function optionsFor(f) {
+function optionsFor(f, form) {
   if (Array.isArray(f.opts)) return f.opts;
+  // only the chosen sport's formats once a sport is set
+  if (f.opts === 'formats' && form) { const sp = formSport(form.type || '', form); const list = Scoring.formats().filter((x) => !sp || x.sport === sp); return (list.length ? list : Scoring.formats()).map((x) => x.text); }
   if (f.opts === 'sports') return App.sports();
   if (f.opts === 'formats') return Scoring.formats().map((x) => x.text);
   if (f.opts === 'crewRoles') return App.sorted('crewRole').map((d) => d.data.name);
@@ -487,7 +532,7 @@ function fieldInput(f, value, onChange, ctx = {}) {
     case 'select': return h('select', { onchange: (e) => onChange(e.target.value) }, optionsFor(f).map((o) => h('option', { value: o, selected: (value || f.def) === o }, o)));
     case 'combo': {
       const id = 'dl_' + Math.random().toString(36).slice(2);
-      return h('div', {}, h('input', { list: id, value: value || '', placeholder: ph, oninput: (e) => onChange(e.target.value) }), h('datalist', { id }, optionsFor(f).map((o) => h('option', { value: o }))));
+      return h('div', {}, h('input', { list: id, value: value || '', placeholder: ph, oninput: (e) => onChange(e.target.value) }), h('datalist', { id }, optionsFor(f, ctx.form).map((o) => h('option', { value: o }))));
     }
     case 'multi': {
       let cur = Array.isArray(value) ? value.slice() : [];
@@ -556,25 +601,62 @@ function listField(f, value, onChange, ctx) {
 }
 
 // Builds a form for a record type. Returns { el, data } where data is updated as the user types.
+// The sport a form is about (scorer engine id: 'rugby', 'cricket' …): its own Sport field, else its competition's.
+function formSport(type, data) {
+  let name = data.sport;
+  if (!name && data.competition) { const c = App.get(data.competition); name = c && c.sport; }
+  const sp = name ? Scoring.sportFor(name) : null;
+  return sp ? sp.id : '';
+}
+App.formSport = formSport;
+
+// Forms with several groups show them as sub-tabs (all fields stay in the form, the other groups are just hidden),
+// so nothing gets lost further down a long page. Fields limited to some sports (f.sports) only show for those.
+const formTabMemo = {};
 function buildForm(type, initial, { fields, onChange } = {}) {
   const data = JSON.parse(JSON.stringify(initial || {}));
   const all = fields || Schema.fieldsFor(type, App.org()).filter((f) => !f.hidden);
   for (const f of all) if (data[f.k] === undefined && f.def !== undefined) data[f.k] = f.def;
   const grid = h('div', { class: 'form' });
   const widgets = {};
+  let active = formTabMemo[type] || '';
+  const REPAINT = { squad: ['club'], fixture: ['sport', 'competition'], competition: ['sport'] };
+  const groupOf = (f, i) => f.group || (all.slice(0, i).some((x) => x.group) ? 'More' : 'Details');
   const paint = () => {
+    const sport = formSport(type, data);
+    const shown = all.map((f, i) => ({ f, g: groupOf(f, i) })).filter(({ f }) => !f.sports || (sport && f.sports.includes(sport)));
+    const groups = [...new Set(shown.map((x) => x.g))];
+    const tabbed = groups.length >= 3 || (groups.length === 2 && shown.length >= 10);
+    if (tabbed && active !== '*' && !groups.includes(active)) active = groups[0];
+    const empty = (v) => v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length);
+    const kids = [];
+    if (tabbed) {
+      kids.push(h('div', { class: 'wide ftabs', role: 'tablist' }, [...groups, '*'].map((g) => {
+        const need = g !== '*' && shown.some((x) => x.g === g && x.f.req && empty(data[x.f.k]));
+        const n = g === '*' ? 0 : shown.filter((x) => x.g === g).length;
+        return h('button', { type: 'button', class: (g === active ? 'on' : '') + (need ? ' need' : ''), title: need ? 'Has a required field still empty' : '',
+          onclick: () => { active = g; formTabMemo[type] = g; paint(); } }, g === '*' ? 'All' : g.replace(/ \(.*\)$/, ''), n ? h('small', {}, ' ' + n) : null);
+      })));
+      if (active !== '*') { const g = shown.find((x) => x.g === active); if (g && g.f.group && /\(/.test(g.f.group)) kids.push(h('p', { class: 'wide help', style: { margin: 0 } }, g.f.group.replace(/^.*\((.*)\)$/, '$1').replace(/^./, (c) => c.toUpperCase()) + '.')); }
+    }
     let lastGroup;
-    grid.replaceChildren(...all.flatMap((f) => {
-      const head = f.group && f.group !== lastGroup ? h('h4', { class: 'wide fgroup' }, f.group) : null;
-      lastGroup = f.group;
-      return head ? [head, one(f)] : [one(f)];
-    }));
+    for (const { f, g } of shown) {
+      const el = one(f);
+      if (tabbed) { if (active !== '*' && g !== active) el.classList.add('fhide'); }
+      else if (f.group && f.group !== lastGroup) kids.push(h('h4', { class: 'wide fgroup' }, f.group));
+      if (tabbed && active === '*' && g !== lastGroup) kids.push(h('h4', { class: 'wide fgroup' }, g));
+      lastGroup = g;
+      kids.push(el);
+    }
+    grid.replaceChildren(...kids);
   };
   const one = (f) => {
     const club = type === 'squad' && data.club ? App.get(data.club) : null;
     {
       const inherited = f.inherit && club && club[f.inherit] && f.t !== 'image' ? `${club[f.inherit]} (from club)` : '';
-      const input = fieldInput(f, data[f.k], (v) => { data[f.k] = v; if (onChange) onChange(f.k, v); if ((f.k === 'club' && type === 'squad') || (f.k === 'sport' && type === 'fixture')) paint(); }, { form: data, placeholder: inherited });
+      const input = fieldInput(f, data[f.k], (v) => { data[f.k] = v; if (onChange) onChange(f.k, v); if ((REPAINT[type] || []).includes(f.k) && f.t !== 'combo') paint(); }, { form: data, placeholder: inherited });
+      // a typed field (combo) repaints when the typing stops, not on every key
+      if ((REPAINT[type] || []).includes(f.k) && f.t === 'combo') input.addEventListener('change', () => paint());
       widgets[f.k] = input;
       const wide = ['textarea', 'list', 'multi'].includes(f.t);
       const lab = h('span', {}, f.l + (f.req ? ' *' : ''));
