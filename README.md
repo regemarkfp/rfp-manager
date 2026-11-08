@@ -18,6 +18,19 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.10
+
+- **Long screens are split into sub-tabs**: a form with several groups (Match, When & where, People, Match settings …) shows them as a row of chips at the top, one group at a time, with **All** for everything; a red dot marks a group with a required field still empty. A page that stacks three or more titled sections (Settings → Website, and the like) gets the same row, sticky while you scroll. Live tools (scorer, graphics control, rundown, call sheet, dashboard) are left as they are.
+- **Match setup only shows what the sport uses**: periods, lengths and extra time for the timed sports; golden point and the 20-minute red for rugby; sin bin for rugby, hockey and netball; shoot-out / kicking competition for rugby, hockey and football; line-up and bench for team sports. The Format list only offers the chosen sport's formats.
+- **Scoring follows the federations**:
+  - Team sports no longer show "X LEAD BY Y" while live (that is a cricket line); graphics show the period instead, and "X WIN" / "DRAW" at the end. Tennis and padel show who serves (or set / match / break point) instead of "LEAD 1-0 IN SETS".
+  - Padel: the FIP / Premier Padel **star point** (2026) is the default: two advantage rounds, then one deciding point. Golden point and advantage are still there.
+  - Badminton: **BWF 3 × 15** (from 4 January 2027): win by two from 14-14, 21 caps it, interval at 8.
+  - Basketball: the bonus now starts after 4 team fouls in a quarter (FIBA, NBA) and after 6 in 3x3, as the rules say.
+  - Rugby league: "Field goal" and the NRL **2-point field goal** from 40 m+.
+  - Netball Fast5: 1, 2 and 3-point shots.
+- The old scoring test (written for an engine that no longer exists) is replaced by federation checks for every sport above.
+
 ### 1.0.9
 
 - **Settings save by themselves**: Production team, My account (name, phone, email choices; a new password still has its own button), Website home page, Legal & company, the booking form and Billing details save a moment after you change something, with a small "✓ Saved" (or "Not saved … Try again") where the Save button was.
