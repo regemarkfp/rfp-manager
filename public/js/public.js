@@ -19,7 +19,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     for (const k of kids.flat(Infinity)) if (k !== null && k !== undefined && k !== false) e.append(k);
     return e;
   };
-  const img = (id) => (!id ? '' : /^https?:/.test(id) ? id : '/media/' + encodeURIComponent(id));
+  const img = (id) => (!id ? '' : /^(https?:|\/)/.test(id) ? id : '/media/' + encodeURIComponent(id));
   const esc = (s) => String(s || '');
   let D = null, CH = null, query = '';
 
@@ -44,7 +44,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       !bg && ch.logo ? el('img', { class: 'logo', src: img(ch.logo), alt: '' }) : !bg ? el('div', { class: 'thumb-name' }, ch.name || '') : null, badges);
   }
   function streamCard(s, opts = {}) {
-    const href = '/watch/' + s.slug + (s.match ? '?m=' + encodeURIComponent(s.match) : s.start ? '?v=' + encodeURIComponent(s.start) : '');
+    const href = s.href || '/watch/' + s.slug + (s.match ? '?m=' + encodeURIComponent(s.match) : s.start ? '?v=' + encodeURIComponent(s.start) : '');
     const badges = s.live ? el('span', { class: 'badge live' }, '● LIVE') : s.start ? el('span', { class: 'badge dur' }, dur(s.duration)) : el('span', { class: 'badge when' }, day(s.date, s.time));
     const sub = s.live ? `${s.viewers || 0} watching` : s.start ? (s.of ? s.of + ' · ' : '') + ago(s.start) : 'Upcoming · ' + day(s.date, s.time);
     const price = s.price && s.price.ticket ? el('span', { class: 'badge price' }, 'R ' + Number(s.price.ticket).toFixed(2).replace(/\.00$/, '')) : null;
@@ -649,6 +649,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       section(mLive.length ? 'Live matches' : '', mLive.length ? el('div', { class: 'matches' }, mLive.map(matchCard)) : null),
       section('Coming up', up.length ? el('div', { class: 'grid' }, up.slice(0, 8).map((s) => streamCard(s))) : null),
       section('Videos', vids.length ? el('div', { class: 'grid' }, vids.slice(0, 24).map((s) => streamCard(s))) : null, vids.length > 24 ? el('a', { href: '/videos', 'data-nav': '' }, 'See all ' + vids.length) : ''),
+      section('Series', (D.series || []).filter((x) => match(q, x.title, x.channel.name)).length ? el('div', { class: 'grid' }, (D.series || []).filter((x) => match(q, x.title, x.channel.name)).slice(0, 12).map(seriesCard)) : null),
       section('Fixtures', mUp.length ? el('div', { class: 'matches' }, mUp.map(matchCard)) : null),
       section('Results', mRes.length ? el('div', { class: 'matches' }, mRes.map(matchCard)) : null),
       section('Channels', chans.length ? el('div', { class: 'chans' }, chans.map(chanChip)) : null),
@@ -693,6 +694,8 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       for (const m of s.matches || []) if (m.duration > 0) vids.push({ ...s, live: false, title: m.title, of: s.title, match: m.fixture, start: m.start, duration: m.duration });
       for (const v of s.videos) vids.push({ ...s, live: false, title: s.title + ((s.matches || []).length ? ' (full stream)' : ''), start: v.start, duration: v.duration });
     }
+    vids.push(...(c.vods || []));
+    const sers = c.series || [];
     vids.sort((a, b) => String(b.start).localeCompare(String(a.start)));
     const sub = el('button', { class: 'primary' + (c.subscribed ? ' on' : ''), onclick: () => subscribe(ch.id, !c.subscribed) }, c.subscribed ? 'Subscribed ✓' : 'Subscribe');
     const t = tab || 'home';
@@ -712,14 +715,156 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     };
     const body = t === 'sermons' ? sermonsBox() : t === 'upcoming' ? (up.length ? [el('div', { class: 'up-list' }, up.map(upRow)), c.subscribed ? null : el('p', { class: 'sub' }, 'Subscribe to get an email when a stream starts.')] : el('div', { class: 'empty' }, 'Nothing scheduled yet.'))
       : t === 'about' ? el('div', { class: 'about' }, ch.description || 'No description yet.', el('p', {}, `${c.subscribers} subscriber${c.subscribers === 1 ? '' : 's'} · ${ch.owner === 'Production company' ? 'by ' + ch.company : ch.owner + ' channel · ' + ch.company}`))
+      : t === 'series' ? (sers.length ? el('div', { class: 'grid' }, sers.map(seriesCard)) : el('div', { class: 'empty' }, 'No series yet.'))
       : t === 'videos' ? (vids.length ? el('div', { class: 'grid' }, vids.map((s) => streamCard(s, { noChannel: true }))) : el('div', { class: 'empty' }, 'No videos yet.'))
         : [section('Live now', live.length ? el('div', { class: 'grid' }, live.map((s) => streamCard(s, { noChannel: true }))) : null), section('Coming up', up.length ? el('div', { class: 'grid' }, up.slice(0, 8).map((s) => streamCard(s, { noChannel: true }))) : null),
-          section('Videos', vids.length ? el('div', { class: 'grid' }, vids.slice(0, 12).map((s) => streamCard(s, { noChannel: true }))) : null), !live.length && !up.length && !vids.length ? el('div', { class: 'empty' }, 'Nothing here yet.') : null];
+          section('Series', sers.length ? el('div', { class: 'grid' }, sers.slice(0, 8).map(seriesCard)) : null),
+          section('Videos', vids.length ? el('div', { class: 'grid' }, vids.slice(0, 12).map((s) => streamCard(s, { noChannel: true }))) : null), !live.length && !up.length && !vids.length && !sers.length ? el('div', { class: 'empty' }, 'Nothing here yet.') : null];
     return [el('div', { class: 'banner', style: { backgroundImage: ch.banner ? `url("${img(ch.banner)}")` : `linear-gradient(120deg, ${ch.color}, #151515 75%)` } }),
       el('div', { class: 'chead' }, ch.logo ? el('img', { class: 'big', src: img(ch.logo), alt: '' }) : el('span', { class: 'big avatar', style: { fontSize: '44px' } }, ch.name.slice(0, 1)),
         el('div', { style: { flex: 1, minWidth: '200px' } }, el('h1', {}, ch.name), el('div', { class: 'sub' }, `/c/${ch.slug} · ${c.subscribers} subscriber${c.subscribers === 1 ? '' : 's'} · ${vids.length} video${vids.length === 1 ? '' : 's'}`)), sub),
-      el('div', { class: 'tabs' }, tabLink('home', 'Home'), tabLink('upcoming', 'Upcoming' + (up.length ? ` (${up.length})` : '')), tabLink('videos', 'Videos'), ch.owner === 'Church' || /church|kerk|gemeente|ministr/i.test(ch.name + ' ' + (ch.company || '')) || t === 'sermons' ? tabLink('sermons', 'Sermons') : null, tabLink('about', 'About')), body];
+      el('div', { class: 'tabs' }, tabLink('home', 'Home'), tabLink('upcoming', 'Upcoming' + (up.length ? ` (${up.length})` : '')), tabLink('videos', 'Videos'), sers.length ? tabLink('series', 'Series') : null, ch.owner === 'Church' || /church|kerk|gemeente|ministr/i.test(ch.name + ' ' + (ch.company || '')) || t === 'sermons' ? tabLink('sermons', 'Sermons') : null, tabLink('about', 'About')), body];
   }
+
+  // ---- videos on demand (/v/<video>) and series (/s/<series>): play, carry on where you stopped, next episode, buy
+  const TK = 'rfp-tickets', POS = 'rfp-vod-pos';
+  const myTickets = () => { try { return JSON.parse(localStorage.getItem(TK) || '[]').filter((t) => /^tk_/.test(t)); } catch (e) { return []; } };
+  const keepTicket = (t) => { if (!/^tk_/.test(t || '')) return; try { localStorage.setItem(TK, JSON.stringify([t, ...myTickets().filter((x) => x !== t)].slice(0, 30))); } catch (e) { /* private window */ } };
+  const positions = () => { try { return JSON.parse(localStorage.getItem(POS) || '{}'); } catch (e) { return {}; } };
+  const savePos = (id, t, d) => { try { const p = positions(); p[id] = { t: Math.round(t), d: Math.round(d), at: Date.now() }; const keys = Object.keys(p); if (keys.length > 300) keys.sort((a, b) => p[a].at - p[b].at).slice(0, 50).forEach((k) => delete p[k]); localStorage.setItem(POS, JSON.stringify(p)); } catch (e) { /* private window */ } };
+  const seenPart = (id) => { const x = positions()[id]; return x && x.d ? Math.min(1, x.t / x.d) : 0; };
+  const vget = async (url, opts = {}) => {
+    const r = await fetch(url, { credentials: 'same-origin', ...opts, headers: { 'x-rfp': '1', 'x-rfp-tickets': myTickets().join(','), ...(opts.body ? { 'content-type': 'application/json' } : {}), ...(opts.headers || {}) } });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'Something went wrong');
+    return j;
+  };
+  const zar = (n) => 'R ' + Number(n).toFixed(2).replace(/\.00$/, '');
+  // back from PayFast with ?paid=<id>: wait for the confirmation, keep the ticket in this browser, show the page again
+  function afterPayment(onDone) {
+    const id = new URLSearchParams(location.search).get('paid');
+    if (!id) return null;
+    const box = el('div', { class: 'push-inline' }, el('span', {}, '⏳ Waiting for PayFast to confirm your payment…'));
+    let n = 0;
+    const tick = async () => {
+      let s = null;
+      try { s = await get('/api/pay/status/' + encodeURIComponent(id)); } catch { s = null; }
+      if (s && s.status === 'Paid') { keepTicket(s.ticket); history.replaceState(null, '', location.pathname); box.replaceChildren(el('span', {}, '✓ Paid – enjoy! Your ticket is also in your email.')); setTimeout(onDone, 800); return; }
+      if (s && ['Failed', 'Cancelled'].includes(s.status)) { box.replaceChildren(el('span', {}, 'The payment did not go through. Nothing was charged; you can try again.')); return; }
+      if (++n < 40) setTimeout(tick, 3000); else box.replaceChildren(el('span', {}, 'PayFast has not confirmed it yet. If you paid, your ticket arrives by email.'));
+    };
+    tick();
+    return box;
+  }
+  // what to buy: this video, the whole series, or the channel pass
+  function buyBox(options, info) {
+    const name = el('input', { placeholder: 'Your name', autocomplete: 'name' });
+    const email = el('input', { type: 'email', placeholder: 'Your email address (the ticket is sent there)', autocomplete: 'email' });
+    const err = el('div', { class: 'err' });
+    const go = async (kind, id, btn) => {
+      btn.disabled = true; err.textContent = '';
+      try { await payGo('/api/public/vod/buy', { kind, id, email: email.value, name: name.value }); } catch (e) { err.textContent = e.message; btn.disabled = false; }
+    };
+    if (!info.payments) return el('div', { class: 'vod-lock' }, el('h2', {}, 'This needs a ticket'), el('p', {}, 'Tickets are not on sale yet. Try again later.'));
+    return el('div', { class: 'vod-lock' }, el('h2', {}, 'Watch with a ticket'),
+      el('div', { class: 'vod-buy' }, options.map((o) => { const b = el('button', { class: 'primary', onclick: () => go(o.kind, o.id, b) }, o.label); return el('div', {}, b, el('div', { class: 'sub' }, o.sub)); })),
+      D.me ? el('p', { class: 'sub' }, 'Signed in as ' + D.me.email + ': the ticket is kept on your account.') : el('div', { class: 'vod-who' }, name, email, el('p', { class: 'sub' }, el('a', { href: '#', onclick: (e) => { e.preventDefault(); signIn('Sign in to keep your tickets on your account.'); } }, 'Sign in'), ' to keep it on your account instead.')),
+      err, el('p', { class: 'sub' }, 'Paid securely with PayFast (card, Instant EFT, SnapScan …).'));
+  }
+  function seasonsList(series, currentId) {
+    if (!series || !series.seasons.length) return null;
+    const anyPaid = series.seasons.some((x) => x.episodes.some((e) => !e.free));
+    let open = (series.seasons.find((s) => s.episodes.some((e) => e.id === currentId)) || series.seasons[0]).number;
+    const box = el('div', {});
+    const paint = () => {
+      const s = series.seasons.find((x) => x.number === open) || series.seasons[0];
+      box.replaceChildren(series.seasons.length > 1 ? el('div', { class: 'tabs' }, series.seasons.map((x) => el('a', { href: '#', class: x.number === open ? 'on' : '', onclick: (e) => { e.preventDefault(); open = x.number; paint(); } }, x.title))) : el('h3', { class: 'vod-season' }, s.title),
+        el('div', { class: 'eps' }, s.episodes.map((e) => el('a', { class: 'ep' + (e.id === currentId ? ' on' : ''), href: '/v/' + e.id, 'data-nav': '' },
+          el('div', { class: 'thumb', style: { backgroundImage: e.poster ? `url("${img(e.poster)}")` : '' } }, e.duration ? el('span', { class: 'badge dur' }, dur(e.duration)) : null, seenPart(e.id) > 0.02 ? el('div', { class: 'seen' }, el('span', { style: { width: Math.round(seenPart(e.id) * 100) + '%' } })) : null),
+          el('div', {}, el('b', {}, (e.episode ? e.episode + '. ' : '') + e.title, e.free && anyPaid ? el('span', { class: 'chip' }, 'Free') : null), e.description ? el('div', { class: 'sub' }, e.description.slice(0, 160)) : null)))));
+    };
+    paint();
+    return box;
+  }
+  async function videoPage(id, password) {
+    let v;
+    try { v = await vget('/api/public/v/' + encodeURIComponent(id), password !== undefined ? { method: 'POST', body: JSON.stringify({ password }) } : {}); } catch (e) { return el('div', { class: 'empty' }, e.message); }
+    document.title = v.title + ' · ' + v.channel.name;
+    const paid = afterPayment(() => render());
+    const head = [el('h1', { class: 'vod-title' }, v.title), el('div', { class: 'vod-meta' },
+      el('a', { href: '/c/' + v.channel.slug, 'data-nav': '', class: 'row' }, avatar(v.channel.logo, v.channel.name, 'chlogo'), el('b', {}, v.channel.name)),
+      v.series ? el('a', { href: '/s/' + v.series.id, 'data-nav': '', class: 'sub' }, v.series.title + (v.label ? ' · ' + v.label : '')) : null, v.duration ? el('span', { class: 'sub' }, dur(v.duration)) : null)];
+    let stage;
+    if (v.needs === 'processing') stage = el('div', { class: 'vod-lock' }, el('h2', {}, 'This video is being prepared'), el('p', {}, v.status === 'processing' ? `Almost there (${v.progress}%). Try again in a few minutes.` : 'It is not ready yet.'));
+    else if (v.needs === 'password') {
+      const pw = el('input', { type: 'password', placeholder: 'Password' });
+      const go = async () => { const view = await videoPage(id, pw.value); $('main').replaceChildren(...[view].flat(Infinity).filter(Boolean), siteFooter()); };
+      stage = el('div', { class: 'vod-lock' }, el('h2', {}, 'This channel needs a password'), el('div', { class: 'row' }, pw, el('button', { class: 'primary', onclick: go }, 'Watch')));
+      pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    } else if (v.needs === 'signin') stage = el('div', { class: 'vod-lock' }, el('h2', {}, 'For the production team'), el('p', {}, 'Sign in with the account of a team member to watch this.'), signInButton());
+    else if (v.needs === 'team') stage = el('div', { class: 'vod-lock' }, el('h2', {}, 'For the production team only'), el('p', {}, 'This channel is only for its production team.'));
+    else if (v.needs === 'ticket') {
+      const pr = v.price, opts = [];
+      if (pr.video) opts.push({ kind: 'vod', id: v.id, label: `Buy this video · ${zar(pr.video)}`, sub: 'Watch it as often as you like.' });
+      if (pr.series) opts.push({ kind: 'series', id: v.id, label: `Buy the series · ${zar(pr.series.amount)}`, sub: `Every episode of ${pr.series.title}.` });
+      if (pr.pass) opts.push({ kind: 'pass', id: v.id, label: `Channel pass · ${zar(pr.pass.amount)}`, sub: `Everything paid on ${v.channel.name} for ${pr.pass.days} days, live streams too.` });
+      stage = el('div', { class: 'vod-stage locked', style: { backgroundImage: v.poster ? `url("${img(v.poster)}")` : '' } }, buyBox(opts, v));
+    } else {
+      const video = el('video', { controls: true, playsinline: true, preload: 'metadata', poster: v.poster ? img(v.poster) : null, src: v.src });
+      const over = el('div', { class: 'vod-next', style: { display: 'none' } });
+      let lastSave = 0, counted = false, played = 0, timer = null;
+      video.addEventListener('loadedmetadata', () => { const p = positions()[v.id]; if (p && p.t > 10 && p.t < video.duration - 15) video.currentTime = p.t; });
+      video.addEventListener('timeupdate', () => {
+        const now = Date.now();
+        if (now - lastSave > 5000 && video.duration) { lastSave = now; savePos(v.id, video.currentTime, video.duration); }
+        if (!video.paused) played += 0.25;
+        if (!counted && played > 40) { counted = true; post('/api/public/v/' + encodeURIComponent(v.id) + '/view', {}).catch(() => {}); }
+      });
+      video.addEventListener('ended', () => {
+        savePos(v.id, video.duration, video.duration);
+        if (!v.next) return;
+        let n = 6;
+        const cancel = el('button', { onclick: () => { clearInterval(timer); over.style.display = 'none'; } }, 'Cancel');
+        const now1 = el('button', { class: 'primary', onclick: () => { clearInterval(timer); history.pushState(null, '', '/v/' + v.next.id); render(); } }, 'Play now');
+        const txt = el('b', {});
+        over.replaceChildren(el('div', { class: 'sub' }, 'Next episode'), el('div', { class: 'vod-next-title' }, v.next.title), txt, el('div', { class: 'row' }, now1, cancel));
+        over.style.display = '';
+        const step = () => { txt.textContent = `Starts in ${n}…`; if (n-- <= 0) { clearInterval(timer); history.pushState(null, '', '/v/' + v.next.id); window.scrollTo(0, 0); render(); } };
+        step(); timer = setInterval(step, 1000);
+      });
+      stage = el('div', { class: 'vod-stage' }, video, over);
+      setTimeout(() => video.play().catch(() => {}), 50);
+    }
+    return [paid, stage, head,
+      v.description ? el('div', { class: 'desc-box', style: { whiteSpace: 'pre-wrap' } }, v.description) : null,
+      v.next && !v.needs ? el('p', {}, el('a', { href: '/v/' + v.next.id, 'data-nav': '' }, el('button', {}, 'Next: ' + v.next.title + ' ›'))) : null,
+      v.series ? [el('h2', { class: 'sec' }, v.series.title), seasonsList(v.series, v.id)] : null];
+  }
+  async function seriesPage(id) {
+    let s;
+    try { s = await vget('/api/public/s/' + encodeURIComponent(id)); } catch (e) { return el('div', { class: 'empty' }, e.message); }
+    document.title = s.title + ' · ' + s.channel.name;
+    const paid = afterPayment(() => render());
+    const flat = s.seasons.flatMap((x) => x.episodes);
+    const resume = flat.find((e) => seenPart(e.id) > 0.02 && seenPart(e.id) < 0.95) || flat.find((e) => seenPart(e.id) < 0.95) || flat[0];
+    const started = flat.some((e) => seenPart(e.id) > 0.02);
+    const buys = [];
+    if (s.price && !s.owned) {
+      buys.push({ kind: 'series', id: s.id, label: `Buy the series · ${zar(s.price.series)}`, sub: `All ${flat.length} episode${flat.length === 1 ? '' : 's'}, as often as you like.` });
+      if (s.price.pass) buys.push({ kind: 'pass', id: s.id, label: `Channel pass · ${zar(s.price.pass.amount)}`, sub: `Everything paid on ${s.channel.name} for ${s.price.pass.days} days.` });
+    }
+    return [paid, el('div', { class: 'banner vod-banner', style: { backgroundImage: s.banner || s.poster ? `url("${img(s.banner || s.poster)}")` : `linear-gradient(120deg, ${s.channel.color}, #151515 75%)` } }),
+      el('div', { class: 'vod-shead' + (s.poster ? ' has-poster' : '') }, s.poster ? el('img', { class: 'vod-poster', src: img(s.poster), alt: '' }) : null,
+        el('div', { style: { flex: 1, minWidth: '220px' } }, el('h1', { class: 'vod-title' }, s.title),
+          el('div', { class: 'vod-meta' }, el('a', { href: '/c/' + s.channel.slug, 'data-nav': '', class: 'row' }, avatar(s.channel.logo, s.channel.name, 'chlogo'), el('b', {}, s.channel.name)),
+            el('span', { class: 'sub' }, [s.seasons.length > 1 ? s.seasons.length + ' seasons' : '', flat.length + ' episode' + (flat.length === 1 ? '' : 's'), s.price ? (s.owned ? 'Yours ✓' : zar(s.price.series)) : 'Free'].filter(Boolean).join(' · '))),
+          s.description ? el('p', { style: { whiteSpace: 'pre-wrap' } }, s.description) : null,
+          resume ? el('a', { href: '/v/' + resume.id, 'data-nav': '' }, el('button', { class: 'primary' }, (started ? '▶ Carry on: ' : '▶ Play: ') + (resume.episode ? 'E' + resume.episode + ' ' : '') + resume.title)) : null)),
+      buys.length ? buyBox(buys, s) : null,
+      flat.length ? seasonsList(s, '') : el('div', { class: 'empty' }, 'No episodes yet.')];
+  }
+  const seriesCard = (s) => el('a', { class: 'card', href: s.href, 'data-nav': '' }, thumb(s, [el('span', { class: 'badge dur' }, `${s.episodes} ep`), s.price ? el('span', { class: 'badge price' }, zar(s.price.ticket)) : null]),
+    el('div', { class: 'meta' }, avatar(s.channel.logo, s.channel.name, 'chlogo'), el('div', {}, el('b', {}, s.title), el('div', { class: 'sub' }, s.channel.name, el('br'), s.seasons > 1 ? s.seasons + ' seasons' : 'Series'))));
 
   // ---- the landing page: about us, Browse content, Book services, sign in as a production team
   let L = null;
@@ -976,6 +1121,8 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     else if (p.startsWith('/team/')) view = teamPage(decodeURIComponent(p.slice(6).replace(/\/$/, '')));
     else if (p === '/following') view = followingPage();
     else if (p.startsWith('/match/')) view = matchPage(decodeURIComponent(p.slice(7).replace(/\/$/, '')));
+    else if (/^\/v\/[\w-]+\/?$/.test(p)) view = await videoPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')));
+    else if (/^\/s\/[\w-]+\/?$/.test(p)) view = await seriesPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')));
     else if (p.startsWith('/c/')) view = await channelPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')), params.get('tab'));
     else if (p === '/videos') view = videosPage();
     else if (p === '/matches') view = matchesPage();
