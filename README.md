@@ -18,6 +18,16 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.12
+
+- **Videos on demand and series** (Streaming → Videos & series, on the website):
+  - **Upload** films, highlights, interviews or whole shows: press Upload or drop files on the page, several at once. Big files are fine – they go up in 8 MB pieces (past Cloudflare's 100 MB limit) and carry on after a dropped connection. Keep the tab open; other screens are fine.
+  - The server keeps them on the NAS (`<NAS>/vod`, or `VOD_DIR`) and, with ffmpeg (installed by the server setup), makes a web copy that starts at once and seeks (H.264 / AAC MP4), a poster frame and the length. Without ffmpeg MP4 / WebM play as uploaded.
+  - **Series** with seasons and episodes: name the seasons, upload episodes straight into a season (numbered for you), mark a trailer or first episode free.
+  - **Who sees it**: Public, Unlisted (link only) or Hidden (only your team), a "publish on" date, and the channel's own rules (team members / password).
+  - **Selling** as with live streams (PayFast): a price on a video, a price for the whole series, or the channel pass covers it. Tickets are emailed and kept in the browser; sales show in Ticket sales. Your production team always watches free.
+  - **Viewers** get `/v/<video>` and `/s/<series>` pages: the player carries on where they stopped, "Next episode in 5…" at the end, season tabs with what they have watched, and Series and Videos on the channel and home pages. Plays are counted (once per viewer and hour).
+
 ### 1.0.11
 
 - Tests tidied: the paid-streams test uses dates relative to today (fixed dates went stale once the day passed), and the old browser output (`/output.html`, `lib/graphics.js`) and its test are removed. The browser output is `/output` (fill, `/key`, `/fill-key`), tested in `tests/live.test.js`.
