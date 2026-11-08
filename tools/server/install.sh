@@ -190,7 +190,7 @@ if [ -n "$NAS" ]; then
   say "NAS (Samba share)"
   apt-get install -y -q samba
   getent group nas >/dev/null || groupadd nas
-  mkdir -p "$NAS/assets/images" "$NAS/templates" "$NAS/shared" "$NAS/backups" "$NAS/software"
+  mkdir -p "$NAS/assets/images" "$NAS/templates" "$NAS/shared" "$NAS/backups" "$NAS/software" "$NAS/vod"
   OWNER="${SUDO_USER:-}"; [ -n "$OWNER" ] && [ "$OWNER" != root ] && usermod -aG nas "$OWNER"
   chgrp -R nas "$NAS"; chmod -R g+rwX "$NAS"; find "$NAS" -type d -exec chmod g+s {} +
   if ! grep -q '^\[NAS\]' /etc/samba/smb.conf; then
