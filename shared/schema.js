@@ -314,15 +314,18 @@
       { k: 'teamOnly', l: 'Only this production team', t: 'bool', help: 'Off: any production team can stream its productions on this channel. On: only this team\'s productions.' },
       { k: 'disabled', l: 'Switched off', t: 'bool', help: 'Hidden, and nobody can stream to it or watch it.' }] },
     // videos on demand (lib/vod.js): uploaded in Streaming → Videos; the file itself is kept by the server ("vodfile")
-    vodvideo: { label: 'Video', plural: 'Videos', group: 'Streaming', title: (d) => d.title, cols: ['poster', 'title', 'series', 'season', 'episode', 'channel', 'visibility'], fields: [
+    vodvideo: { label: 'VOD', plural: 'VOD', group: 'Streaming', title: (d) => d.title, cols: ['poster', 'title', 'series', 'season', 'episode', 'channel', 'visibility'], fields: [
       { k: 'title', l: 'Title', t: 'text', req: true, group: 'Video' }, { k: 'channel', l: 'Channel', t: 'ref', ref: 'channel', req: true, group: 'Video' },
       { k: 'description', l: 'Description', t: 'textarea', group: 'Video' },
       { k: 'poster', l: 'Poster / thumbnail', t: 'image', group: 'Video', help: 'Empty = a frame from the video.' },
       { k: 'visibility', l: 'Who sees it', t: 'select', opts: ['Public', 'Unlisted', 'Hidden'], def: 'Public', group: 'Video', help: 'Public: on the channel and the website. Unlisted: only with the link. Hidden: only your production team. The channel\'s own rules (team members / password) still apply.' },
       { k: 'publishOn', l: 'Publish on', t: 'date', group: 'Video', help: 'Empty = as soon as it is ready.' },
+      { k: 'category', l: 'Category', t: 'combo', opts: 'vodCategories', group: 'Video', help: 'For the website: a row per category (Content → Website), and filters.' },
+      { k: 'tags', l: 'Tags', t: 'text', ph: 'rugby, final, interview', group: 'Video', help: 'Separate with commas. For finding things in Content.' },
+      { k: 'youtube', l: 'YouTube video', t: 'text', group: 'Video', when: (d) => d.source === 'YouTube', help: 'Plays in our own player; YouTube may still show its own adverts.' },
       { k: 'series', l: 'Series', t: 'ref', ref: 'vodseries', group: 'Series' }, { k: 'season', l: 'Season', t: 'number', ph: '1', group: 'Series' }, { k: 'episode', l: 'Episode', t: 'number', group: 'Series' },
-      { k: 'price', l: 'Price (ZAR)', t: 'money', group: 'Selling', help: 'Empty or 0 = free (unless its series has a price). Viewers pay with PayFast. Only on a Public channel; your production team always watches free.' },
-      { k: 'freeInSeries', l: 'Free in a paid series (trailer, first episode)', t: 'bool', group: 'Selling' }] },
+      { k: 'price', l: 'Price (ZAR)', t: 'money', group: 'Selling', when: (d) => d.source !== 'YouTube', help: 'Empty or 0 = free (unless its series has a price). Viewers pay with PayFast. Only on a Public channel; your production team always watches free.' },
+      { k: 'freeInSeries', l: 'Free in a paid series (trailer, first episode)', t: 'bool', group: 'Selling', when: (d) => d.source !== 'YouTube' }] },
     vodseries: { label: 'Series', plural: 'Series', group: 'Streaming', title: (d) => d.title, cols: ['poster', 'title', 'channel', 'price', 'visibility'], fields: [
       { k: 'title', l: 'Title', t: 'text', req: true, group: 'Series' }, { k: 'channel', l: 'Channel', t: 'ref', ref: 'channel', req: true, group: 'Series' },
       { k: 'description', l: 'Description', t: 'textarea', group: 'Series' },
@@ -330,7 +333,16 @@
       { k: 'poster', l: 'Poster', t: 'image', group: 'Pictures' }, { k: 'banner', l: 'Banner (wide picture on the series page)', t: 'image', group: 'Pictures' },
       { k: 'visibility', l: 'Who sees it', t: 'select', opts: ['Public', 'Unlisted', 'Hidden'], def: 'Public', group: 'Series' },
       { k: 'publishOn', l: 'Publish on', t: 'date', group: 'Series' },
+      { k: 'category', l: 'Category', t: 'combo', opts: 'vodCategories', group: 'Series' }, { k: 'tags', l: 'Tags', t: 'text', group: 'Series' },
       { k: 'price', l: 'Price for the whole series (ZAR)', t: 'money', group: 'Selling', help: 'Empty or 0 = free. With a price every episode needs the series ticket (or its own ticket, or the channel pass), except episodes marked free.' }] },
+    // playlists: uploaded and YouTube videos and live streams in an order of your choosing (items edited in Streaming → Playlists)
+    vodplaylist: { label: 'Playlist', plural: 'Playlists', group: 'Streaming', title: (d) => d.title, cols: ['poster', 'title', 'channel', 'category', 'visibility'], fields: [
+      { k: 'title', l: 'Title', t: 'text', req: true, group: 'Playlist' }, { k: 'channel', l: 'Channel', t: 'ref', ref: 'channel', req: true, group: 'Playlist' },
+      { k: 'description', l: 'Description', t: 'textarea', group: 'Playlist' }, { k: 'poster', l: 'Picture', t: 'image', group: 'Playlist', help: 'Empty = the first item\'s picture.' },
+      { k: 'visibility', l: 'Who sees it', t: 'select', opts: ['Public', 'Unlisted', 'Hidden'], def: 'Public', group: 'Playlist' },
+      { k: 'publishOn', l: 'Publish on', t: 'date', group: 'Playlist' },
+      { k: 'category', l: 'Category', t: 'combo', opts: 'vodCategories', group: 'Playlist' }, { k: 'tags', l: 'Tags', t: 'text', group: 'Playlist' },
+      { k: 'youtubePlaylist', l: 'YouTube playlist', t: 'text', group: 'Playlist', when: (d) => !!d.youtubePlaylist, help: 'Brought in from YouTube: Sync on the Playlists page brings in new videos.' }] },
     booking: { label: 'Booking request', plural: 'Booking requests', group: 'Productions', title: (d) => [d.name, d.service].filter(Boolean).join(' · '), cols: ['received', 'name', 'service', 'date', 'producer', 'status'], fields: [
       { k: 'status', l: 'Status', t: 'select', opts: BOOKING_STATUS, def: 'New' },
       { k: 'producer', l: 'Producer', t: 'member', roles: ['Producer', 'Admin'], help: 'The Producer who looks after this booking. Only they (and Admins) see it; they accept or decline it.' },
