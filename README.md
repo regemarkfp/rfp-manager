@@ -18,6 +18,10 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.11
+
+- Tests tidied: the paid-streams test uses dates relative to today (fixed dates went stale once the day passed), and the old browser output (`/output.html`, `lib/graphics.js`) and its test are removed. The browser output is `/output` (fill, `/key`, `/fill-key`), tested in `tests/live.test.js`.
+
 ### 1.0.10
 
 - **Long screens are split into sub-tabs**: a form with several groups (Match, When & where, People, Match settings …) shows them as a row of chips at the top, one group at a time, with **All** for everything; a red dot marks a group with a required field still empty. A page that stacks three or more titled sections (Settings → Website, and the like) gets the same row, sticky while you scroll. Live tools (scorer, graphics control, rundown, call sheet, dashboard) are left as they are.
