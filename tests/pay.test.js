@@ -7,6 +7,8 @@ const { boot, client, until } = require('./helpers');
 const fakeMongo = require('./fake-mongo');
 const { formSignature, itnParamString, pfEncode, inRange } = require('../lib/pay');
 
+// dates relative to today, so the final is always still to come (fixed dates went stale once the day passed)
+const day = (n) => new Date(Date.now() + n * 86400e3).toISOString().slice(0, 10);
 const md5 = (s) => crypto.createHash('md5').update(s).digest('hex');
 
 test('PayFast signature encoding', () => {
@@ -38,9 +40,9 @@ test('paid streams: tickets and channel passes through PayFast, ticket links, wh
   const team = (await admin.post('/api/orgs', { name: 'RegemarkFP' })).data.id;
   assert.equal((await admin.get('/api/config')).data.payments, true);
   assert.equal((await admin.put(`/api/docs/channel/chan_tv?team=${team}`, { data: { name: 'RegemarkFP TV', passPrice: 120, passDays: 30 } })).status, 200);
-  assert.equal((await admin.put(`/api/docs/production/prod_final?team=${team}`, { data: { name: 'Cup final', date: '2026-11-07', streamChannel: 'chan_tv', streamPrice: 50 } })).status, 200);
-  assert.equal((await admin.put(`/api/docs/production/prod_semi?team=${team}`, { data: { name: 'Cup semi', date: '2026-10-31', streamChannel: 'chan_tv', streamPrice: 40 } })).status, 200);
-  assert.equal((await admin.put(`/api/docs/production/prod_free?team=${team}`, { data: { name: 'Club day', date: '2026-10-24', streamChannel: 'chan_tv' } })).status, 200);
+  assert.equal((await admin.put(`/api/docs/production/prod_final?team=${team}`, { data: { name: 'Cup final', date: day(3), streamChannel: 'chan_tv', streamPrice: 50 } })).status, 200);
+  assert.equal((await admin.put(`/api/docs/production/prod_semi?team=${team}`, { data: { name: 'Cup semi', date: day(-4), streamChannel: 'chan_tv', streamPrice: 40 } })).status, 200);
+  assert.equal((await admin.put(`/api/docs/production/prod_free?team=${team}`, { data: { name: 'Club day', date: day(-11), streamChannel: 'chan_tv' } })).status, 200);
   const slug = (await cloud.store.get('prod_final')).data.streamSlug;
   const semi = (await cloud.store.get('prod_semi')).data.streamSlug;
   const free = (await cloud.store.get('prod_free')).data.streamSlug;
