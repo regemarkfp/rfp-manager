@@ -55,6 +55,13 @@ label.f { display: block; } label.f > span, .flabel { display: block; font-size:
 .help { font-size: 12px; color: var(--dim); margin-top: 4px; }
 .form { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px 16px; }
 .form .wide { grid-column: 1 / -1; }
+.form .fhide { display: none !important; }
+.ftabs { display: flex; gap: 6px; flex-wrap: wrap; position: sticky; top: 0; z-index: 3; background: var(--panel); padding: 4px 0 10px; margin-bottom: -2px; border-bottom: 1px solid var(--line); }
+.ftabs button { padding: 6px 14px; font-size: 13px; background: rgba(255,255,255,.04); border: 1px solid var(--line); color: var(--dim); }
+.ftabs button small { opacity: .6; font-size: 11px; }
+.ftabs button.on { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+.ftabs button.need::after { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #ff5c5c; margin-left: 6px; vertical-align: middle; }
+@media (max-width: 860px) { .ftabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .ftabs > * { flex: none; } }
 .form h4.fgroup { margin: 10px 0 -4px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
 .card + .card { margin-top: 16px; }
@@ -379,3 +386,13 @@ table.t tr.picked td { background: rgba(0, 255, 130, 0.08); }
 /* settings save by themselves: the little status where the Save button was */
 .autosave { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; }
 .autosave.ok { color: var(--ok, #00d26a); } .autosave.bad { color: var(--bad, #ff5c5c); }
+
+/* page sections as sub-tabs (App.applySections) */
+.subnav { display: flex; gap: 6px; flex-wrap: wrap; position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 8px 0 10px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+.subnav button { padding: 6px 14px; font-size: 13px; background: var(--panel); border: 1px solid var(--line); color: var(--dim); }
+.subnav button.on { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+.subnav + .card, .card.shide + .card { margin-top: 0; }
+.card.shide, .shide { display: none !important; }
+@media (max-width: 860px) { .subnav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .subnav > * { flex: none; } }
+@media print { .subnav, .ftabs { display: none !important; } .shide, .fhide { display: revert !important; } }
+.android-app .main .subnav, .android-app .main > * > .form > .ftabs { top: calc(56px + env(safe-area-inset-top)); }
