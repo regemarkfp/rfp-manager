@@ -313,6 +313,24 @@
       { k: 'publicDays', l: 'Streams public for (days after each stream)', t: 'number', ph: 'Empty = always', help: 'How long recordings on this channel stay open to viewers after their stream ends; after that only the production team can watch. A stream can set its own.' },
       { k: 'teamOnly', l: 'Only this production team', t: 'bool', help: 'Off: any production team can stream its productions on this channel. On: only this team\'s productions.' },
       { k: 'disabled', l: 'Switched off', t: 'bool', help: 'Hidden, and nobody can stream to it or watch it.' }] },
+    // videos on demand (lib/vod.js): uploaded in Streaming → Videos; the file itself is kept by the server ("vodfile")
+    vodvideo: { label: 'Video', plural: 'Videos', group: 'Streaming', title: (d) => d.title, cols: ['poster', 'title', 'series', 'season', 'episode', 'channel', 'visibility'], fields: [
+      { k: 'title', l: 'Title', t: 'text', req: true, group: 'Video' }, { k: 'channel', l: 'Channel', t: 'ref', ref: 'channel', req: true, group: 'Video' },
+      { k: 'description', l: 'Description', t: 'textarea', group: 'Video' },
+      { k: 'poster', l: 'Poster / thumbnail', t: 'image', group: 'Video', help: 'Empty = a frame from the video.' },
+      { k: 'visibility', l: 'Who sees it', t: 'select', opts: ['Public', 'Unlisted', 'Hidden'], def: 'Public', group: 'Video', help: 'Public: on the channel and the website. Unlisted: only with the link. Hidden: only your production team. The channel\'s own rules (team members / password) still apply.' },
+      { k: 'publishOn', l: 'Publish on', t: 'date', group: 'Video', help: 'Empty = as soon as it is ready.' },
+      { k: 'series', l: 'Series', t: 'ref', ref: 'vodseries', group: 'Series' }, { k: 'season', l: 'Season', t: 'number', ph: '1', group: 'Series' }, { k: 'episode', l: 'Episode', t: 'number', group: 'Series' },
+      { k: 'price', l: 'Price (ZAR)', t: 'money', group: 'Selling', help: 'Empty or 0 = free (unless its series has a price). Viewers pay with PayFast. Only on a Public channel; your production team always watches free.' },
+      { k: 'freeInSeries', l: 'Free in a paid series (trailer, first episode)', t: 'bool', group: 'Selling' }] },
+    vodseries: { label: 'Series', plural: 'Series', group: 'Streaming', title: (d) => d.title, cols: ['poster', 'title', 'channel', 'price', 'visibility'], fields: [
+      { k: 'title', l: 'Title', t: 'text', req: true, group: 'Series' }, { k: 'channel', l: 'Channel', t: 'ref', ref: 'channel', req: true, group: 'Series' },
+      { k: 'description', l: 'Description', t: 'textarea', group: 'Series' },
+      { k: 'seasonNames', l: 'Season names', t: 'textarea', ph: '1: The first season\n2: Road to the final', group: 'Series', help: 'Optional, one per line as number: name. Otherwise "Season 1", "Season 2" …' },
+      { k: 'poster', l: 'Poster', t: 'image', group: 'Pictures' }, { k: 'banner', l: 'Banner (wide picture on the series page)', t: 'image', group: 'Pictures' },
+      { k: 'visibility', l: 'Who sees it', t: 'select', opts: ['Public', 'Unlisted', 'Hidden'], def: 'Public', group: 'Series' },
+      { k: 'publishOn', l: 'Publish on', t: 'date', group: 'Series' },
+      { k: 'price', l: 'Price for the whole series (ZAR)', t: 'money', group: 'Selling', help: 'Empty or 0 = free. With a price every episode needs the series ticket (or its own ticket, or the channel pass), except episodes marked free.' }] },
     booking: { label: 'Booking request', plural: 'Booking requests', group: 'Productions', title: (d) => [d.name, d.service].filter(Boolean).join(' · '), cols: ['received', 'name', 'service', 'date', 'producer', 'status'], fields: [
       { k: 'status', l: 'Status', t: 'select', opts: BOOKING_STATUS, def: 'New' },
       { k: 'producer', l: 'Producer', t: 'member', roles: ['Producer', 'Admin'], help: 'The Producer who looks after this booking. Only they (and Admins) see it; they accept or decline it.' },
@@ -368,7 +386,7 @@
   // Everything else is managed on the website.
   const PC_EDIT = ['graphic', 'theme', 'dashboard', 'timeline', 'variable', 'gametrigger'];
 
-  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'musicuse', 'songuse', 'bible', 'product', 'user', 'machinekey', 'purchase', 'streamclip', 'comment', 'viewstat', 'streamvideo', 'mcr', 'videoad', 'adpreset', 'pushdevice', 'notification', 'invoice', 'release'];
+  const SYSTEM_TYPES = ['org', 'member', 'image', 'adlog', 'playlog', 'musicuse', 'songuse', 'bible', 'product', 'user', 'machinekey', 'purchase', 'streamclip', 'comment', 'viewstat', 'streamvideo', 'mcr', 'videoad', 'adpreset', 'pushdevice', 'notification', 'invoice', 'release', 'vodfile'];
   const ALL_TYPES = [...Object.keys(E), ...SYSTEM_TYPES];
 
   const has = (v) => v !== undefined && v !== null && v !== '';
