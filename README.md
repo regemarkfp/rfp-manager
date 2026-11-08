@@ -18,6 +18,14 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.13
+
+- **Content** (Streaming → Content), the CMS: one library of everything your channels show – VOD, YouTube videos, series, playlists and live streams – with search, filters (type, channel, category, tag, who sees it), categories and tags, and changing many at once (who sees it, category, tags, publish date, add to a playlist, delete).
+  - **Website** tab: what the front page (site admins) and each channel's Home tab show – a featured item at the top (or the live stream automatically) and the rows in your order: automatic rows (live, coming up, latest videos, series, playlists, matches …), a playlist, a series or a category, each with its own heading. "Back to the automatic page" undoes it.
+- **Playlists** (Streaming → Playlists): VOD, YouTube videos and live streams in your order (drag them). On the website `/p/<playlist>` plays them one after the other in our player with the list beside it; a live stream plays live while on air, shows when it starts before that, and plays its recording afterwards. Paid items show how to get a ticket and move on.
+- **YouTube**: paste links (videos, Shorts, live videos, playlists) under Content, VOD or Playlists. They play in **our player** (the live streams' bar, in the channel's colour; YouTube's controls hidden – YouTube may still play its own adverts). Single videos need no key; for whole playlists (and video lengths) an Admin adds a free YouTube Data API key (Content → YouTube key; kept on the server only). A playlist from YouTube can be synced again.
+- Uploads are called **VOD** in the app (Streaming → VOD), and the video page on the website uses the same player as live streams.
+
 ### 1.0.12
 
 - **Videos on demand and series** (Streaming → Videos & series, on the website):
