@@ -407,3 +407,15 @@ table.t tr.picked td { background: rgba(0, 255, 130, 0.08); }
 .vod-up { padding: 8px 0; border-top: 1px solid var(--line); display: grid; gap: 6px; } .vod-up > .pill, .vod-up > span { justify-self: start; }
 .meter { height: 8px; background: var(--panel2); border-radius: 4px; overflow: hidden; } .meter span { display: block; height: 100%; background: var(--accent); transition: width .3s; }
 .drop-over { outline: 2px dashed var(--accent); outline-offset: 6px; }
+
+/* Streaming → Content and Playlists */
+.cms-thumb { aspect-ratio: 16 / 9; border-radius: 6px; background: linear-gradient(135deg, #2a2a2a, #121212) center / cover no-repeat; position: relative; flex: none; }
+.cms-thumb span { position: absolute; right: 3px; bottom: 3px; background: rgba(0,0,0,.75); color: #fff; font-size: 10px; padding: 0 4px; border-radius: 3px; }
+.cms-filters { gap: 8px; margin-bottom: 12px; flex-wrap: wrap; } .cms-filters input { padding: 7px 10px; } .cms-filters select, .bulk-bar select, .cms-lrow select { width: auto; flex: 0 1 190px; }
+.cms-table td { vertical-align: middle; } .cms-table tr.sel td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.pill.cms-vod { background: #1d3a5c; color: #cfe3ff; } .pill.cms-yt { background: #5c1d1d; color: #ffd6d6; } .pill.cms-series { background: #3d2a5c; color: #e6d6ff; } .pill.cms-playlist { background: #1d4d3a; color: #ccf5e3; } .pill.cms-live { background: #5c4a1d; color: #fff0c9; }
+.cms-pick { max-height: 60vh; overflow-y: auto; display: grid; gap: 4px; }
+.cms-row { display: flex; gap: 10px; align-items: center; padding: 6px; border-radius: 8px; cursor: pointer; } .cms-row:hover, .cms-row.on { background: var(--panel2); }
+.cms-rows { display: grid; gap: 6px; }
+.cms-lrow { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.02); }
+.pl-row { cursor: grab; } .pl-row + .pl-row { margin-top: 4px; }
