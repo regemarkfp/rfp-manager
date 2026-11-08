@@ -327,7 +327,7 @@
       holder.repaint = () => holder.replaceChildren(PANELS[type](App.docs.get(doc.id) || doc, form));
       panel = holder;
     }
-    const back = type === 'fixture' ? '#/fixtures' : '#/list/' + type;
+    const back = type === 'fixture' ? '#/fixtures' : type === 'vodvideo' ? '#/vod' : type === 'vodseries' ? '#/vod/series' : type === 'vodplaylist' ? '#/playlists/' + id : '#/list/' + type;
     const save = async () => {
       try {
         const keep = isNew ? {} : Object.fromEntries(Object.entries((App.docs.get(doc.id) || doc).data).filter(([k]) => !(k in form.data)));   // fields this form does not show (rundown, live score…)

@@ -212,7 +212,7 @@ function navFor() {
     ['Productions', ifs(['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment'], money && ['#/list/releaseForm', 'Release forms'], ['#/list/expense', ed ? 'Expenses' : 'My expenses'], web && ['#/availability', 'My availability'])],
     ['Sport', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions'], ['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues']]],
     ['Live & graphics', ifs(App.pcs && ['#/pcs', 'Production PCs'], pc && ['#/monitors', 'Monitors'], pc && ['#/templates', 'Templates'], ['#/list/theme', 'Themes'], pc && ['#/adverts', 'Advert playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'])],
-    web ? ['Streaming', ifs(['#/list/channel', 'Channels'], ed && ['#/streams', 'Live streams'], ed && ['#/vod', 'Videos & series'], ed && ['#/analytics', 'Analytics'], ed && ['#/sales', 'Ticket sales'], ['#/streamads', 'Stream adverts'])] : null,
+    web ? ['Streaming', ifs(['#/list/channel', 'Channels'], ed && ['#/streams', 'Live streams'], ed && ['#/content', 'Content'], ed && ['#/vod', 'VOD'], ed && ['#/playlists', 'Playlists'], ed && ['#/analytics', 'Analytics'], ed && ['#/sales', 'Ticket sales'], ['#/streamads', 'Stream adverts'])] : null,
     ['Adverts & sponsors', ifs(['#/list/advert', 'Adverts'], money && ['#/list/adSlot', 'Ad spaces (clients)'], ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log'], money && ['#/sponsors', 'Sponsor reports'])],
     ['Media & music', ifs(['#/images', 'Images'], ['#/list/track', 'Music library'], pc && ['#/music', 'Music playout'], ed && ['#/musicrights', 'Music use report'])],
     ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report']].concat(local ? [['#/bibles', 'Bibles']] : [])],
@@ -458,6 +458,7 @@ function optionsFor(f, form) {
   if (f.opts === 'formats' && form) { const sp = formSport(form.type || '', form); const list = Scoring.formats().filter((x) => !sp || x.sport === sp); return (list.length ? list : Scoring.formats()).map((x) => x.text); }
   if (f.opts === 'sports') return App.sports();
   if (f.opts === 'formats') return Scoring.formats().map((x) => x.text);
+  if (f.opts === 'vodCategories') return [...new Set(['vodvideo', 'vodseries', 'vodplaylist'].flatMap((t) => App.list(t).map((d) => d.data.category)).filter(Boolean))].sort();
   if (f.opts === 'crewRoles') return App.sorted('crewRole').map((d) => d.data.name);
   return [];
 }
@@ -624,7 +625,7 @@ function buildForm(type, initial, { fields, onChange } = {}) {
   const groupOf = (f, i) => f.group || (all.slice(0, i).some((x) => x.group) ? 'More' : 'Details');
   const paint = () => {
     const sport = formSport(type, data);
-    const shown = all.map((f, i) => ({ f, g: groupOf(f, i) })).filter(({ f }) => !f.sports || (sport && f.sports.includes(sport)));
+    const shown = all.map((f, i) => ({ f, g: groupOf(f, i) })).filter(({ f }) => (!f.sports || (sport && f.sports.includes(sport))) && (!f.when || f.when(data)));
     const groups = [...new Set(shown.map((x) => x.g))];
     const tabbed = groups.length >= 3 || (groups.length === 2 && shown.length >= 10);
     if (tabbed && active !== '*' && !groups.includes(active)) active = groups[0];

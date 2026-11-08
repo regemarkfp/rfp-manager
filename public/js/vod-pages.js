@@ -110,14 +110,16 @@
         u.state === 'failed' ? h('div', { class: 'row' }, h('span', { class: 'pill bad' }, 'Stopped'), h('span', { class: 'small' }, u.error), h('button', { class: 'sm', onclick: () => { u.state = 'waiting'; u.error = ''; pump(); } }, 'Try again'))
           : u.state === 'waiting' ? h('span', { class: 'dim small' }, 'Waiting…') : u.state === 'done' ? h('span', { class: 'pill ok' }, 'Uploaded ✓') : null))) : '');
     };
-    const state = (f) => !f ? h('span', { class: 'pill warn' }, 'No file')
+    const state = (f) => f && f.youtube ? h('span', { class: 'pill cms-yt' }, 'YouTube') : !f ? h('span', { class: 'pill warn' }, 'No file')
       : f.status === 'ready' ? (f.note && /may not play/.test(f.note) ? h('span', { class: 'pill warn', title: f.note }, 'Ready – check it plays') : h('span', { class: 'pill ok' }, 'Ready'))
         : f.status === 'processing' ? h('span', { class: 'pill' }, `Processing ${f.progress || 0}%`)
           : f.status === 'uploading' ? h('span', { class: 'pill' }, `Uploading ${f.size ? Math.round((f.received || 0) / f.size * 100) : 0}%`)
             : h('span', { class: 'pill bad', title: f.error }, 'Failed');
-    const posterOf = (v, f) => App.img(v.data.poster) || (f && f.poster ? `/vodfiles/${v.id}/poster.jpg` : '');
+    const posterOf = (v, f) => App.img(v.data.poster) || v.data.ytPoster || (f && f.poster ? `/vodfiles/${v.id}/poster.jpg` : '');
+    // a YouTube video has no file of ours: it is ready as it is
+    const fileOf = (v) => (v.data.source === 'YouTube' ? { status: 'ready', youtube: true, duration: v.data.duration || 0 } : files.get(v.id));
     const videoCard = (v) => {
-      const d = v.data, f = files.get(v.id), s = d.series && App.get(d.series), ch = App.get(d.channel), p = posterOf(v, f);
+      const d = v.data, f = fileOf(v), s = d.series && App.get(d.series), ch = App.get(d.channel), p = posterOf(v, f);
       return h('div', { class: 'card vod-card' },
         h('div', { class: 'vod-thumb', style: { backgroundImage: p ? `url("${p}")` : '' } }, f && f.duration ? h('span', { class: 'vod-dur' }, dur(f.duration)) : null, h('span', { class: 'vod-state' }, state(f))),
         h('div', {}, h('b', {}, d.title), h('div', { class: 'dim small' }, [s ? s.title + (ep(d) ? ' · ' + ep(d) : '') : '', ch ? ch.name : '', d.visibility && d.visibility !== 'Public' ? d.visibility : '', Number(d.price) > 0 ? 'R ' + d.price : d.freeInSeries ? 'Free in series' : '', f && f.views ? f.views + ' views' : ''].filter(Boolean).join(' · ')),
@@ -132,7 +134,7 @@
     const seriesCard = (s) => {
       const eps = App.list('vodvideo').filter((v) => v.data.series === s.id).sort(order);
       const seasons = [...new Set(eps.map((v) => Number(v.data.season) || 1))];
-      const p = App.img(s.data.poster) || App.img(s.data.banner) || (eps[0] && posterOf(eps[0], files.get(eps[0].id))) || '';
+      const p = App.img(s.data.poster) || App.img(s.data.banner) || (eps[0] && posterOf(eps[0], fileOf(eps[0]))) || '';
       return h('div', { class: 'card' },
         h('div', { class: 'row', style: { gap: '14px', alignItems: 'flex-start', flexWrap: 'nowrap' } },
           h('div', { class: 'vod-thumb', style: { width: '180px', flex: 'none', backgroundImage: p ? `url("${p}")` : '' } }),
@@ -145,7 +147,7 @@
               eps.length ? h('a', { class: 'btn sm', href: site() + '/s/' + s.id, target: '_blank', rel: 'noopener' }, 'Series page ↗') : null,
               can && !eps.length ? h('button', { class: 'sm danger', onclick: async () => { if (await confirmBox(`Delete the series "${s.data.title}"?`)) { await App.remove('vodseries', s.id).catch(oops); paint(); } } }, 'Delete') : null))),
         eps.length ? h('table', { class: 't', style: { marginTop: '12px' } }, h('tr', {}, h('th', {}, ''), h('th', {}, 'Episode'), h('th', {}, 'Length'), h('th', {}, ''), h('th', {}, '')),
-          eps.map((v) => { const f = files.get(v.id); return h('tr', {}, h('td', { class: 'nowrap dim' }, ep(v.data) || '–'), h('td', {}, v.data.title, v.data.freeInSeries ? h('span', { class: 'pill', style: { marginLeft: '6px' } }, 'free') : null),
+          eps.map((v) => { const f = fileOf(v); return h('tr', {}, h('td', { class: 'nowrap dim' }, ep(v.data) || '–'), h('td', {}, v.data.title, v.data.freeInSeries ? h('span', { class: 'pill', style: { marginLeft: '6px' } }, 'free') : null),
             h('td', { class: 'nowrap' }, dur(f && f.duration)), h('td', {}, state(f)), h('td', { class: 'nowrap' }, can ? h('a', { href: '#/edit/vodvideo/' + v.id }, 'Edit') : null)); })) : h('p', { class: 'dim', style: { marginBottom: 0 } }, 'No episodes yet. Upload them here, or set the series on a video.'));
     };
     const paint = async () => {
@@ -154,21 +156,21 @@
       paintUploads();
       const vids = App.list('vodvideo').filter((v) => !filter || (filter === '-' ? !v.data.series : v.data.series === filter)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
       const sers = App.sorted('vodseries');
-      const tabs = h('div', { class: 'tabs' }, h('button', { class: tab === 'videos' ? 'on' : '', onclick: () => { location.hash = '#/vod'; } }, `Videos (${App.list('vodvideo').length})`), h('button', { class: tab === 'series' ? 'on' : '', onclick: () => { location.hash = '#/vod/series'; } }, `Series (${sers.length})`));
+      const tabs = h('div', { class: 'tabs' }, h('button', { class: tab === 'videos' ? 'on' : '', onclick: () => { location.hash = '#/vod'; } }, `VOD (${App.list('vodvideo').length})`), h('button', { class: tab === 'series' ? 'on' : '', onclick: () => { location.hash = '#/vod/series'; } }, `Series (${sers.length})`));
       body.replaceChildren(tabs,
         !info.ffmpeg ? h('div', { class: 'card small' }, h('span', { class: 'pill warn' }, 'No ffmpeg'), ' The server has no ffmpeg, so videos play as uploaded (upload MP4, H.264) and get no poster frame. Install it on the server with: ', h('code', {}, 'sudo apt install ffmpeg')) : null,
         tab === 'series'
           ? (sers.length ? sers.map(seriesCard) : h('div', { class: 'card empty' }, 'No series yet. A series groups episodes into seasons; viewers can buy the whole series and carry on with the next episode.'))
-          : [h('div', { class: 'row', style: { marginBottom: '12px' } }, h('select', { class: 'sel', onchange: (e) => { filter = e.target.value; paint(); } }, h('option', { value: '' }, 'All videos'), h('option', { value: '-', selected: filter === '-' }, 'Not in a series'), sers.map((s) => h('option', { value: s.id, selected: filter === s.id }, s.data.title)))),
-            vids.length ? h('div', { class: 'vod-grid' }, vids.map(videoCard)) : h('div', { class: 'card empty' }, 'No videos yet. Upload films, highlights, interviews or whole shows; sell them, or put them in a series.')]);
+          : [h('div', { class: 'row', style: { marginBottom: '12px' } }, h('select', { class: 'sel', onchange: (e) => { filter = e.target.value; paint(); } }, h('option', { value: '' }, 'All VOD'), h('option', { value: '-', selected: filter === '-' }, 'Not in a series'), sers.map((s) => h('option', { value: s.id, selected: filter === s.id }, s.data.title)))),
+            vids.length ? h('div', { class: 'vod-grid' }, vids.map(videoCard)) : h('div', { class: 'card empty' }, 'No VOD yet. Upload films, highlights, interviews or whole shows, or add YouTube videos; sell uploads, or put them in a series.')]);
     };
     repaint = () => { if (upBox.isConnected) paintUploads(); if (!busy()) paint(); };
     paint();
     timer = setInterval(() => { const working = [...files.values()].some((f) => f && ['processing', 'uploading'].includes(f.status)); if (working || busy()) paint(); }, 4000);
     const drop = (e) => { e.preventDefault(); el.classList.remove('drop-over'); if (can && e.dataTransfer.files.length) chooseFiles([...e.dataTransfer.files].filter((f) => /^video\//.test(f.type) || /\.(mkv|mts|m2ts|mxf|ts|mov|mp4)$/i.test(f.name))); };
     const el = h('div', { ondragover: (e) => { e.preventDefault(); el.classList.add('drop-over'); }, ondragleave: () => el.classList.remove('drop-over'), ondrop: drop },
-      pageHead('Videos & series', can ? h('button', { class: 'primary', onclick: () => picker({}) }, '+ Upload videos') : null, can ? h('button', { onclick: () => App.editModal('vodseries', () => { location.hash = '#/vod/series'; paint(); }, { visibility: 'Public', channel: (App.sorted('channel')[0] || {}).id }) }, '+ New series') : null),
-      h('p', { class: 'dim', style: { marginTop: '-8px' } }, 'Videos on demand for your channels: drop files here or press Upload. Big files are fine – they go up in pieces and carry on after a dropped connection. The server makes a web copy that starts at once and a poster frame. Sell a video on its own, a whole series, or let the channel pass cover it.'),
+      pageHead('VOD', can ? h('button', { class: 'primary', onclick: () => picker({}) }, '+ Upload VOD') : null, can && App.youtubeImport ? h('button', { onclick: () => App.youtubeImport({}, () => paint()) }, '+ From YouTube') : null, can ? h('button', { onclick: () => App.editModal('vodseries', () => { location.hash = '#/vod/series'; paint(); }, { visibility: 'Public', channel: (App.sorted('channel')[0] || {}).id }) }, '+ New series') : null),
+      h('p', { class: 'dim', style: { marginTop: '-8px' } }, 'Video on demand for your channels: drop files here or press Upload, or bring in YouTube videos. Big files are fine – they go up in pieces and carry on after a dropped connection. The server makes a web copy that starts at once and a poster frame. Sell a video on its own, a whole series, or let the channel pass cover it.'),
       upBox, body);
     return { el, keepScroll: true, destroy: () => clearInterval(timer) };
   };

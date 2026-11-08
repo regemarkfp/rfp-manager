@@ -640,20 +640,27 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const mRes = D.matches.results.filter((m) => match(q, m.name, m.competition && m.competition.name, m.teams.map((t) => t.name).join(' '))).slice(0, 8);
     const chans = D.channels.filter((c) => match(q, c.name, c.company));
     const first = live[0];
-    const out = [
-      first ? [el('h2', { class: 'sec' }, el('span', { style: { color: 'var(--live)' } }, '●'), 'Live now'),
-        el('div', { class: 'hero' }, el('a', { href: '/watch/' + first.slug }, thumb(first, el('span', { class: 'badge live' }, '● LIVE'))),
-          el('div', {}, el('a', { href: '/c/' + first.channel.slug, 'data-nav': '', style: { display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' } }, avatar(first.channel.logo, first.channel.name, 'chlogo'), el('b', {}, first.channel.name)),
-            el('h3', {}, first.title), el('div', { class: 'sub' }, `${first.viewers || 0} watching now`), el('p', {}, el('a', { href: '/watch/' + first.slug }, el('button', { class: 'primary' }, '▶ Watch'))))),
-        live.length > 1 ? el('div', { class: 'grid', style: { marginTop: '18px' } }, live.slice(1).map((s) => streamCard(s))) : null] : null,
-      section(mLive.length ? 'Live matches' : '', mLive.length ? el('div', { class: 'matches' }, mLive.map(matchCard)) : null),
-      section('Coming up', up.length ? el('div', { class: 'grid' }, up.slice(0, 8).map((s) => streamCard(s))) : null),
-      section('Videos', vids.length ? el('div', { class: 'grid' }, vids.slice(0, 24).map((s) => streamCard(s))) : null, vids.length > 24 ? el('a', { href: '/videos', 'data-nav': '' }, 'See all ' + vids.length) : ''),
-      section('Series', (D.series || []).filter((x) => match(q, x.title, x.channel.name)).length ? el('div', { class: 'grid' }, (D.series || []).filter((x) => match(q, x.title, x.channel.name)).slice(0, 12).map(seriesCard)) : null),
-      section('Fixtures', mUp.length ? el('div', { class: 'matches' }, mUp.map(matchCard)) : null),
-      section('Results', mRes.length ? el('div', { class: 'matches' }, mRes.map(matchCard)) : null),
-      section('Channels', chans.length ? el('div', { class: 'chans' }, chans.map(chanChip)) : null),
-    ];
+    const sers = (D.series || []).filter((x) => match(q, x.title, x.channel.name)), pls = (D.playlists || []).filter((x) => match(q, x.title, x.channel.name));
+    const heroLive = () => (first ? [el('h2', { class: 'sec' }, el('span', { style: { color: 'var(--live)' } }, '●'), 'Live now'),
+      el('div', { class: 'hero' }, el('a', { href: '/watch/' + first.slug }, thumb(first, el('span', { class: 'badge live' }, '● LIVE'))),
+        el('div', {}, el('a', { href: '/c/' + first.channel.slug, 'data-nav': '', style: { display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' } }, avatar(first.channel.logo, first.channel.name, 'chlogo'), el('b', {}, first.channel.name)),
+          el('h3', {}, first.title), el('div', { class: 'sub' }, `${first.viewers || 0} watching now`), el('p', {}, el('a', { href: '/watch/' + first.slug }, el('button', { class: 'primary' }, '▶ Watch')))))] : null);
+    // the parts of the page (Content → Website can put them in another order, with rows of its own between)
+    const B = {
+      hero: heroLive,
+      live: (t, rest) => section(t || 'Live now', (rest ? live.slice(1) : live).length ? el('div', { class: 'grid' }, (rest ? live.slice(1) : live).map((x) => streamCard(x))) : null),
+      liveMatches: (t) => section(mLive.length ? t || 'Live matches' : '', mLive.length ? el('div', { class: 'matches' }, mLive.map(matchCard)) : null),
+      upcoming: (t) => section(t || 'Coming up', up.length ? el('div', { class: 'grid' }, up.slice(0, 8).map((x) => streamCard(x))) : null),
+      videos: (t) => section(t || 'Videos', vids.length ? el('div', { class: 'grid' }, vids.slice(0, 24).map((x) => streamCard(x))) : null, vids.length > 24 ? el('a', { href: '/videos', 'data-nav': '' }, 'See all ' + vids.length) : ''),
+      series: (t) => section(t || 'Series', sers.length ? el('div', { class: 'grid' }, sers.slice(0, 12).map(seriesCard)) : null),
+      playlists: (t) => section(t || 'Playlists', pls.length ? el('div', { class: 'grid' }, pls.slice(0, 12).map(playlistCard)) : null),
+      fixtures: (t) => section(t || 'Fixtures', mUp.length ? el('div', { class: 'matches' }, mUp.map(matchCard)) : null),
+      results: (t) => section(t || 'Results', mRes.length ? el('div', { class: 'matches' }, mRes.map(matchCard)) : null),
+      channels: (t) => section(t || 'Channels', chans.length ? el('div', { class: 'chans' }, chans.map(chanChip)) : null),
+    };
+    if (D.layout && !q) return laidOut(D.layout, { ...B, live: (t) => B.live(t, D.layout.heroMode === 'auto') });
+    const out = [heroLive(), first && live.length > 1 ? el('div', { class: 'grid', style: { marginTop: '18px' } }, live.slice(1).map((x) => streamCard(x))) : null,
+      B.liveMatches(), B.upcoming(), B.videos(), B.series(), B.playlists(), B.fixtures(), B.results(), B.channels()];
     const any = live.length + up.length + vids.length + mLive.length + mUp.length + mRes.length + chans.length;
     return any ? out : el('div', { class: 'empty' }, q ? 'Nothing matches your search.' : 'Nothing to show yet. Live streams, videos and matches appear here.');
   }
@@ -713,17 +720,28 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       load();
       return box;
     };
+    const pls = c.playlists || [];
+    const CB = {
+      live: (tt) => section(tt || 'Live now', live.length ? el('div', { class: 'grid' }, live.map((x) => streamCard(x, { noChannel: true }))) : null),
+      upcoming: (tt) => section(tt || 'Coming up', up.length ? el('div', { class: 'grid' }, up.slice(0, 8).map((x) => streamCard(x, { noChannel: true }))) : null),
+      videos: (tt) => section(tt || 'Videos', vids.length ? el('div', { class: 'grid' }, vids.slice(0, 12).map((x) => streamCard(x, { noChannel: true }))) : null),
+      series: (tt) => section(tt || 'Series', sers.length ? el('div', { class: 'grid' }, sers.slice(0, 8).map(seriesCard)) : null),
+      playlists: (tt) => section(tt || 'Playlists', pls.length ? el('div', { class: 'grid' }, pls.slice(0, 8).map(playlistCard)) : null),
+    };
     const body = t === 'sermons' ? sermonsBox() : t === 'upcoming' ? (up.length ? [el('div', { class: 'up-list' }, up.map(upRow)), c.subscribed ? null : el('p', { class: 'sub' }, 'Subscribe to get an email when a stream starts.')] : el('div', { class: 'empty' }, 'Nothing scheduled yet.'))
       : t === 'about' ? el('div', { class: 'about' }, ch.description || 'No description yet.', el('p', {}, `${c.subscribers} subscriber${c.subscribers === 1 ? '' : 's'} · ${ch.owner === 'Production company' ? 'by ' + ch.company : ch.owner + ' channel · ' + ch.company}`))
       : t === 'series' ? (sers.length ? el('div', { class: 'grid' }, sers.map(seriesCard)) : el('div', { class: 'empty' }, 'No series yet.'))
+      : t === 'playlists' ? (pls.length ? el('div', { class: 'grid' }, pls.map(playlistCard)) : el('div', { class: 'empty' }, 'No playlists yet.'))
       : t === 'videos' ? (vids.length ? el('div', { class: 'grid' }, vids.map((s) => streamCard(s, { noChannel: true }))) : el('div', { class: 'empty' }, 'No videos yet.'))
+        : c.layout ? laidOut(c.layout, CB, { noChannel: true })
         : [section('Live now', live.length ? el('div', { class: 'grid' }, live.map((s) => streamCard(s, { noChannel: true }))) : null), section('Coming up', up.length ? el('div', { class: 'grid' }, up.slice(0, 8).map((s) => streamCard(s, { noChannel: true }))) : null),
           section('Series', sers.length ? el('div', { class: 'grid' }, sers.slice(0, 8).map(seriesCard)) : null),
+          section('Playlists', pls.length ? el('div', { class: 'grid' }, pls.slice(0, 8).map(playlistCard)) : null),
           section('Videos', vids.length ? el('div', { class: 'grid' }, vids.slice(0, 12).map((s) => streamCard(s, { noChannel: true }))) : null), !live.length && !up.length && !vids.length && !sers.length ? el('div', { class: 'empty' }, 'Nothing here yet.') : null];
     return [el('div', { class: 'banner', style: { backgroundImage: ch.banner ? `url("${img(ch.banner)}")` : `linear-gradient(120deg, ${ch.color}, #151515 75%)` } }),
       el('div', { class: 'chead' }, ch.logo ? el('img', { class: 'big', src: img(ch.logo), alt: '' }) : el('span', { class: 'big avatar', style: { fontSize: '44px' } }, ch.name.slice(0, 1)),
         el('div', { style: { flex: 1, minWidth: '200px' } }, el('h1', {}, ch.name), el('div', { class: 'sub' }, `/c/${ch.slug} · ${c.subscribers} subscriber${c.subscribers === 1 ? '' : 's'} · ${vids.length} video${vids.length === 1 ? '' : 's'}`)), sub),
-      el('div', { class: 'tabs' }, tabLink('home', 'Home'), tabLink('upcoming', 'Upcoming' + (up.length ? ` (${up.length})` : '')), tabLink('videos', 'Videos'), sers.length ? tabLink('series', 'Series') : null, ch.owner === 'Church' || /church|kerk|gemeente|ministr/i.test(ch.name + ' ' + (ch.company || '')) || t === 'sermons' ? tabLink('sermons', 'Sermons') : null, tabLink('about', 'About')), body];
+      el('div', { class: 'tabs' }, tabLink('home', 'Home'), tabLink('upcoming', 'Upcoming' + (up.length ? ` (${up.length})` : '')), tabLink('videos', 'Videos'), sers.length ? tabLink('series', 'Series') : null, pls.length ? tabLink('playlists', 'Playlists') : null, ch.owner === 'Church' || /church|kerk|gemeente|ministr/i.test(ch.name + ' ' + (ch.company || '')) || t === 'sermons' ? tabLink('sermons', 'Sermons') : null, tabLink('about', 'About')), body];
   }
 
   // ---- videos on demand (/v/<video>) and series (/s/<series>): play, carry on where you stopped, next episode, buy
@@ -786,6 +804,31 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     paint();
     return box;
   }
+  // ---- our player (the same as the live streams'): a stage and the bar under it, for files, YouTube and live HLS
+  let curMedia = null;
+  function stopMedia() { if (!curMedia) return; const m = curMedia; curMedia = null; try { if (m.destroy) m.destroy(); else { m.pause(); m.removeAttribute('src'); m.load(); } } catch (e) { /* gone */ } if (m._hls) m._hls.destroy(); }
+  function playerBox() { const stage = el('div', { class: 'stage' }); const ctrl = el('div', {}); return { box: el('div', { class: 'player' }, stage, ctrl), stage, ctrl }; }
+  const resumeAt = (id, d) => { const p = positions()[id]; return p && p.t > 10 && (!d || p.t < d - 15) ? p.t : 0; };
+  // { youtube, start } | { src, poster } | { hls, token, poster }
+  function mediaFor(stage, it) {
+    stopMedia();
+    let m;
+    if (it.youtube) m = window.RFPMedia.youtube(stage, it.youtube, { start: it.start || 0 });
+    else {
+      m = el('video', { playsinline: '', preload: 'auto', poster: it.poster ? img(it.poster) : null });
+      if (it.hls) m._hls = window.RFPMedia.hls(m, it.hls, it.token); else m.src = it.src;
+      stage.append(m);
+    }
+    curMedia = m;
+    return m;
+  }
+  function attach(pb, media, opts) {
+    const unmute = el('button', { class: 'unmute', onclick: (e) => { e.stopPropagation(); media.muted = false; window.RFPPlayer.saveSound(media); media.play().catch(() => {}); unmute.remove(); } }, '🔊 Tap for sound');
+    const b = window.RFPPlayer.mount(media, { player: pb.box, color: opts.color || '', live: !!opts.live, since: opts.since || 0, prev: opts.prev, next: opts.next, prevLabel: opts.prevLabel, nextLabel: opts.nextLabel, onList: opts.onList, listLabel: opts.listLabel, onUnmute: () => unmute.remove() });
+    pb.ctrl.replaceChildren(b.el); pb.box.classList.add('has-bar');
+    setTimeout(() => window.RFPPlayer.playWithSound(media, () => pb.stage.append(unmute)), 30);
+    return b;
+  }
   async function videoPage(id, password) {
     let v;
     try { v = await vget('/api/public/v/' + encodeURIComponent(id), password !== undefined ? { method: 'POST', body: JSON.stringify({ password }) } : {}); } catch (e) { return el('div', { class: 'empty' }, e.message); }
@@ -810,30 +853,36 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       if (pr.pass) opts.push({ kind: 'pass', id: v.id, label: `Channel pass · ${zar(pr.pass.amount)}`, sub: `Everything paid on ${v.channel.name} for ${pr.pass.days} days, live streams too.` });
       stage = el('div', { class: 'vod-stage locked', style: { backgroundImage: v.poster ? `url("${img(v.poster)}")` : '' } }, buyBox(opts, v));
     } else {
-      const video = el('video', { controls: true, playsinline: true, preload: 'metadata', poster: v.poster ? img(v.poster) : null, src: v.src });
+      const pb = playerBox();
+      const media = mediaFor(pb.stage, v.youtube ? { youtube: v.youtube, start: resumeAt(v.id, v.duration) } : { src: v.src, poster: v.poster });
       const over = el('div', { class: 'vod-next', style: { display: 'none' } });
+      pb.stage.append(over);
       let lastSave = 0, counted = false, played = 0, timer = null;
-      video.addEventListener('loadedmetadata', () => { const p = positions()[v.id]; if (p && p.t > 10 && p.t < video.duration - 15) video.currentTime = p.t; });
-      video.addEventListener('timeupdate', () => {
+      const go = (to) => { clearInterval(timer); history.pushState(null, '', '/v/' + to); window.scrollTo(0, 0); render(); };
+      if (!v.youtube) media.addEventListener('loadedmetadata', () => { const at = resumeAt(v.id, media.duration); if (at) media.currentTime = at; }, { once: true });
+      media.addEventListener('timeupdate', () => {
         const now = Date.now();
-        if (now - lastSave > 5000 && video.duration) { lastSave = now; savePos(v.id, video.currentTime, video.duration); }
-        if (!video.paused) played += 0.25;
+        if (now - lastSave > 5000 && media.duration) { lastSave = now; savePos(v.id, media.currentTime, media.duration); }
+        if (!media.paused) played += 0.25;
         if (!counted && played > 40) { counted = true; post('/api/public/v/' + encodeURIComponent(v.id) + '/view', {}).catch(() => {}); }
       });
-      video.addEventListener('ended', () => {
-        savePos(v.id, video.duration, video.duration);
+      media.addEventListener('ended', () => {
+        savePos(v.id, media.duration, media.duration);
         if (!v.next) return;
         let n = 6;
         const cancel = el('button', { onclick: () => { clearInterval(timer); over.style.display = 'none'; } }, 'Cancel');
-        const now1 = el('button', { class: 'primary', onclick: () => { clearInterval(timer); history.pushState(null, '', '/v/' + v.next.id); render(); } }, 'Play now');
+        const now1 = el('button', { class: 'primary', onclick: () => go(v.next.id) }, 'Play now');
         const txt = el('b', {});
         over.replaceChildren(el('div', { class: 'sub' }, 'Next episode'), el('div', { class: 'vod-next-title' }, v.next.title), txt, el('div', { class: 'row' }, now1, cancel));
         over.style.display = '';
-        const step = () => { txt.textContent = `Starts in ${n}…`; if (n-- <= 0) { clearInterval(timer); history.pushState(null, '', '/v/' + v.next.id); window.scrollTo(0, 0); render(); } };
+        const step = () => { txt.textContent = `Starts in ${n}…`; if (n-- <= 0) go(v.next.id); };
         step(); timer = setInterval(step, 1000);
       });
-      stage = el('div', { class: 'vod-stage' }, video, over);
-      setTimeout(() => video.play().catch(() => {}), 50);
+      const flat = v.series ? v.series.seasons.flatMap((x) => x.episodes) : [];
+      const at = flat.findIndex((e) => e.id === v.id);
+      attach(pb, media, { color: v.channel.color, prev: at > 0 ? () => go(flat[at - 1].id) : null, next: v.next ? () => go(v.next.id) : null, prevLabel: 'Previous episode', nextLabel: 'Next episode',
+        onList: v.series ? () => { const t = document.querySelector('.eps'); if (t) t.scrollIntoView({ behavior: 'smooth' }); } : null, listLabel: 'Episodes' });
+      stage = pb.box;
     }
     return [paid, stage, head,
       v.description ? el('div', { class: 'desc-box', style: { whiteSpace: 'pre-wrap' } }, v.description) : null,
@@ -865,6 +914,100 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   }
   const seriesCard = (s) => el('a', { class: 'card', href: s.href, 'data-nav': '' }, thumb(s, [el('span', { class: 'badge dur' }, `${s.episodes} ep`), s.price ? el('span', { class: 'badge price' }, zar(s.price.ticket)) : null]),
     el('div', { class: 'meta' }, avatar(s.channel.logo, s.channel.name, 'chlogo'), el('div', {}, el('b', {}, s.title), el('div', { class: 'sub' }, s.channel.name, el('br'), s.seasons > 1 ? s.seasons + ' seasons' : 'Series'))));
+
+  // ---- a playlist (/p/<id>): uploaded and YouTube videos, and live streams (live while on air, then the recording)
+  async function playlistPage(id) {
+    let pl;
+    try { pl = await vget('/api/public/p/' + encodeURIComponent(id)); } catch (e) { return el('div', { class: 'empty' }, e.message); }
+    document.title = pl.title + ' · ' + pl.channel.name;
+    if (!pl.items.length) return el('div', { class: 'empty' }, 'This playlist is empty.');
+    const params = new URLSearchParams(location.search);
+    let i = Math.min(pl.items.length - 1, Math.max(0, Number(params.get('i')) || 0));
+    const pb = playerBox();
+    const title = el('h1', { class: 'vod-title' }), sub = el('div', { class: 'vod-meta' });
+    const list = el('div', { class: 'pl-list' });
+    let skipT = null;
+    const paintList = () => list.replaceChildren(el('div', { class: 'pl-head' }, el('b', {}, pl.title), el('span', { class: 'sub' }, `${i + 1} / ${pl.items.length}`)),
+      pl.items.map((it, n) => el('a', { href: '#', class: 'pl-item' + (n === i ? ' on' : ''), onclick: (e) => { e.preventDefault(); play(n); } },
+        el('span', { class: 'pl-n' }, n === i ? '▶' : String(n + 1)),
+        el('div', { class: 'thumb', style: { backgroundImage: it.poster ? `url("${img(it.poster)}")` : '' } }, it.live ? el('span', { class: 'badge live' }, '● LIVE') : it.duration ? el('span', { class: 'badge dur' }, dur(it.duration)) : null, it.kind === 'vod' && seenPart(it.id) > 0.02 ? el('div', { class: 'seen' }, el('span', { style: { width: Math.round(seenPart(it.id) * 100) + '%' } })) : null),
+        el('div', {}, el('b', {}, it.title), el('div', { class: 'sub' }, it.kind === 'live' ? (it.live ? 'Live now' : it.recordings ? 'Recording' : it.date ? 'Live · ' + day(it.date, it.time) : 'Live stream') : [it.of, it.youtube ? 'YouTube' : '', it.price ? zar(it.price.ticket) : ''].filter(Boolean).join(' · '))))));
+    // a card over the picture instead of playing (a ticket, a password, not on yet …), moving on by itself
+    const notice = (head, text, link, linkLabel, autoSkip) => {
+      stopMedia();
+      const left = el('b', {});
+      const next = i < pl.items.length - 1;
+      pb.stage.replaceChildren(el('div', { class: 'slate' }, el('b', {}, head), el('p', {}, text), el('div', { class: 'row', style: { justifyContent: 'center', marginTop: '10px' } },
+        link ? el('a', { href: link }, el('button', { class: 'primary' }, linkLabel)) : null, next ? el('button', { onclick: () => play(i + 1) }, 'Skip ›') : null), next && autoSkip ? el('p', { class: 'small' }, left) : null));
+      if (next && autoSkip) { let n = autoSkip; const step = () => { left.textContent = `Next in ${n}…`; if (n-- <= 0) { clearInterval(skipT); play(i + 1); } }; step(); skipT = setInterval(step, 1000); }
+      pb.ctrl.replaceChildren(); pb.box.classList.remove('has-bar');
+    };
+    const nav = { prev: () => (i > 0 ? play(i - 1) : null), next: () => (i < pl.items.length - 1 ? play(i + 1) : null) };
+    const onEnd = () => { if (i < pl.items.length - 1) play(i + 1); };
+    async function play(n) {
+      clearInterval(skipT);
+      i = n;
+      history.replaceState(null, '', location.pathname + (i ? '?i=' + i : ''));
+      const it = pl.items[i];
+      title.textContent = it.title;
+      sub.replaceChildren(el('a', { href: '/c/' + pl.channel.slug, 'data-nav': '', class: 'row' }, avatar(pl.channel.logo, pl.channel.name, 'chlogo'), el('b', {}, pl.channel.name)),
+        el('a', { href: it.kind === 'live' ? '/watch/' + it.slug : '/v/' + it.id, class: 'sub' }, it.kind === 'live' ? 'Open the stream page ›' : 'Open the video page ›'));
+      paintList();
+      pb.stage.replaceChildren();
+      const common = { color: pl.channel.color, prev: i > 0 ? nav.prev : null, next: i < pl.items.length - 1 ? nav.next : null, prevLabel: 'Previous in playlist', nextLabel: 'Next in playlist', onList: () => list.scrollIntoView({ behavior: 'smooth' }), listLabel: 'Playlist' };
+      if (it.kind === 'vod') {
+        let v;
+        try { v = await vget('/api/public/v/' + encodeURIComponent(it.id)); } catch (e) { return notice('This video is not available', e.message, '', '', 6); }
+        if (v.needs === 'ticket') return notice('This one needs a ticket', `${v.title} is paid content.`, '/v/' + v.id, 'Get a ticket', 10);
+        if (v.needs === 'password') return notice('This needs a password', 'Open it to type the channel\'s password.', '/v/' + v.id, 'Open', 10);
+        if (v.needs) return notice('Not available here', v.needs === 'processing' ? 'It is still being prepared.' : 'It is only for the production team.', '', '', 6);
+        const m = mediaFor(pb.stage, v.youtube ? { youtube: v.youtube, start: resumeAt(v.id, v.duration) } : { src: v.src, poster: v.poster });
+        if (!v.youtube) m.addEventListener('loadedmetadata', () => { const at = resumeAt(v.id, m.duration); if (at) m.currentTime = at; }, { once: true });
+        let last = 0;
+        m.addEventListener('timeupdate', () => { if (Date.now() - last > 5000 && m.duration) { last = Date.now(); savePos(v.id, m.currentTime, m.duration); } });
+        m.addEventListener('ended', () => { savePos(v.id, m.duration, m.duration); onEnd(); });
+        m.addEventListener('error', () => { if (m.error && typeof m.error === 'string') notice('This video cannot play', m.error, '', '', 6); });
+        attach(pb, m, common);
+        return;
+      }
+      // a live stream: on air → live; over → its newest recording; not yet → when it starts
+      let w;
+      try { w = await vget('/api/watch/' + encodeURIComponent(it.slug)); } catch (e) { return notice('This stream is not available', e.message, '', '', 6); }
+      if (w.needs) return notice(w.needs === 'ticket' ? 'This stream needs a ticket' : 'Not available here', w.title, '/watch/' + it.slug, 'Open the stream page', 10);
+      if (w.live && w.hls) {
+        const m = mediaFor(pb.stage, { hls: w.hls, token: w.token, poster: w.poster });
+        if (!m._hls) return notice('This browser cannot play the stream here', '', '/watch/' + it.slug, 'Open the stream page', 0);
+        attach(pb, m, { ...common, live: true, since: w.since || 0 });
+        return;
+      }
+      const rec = (w.videos || [])[0];
+      if (rec) { const m = mediaFor(pb.stage, { src: rec.url, poster: w.poster }); m.addEventListener('ended', onEnd); attach(pb, m, common); return; }
+      if (w.startsAt && Date.parse(w.startsAt) > Date.now()) return notice('Coming up', `${w.title} starts ${day(w.date, w.time)}.`, '/watch/' + it.slug, 'Open the stream page', 8);
+      return notice('Not live right now', w.title, '/watch/' + it.slug, 'Open the stream page', 6);
+    }
+    setTimeout(() => play(i), 0);
+    return [el('div', { class: 'pl-wrap' }, el('div', { class: 'pl-main' }, pb.box, title, sub, pl.description ? el('div', { class: 'desc-box', style: { whiteSpace: 'pre-wrap' } }, pl.description) : null), list)];
+  }
+  const playlistCard = (p) => el('a', { class: 'card', href: p.href, 'data-nav': '' }, thumb(p, [p.live ? el('span', { class: 'badge live' }, '● LIVE') : null, el('span', { class: 'badge dur' }, `▤ ${p.count}`)]),
+    el('div', { class: 'meta' }, avatar(p.channel.logo, p.channel.name, 'chlogo'), el('div', {}, el('b', {}, p.title), el('div', { class: 'sub' }, p.channel.name, el('br'), 'Playlist'))));
+  // any card of a row: a series, a playlist, or a video / stream
+  const anyCard = (x, opts) => (x.episodes !== undefined ? seriesCard(x) : x.count !== undefined && /^\/p\//.test(x.href || '') ? playlistCard(x) : streamCard(x, opts));
+  // a page arranged in Content → Website: the featured item, then the rows in their order (built-in rows drawn by the page)
+  function laidOut(L, builtin, opts = {}) {
+    const out = [];
+    if (L.heroMode === 'pick' && L.hero) {
+      const x = L.hero;
+      out.push(el('div', { class: 'hero' }, el('a', { href: x.href, 'data-nav': /^\/(v|s|p)\//.test(x.href) ? '' : null }, thumb(x, x.live ? el('span', { class: 'badge live' }, '● LIVE') : null)),
+        el('div', {}, el('a', { href: '/c/' + x.channel.slug, 'data-nav': '', style: { display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' } }, avatar(x.channel.logo, x.channel.name, 'chlogo'), el('b', {}, x.channel.name)),
+          el('h3', {}, x.title), x.of ? el('div', { class: 'sub' }, x.of) : x.episodes ? el('div', { class: 'sub' }, `${x.episodes} episodes`) : null,
+          el('p', {}, el('a', { href: x.href, 'data-nav': /^\/(v|s|p)\//.test(x.href) ? '' : null }, el('button', { class: 'primary' }, x.live ? '● Watch live' : '▶ Watch'))))));
+    } else if (L.heroMode === 'auto' && builtin.hero) out.push(builtin.hero());
+    for (const r of L.rows) {
+      if (r.type === 'builtin') { const b = builtin[r.key]; if (b) out.push(b(r.title)); continue; }
+      out.push(section(r.title, el('div', { class: 'grid' }, r.cards.map((x) => anyCard(x, opts))), r.href ? el('a', { href: r.href, 'data-nav': '' }, 'See all') : ''));
+    }
+    return out;
+  }
 
   // ---- the landing page: about us, Browse content, Book services, sign in as a production team
   let L = null;
@@ -1104,6 +1247,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     return el('footer', { class: 'site-foot' }, line, el('nav', {}, el('a', { href: '/terms', 'data-nav': '' }, 'Terms'), el('a', { href: '/privacy', 'data-nav': '' }, 'Privacy'), el('a', { href: '/legal', 'data-nav': '' }, 'Company information')));
   }
   async function render() {
+    stopMedia();
     side(); meBox();
     const p = location.pathname, params = new URLSearchParams(location.search);
     document.body.classList.toggle('landing', p === '/' || p === '');
@@ -1122,6 +1266,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     else if (p === '/following') view = followingPage();
     else if (p.startsWith('/match/')) view = matchPage(decodeURIComponent(p.slice(7).replace(/\/$/, '')));
     else if (/^\/v\/[\w-]+\/?$/.test(p)) view = await videoPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')));
+    else if (/^\/p\/[\w-]+\/?$/.test(p)) view = await playlistPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')));
     else if (/^\/s\/[\w-]+\/?$/.test(p)) view = await seriesPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')));
     else if (p.startsWith('/c/')) view = await channelPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')), params.get('tab'));
     else if (p === '/videos') view = videosPage();
