@@ -303,8 +303,9 @@
         return best ? { label: L.label, name: best.tvName, team: best.team, value: best.stats[L.stat] } : null;
       }).filter(Boolean);
 
-      const lead = st.score.A === st.score.B ? 'SCORES LEVEL' : `${v.teams[st.score.A > st.score.B ? 'A' : 'B'].name.toUpperCase()} LEAD BY ${Math.abs(st.score.A - st.score.B)}`;
-      v.status = st.finished ? (v.winner ? `${v.teams[v.winner].name.toUpperCase()} WIN` : 'DRAW') : lead;
+      // team sports keep it simple: the score is the story while it is live ("X lead by Y" is a cricket thing);
+      // graphics fall back to the period name when this is empty
+      v.status = st.finished ? (v.winner ? `${v.teams[v.winner].name.toUpperCase()} WIN` : 'DRAW') : '';
       if (def.extraView) def.extraView(v, st);
       v.facts = timedFacts(def, v, st);
       return v;
@@ -364,7 +365,9 @@
         { key: 'try', label: 'Try', pts: P.try, player: true, wipe: 'TRY', btn: 'big' },
         { key: 'conv', label: 'Conversion', pts: P.conv, player: true, attempt: 'conv_att' },
         { key: 'pen', label: o.points === 'league' ? 'Penalty goal' : 'Penalty', pts: P.pen, player: true, attempt: 'pen_att' },
-        { key: 'drop', label: 'Drop goal', pts: P.drop, player: true, wipe: 'DROP GOAL' },
+        { key: 'drop', label: o.points === 'league' ? 'Field goal' : 'Drop goal', pts: P.drop, player: true, wipe: o.points === 'league' ? 'FIELD GOAL' : 'DROP GOAL' },
+        // NRL (since 2021): a field goal from 40 m or further out is worth 2
+        ...(o.points === 'league' ? [{ key: 'drop2', label: 'Field goal 40 m+ (NRL)', pts: 2, player: true, wipe: 'FIELD GOAL' }] : []),
         { key: 'ptry', label: 'Penalty try', pts: P.ptry, player: false, wipe: 'PENALTY TRY' },
         { key: 'conv_miss', label: 'Conversion missed', type: 'miss', stat: 'conv_att', player: true },
         { key: 'pen_miss', label: 'Penalty missed', type: 'miss', stat: 'pen_att', player: true },
@@ -553,12 +556,14 @@
     variants: {
       standard: { label: 'Standard (4 × 15)', options: { periods: 4, periodMin: 15, superShot: false } },
       super: { label: 'Super shot (4 × 15, 2-pt zone)', options: { periods: 4, periodMin: 15, superShot: true } },
-      fast5: { label: 'Fast5 (4 × 6)', options: { periods: 4, periodMin: 6, superShot: true } },
+      fast5: { label: 'Fast5 (4 × 6, 1-2-3 point zones)', options: { periods: 4, periodMin: 6, superShot: true, fast5: true } },
     },
     options: { clockDir: 'down', otMin: 7, centreFirst: 'A' },
     actions: o => [
       { key: 'goal', label: 'Goal', pts: 1, player: true, attempt: 'att', btn: 'big', stat: 'goals' },
-      ...(o.superShot ? [{ key: 'super', label: 'Super shot', pts: 2, player: true, attempt: 'att', wipe: 'SUPER SHOT', stat: 'supers' }] : []),
+      ...(o.superShot ? [{ key: 'super', label: o.fast5 ? '2-point shot' : 'Super shot', pts: 2, player: true, attempt: 'att', wipe: o.fast5 ? '2 POINTS' : 'SUPER SHOT', stat: 'supers' }] : []),
+      // World Netball Fast5: shots from outside the circle are worth 3
+      ...(o.fast5 ? [{ key: 'long3', label: '3-point shot', pts: 3, player: true, attempt: 'att', wipe: '3 POINTS', stat: 'supers' }] : []),
       { key: 'miss', label: 'Missed shot', type: 'miss', stat: 'att', player: true },
       { key: 'gain', label: 'Gain / intercept', type: 'stat', player: true },
       { key: 'penalty', label: 'Penalty', type: 'stat', player: true },
@@ -611,9 +616,9 @@
     id: 'basketball', name: 'Basketball', lineupSize: o => (o.threeByThree ? 3 : 5),
     defaultVariant: 'fiba',
     variants: {
-      fiba: { label: 'FIBA (4 × 10)', options: { periods: 4, periodMin: 10, otMin: 5, foulOut: 5, bonusAt: 5, shotClock: 24, shotReset2: 14 } },
-      nba: { label: 'NBA (4 × 12)', options: { periods: 4, periodMin: 12, otMin: 5, foulOut: 6, bonusAt: 5, shotClock: 24, shotReset2: 14 } },
-      '3x3': { label: '3x3 (10 min, to 21)', options: { periods: 1, periodMin: 10, otMin: 0, foulOut: 0, bonusAt: 7, shotClock: 12, shotReset2: 0, threeByThree: true } },
+      fiba: { label: 'FIBA (4 × 10)', options: { periods: 4, periodMin: 10, otMin: 5, foulOut: 5, bonusAt: 4, shotClock: 24, shotReset2: 14 } },
+      nba: { label: 'NBA (4 × 12)', options: { periods: 4, periodMin: 12, otMin: 5, foulOut: 6, bonusAt: 4, shotClock: 24, shotReset2: 14 } },
+      '3x3': { label: '3x3 (10 min, to 21)', options: { periods: 1, periodMin: 10, otMin: 0, foulOut: 0, bonusAt: 6, shotClock: 12, shotReset2: 0, threeByThree: true } },
     },
     options: { clockDir: 'down', stopAtLimit: true },
     actions: o => [
@@ -707,8 +712,10 @@
         return;
       }
       st.pts[w]++;
-      const adv = st.o.scoring === 'ad';
-      if (adv) { if (st.pts[w] >= 4 && st.pts[w] - st.pts[l] >= 2) winGame(st, w); }
+      const adv = st.o.scoring === 'ad' || st.o.scoring === 'star';
+      // FIP star point (2026): two advantage rounds, then the third deuce (5-5) is one deciding point
+      if (st.o.scoring === 'star' && st.pts[w] >= 6) winGame(st, w);
+      else if (adv) { if (st.pts[w] >= 4 && st.pts[w] - st.pts[l] >= 2) winGame(st, w); }
       else if (st.pts[w] >= 4) winGame(st, w);
       else if (st.pts[w] === 4) winGame(st, w);
     }
@@ -783,7 +790,7 @@
     function ptsDisplay(st) {
       if (st.inTB) return { A: String(st.pts.A), B: String(st.pts.B) };
       const a = st.pts.A, b = st.pts.B, map = ['0', '15', '30', '40'];
-      if (st.o.scoring === 'ad' && a >= 3 && b >= 3) {
+      if ((st.o.scoring === 'ad' || st.o.scoring === 'star') && a >= 3 && b >= 3) {
         if (a === b) return { A: '40', B: '40' };
         return a > b ? { A: 'AD', B: '40' } : { A: '40', B: 'AD' };
       }
@@ -798,8 +805,10 @@
       v.periodLabel = st.finished ? 'MATCH COMPLETE' : st.superTB ? 'MATCH TIE-BREAK' : st.inTB ? `SET ${setNo} · TIE-BREAK` : `SET ${setNo}`;
       v.finished = st.finished; v.winner = st.winner;
       const f = flags(st);
-      const golden = !st.inTB && o.scoring !== 'ad' && st.pts.A === 3 && st.pts.B === 3;
-      const flag = f.match ? 'MATCH POINT' : f.set ? 'SET POINT' : golden ? (def.goldenName || 'DECIDING POINT') : f.brk ? 'BREAK POINT' : (st.o.scoring === 'ad' && st.pts.A >= 3 && st.pts.A === st.pts.B && !st.inTB ? 'DEUCE' : '');
+      const adLike = o.scoring === 'ad' || o.scoring === 'star';
+      const star = !st.inTB && o.scoring === 'star' && st.pts.A === 5 && st.pts.B === 5;
+      const golden = star || (!st.inTB && !adLike && st.pts.A === 3 && st.pts.B === 3);
+      const flag = f.match ? 'MATCH POINT' : f.set ? 'SET POINT' : star ? 'STAR POINT' : golden ? (def.goldenName || 'DECIDING POINT') : f.brk ? 'BREAK POINT' : (adLike && st.pts.A >= 3 && st.pts.A === st.pts.B && !st.inTB ? 'DEUCE' : '');
       const flagTeam = f.match || f.set || (golden ? '' : f.brk) || '';
       v.extra = { points: p, games: { A: st.cur.A, B: st.cur.B }, sets: st.sets, server: st.server, tiebreak: st.inTB, superTB: st.superTB, flag, flagTeam };
       const cols = Math.max(st.sets.length + (st.finished ? 0 : 1), 1);
@@ -835,9 +844,8 @@
       ];
       v.timeline = st.timeline; v.lastEvent = st.last;
       ['A', 'B'].forEach(k => v.teams[k].players.forEach(pl => v.players.push({ id: pl.id, team: k, name: pl.name, tvName: pl.tvName || U.up(pl.name), number: pl.number || '', position: pl.position || '', stats: {}, statsText: pl.country || '' })));
-      const lead = st.setsWon.A === st.setsWon.B ? '' : v.teams[st.setsWon.A > st.setsWon.B ? 'A' : 'B'].name.toUpperCase() + ' LEAD';
       v.status = st.finished ? `${v.teams[st.winner] ? v.teams[st.winner].name.toUpperCase() : ''} WIN ${st.sets.map(s => `${s[st.winner]}-${s[U.other(st.winner)]}`).join(' ')}`.trim()
-        : flag ? `${flag}${flagTeam ? ' – ' + v.teams[flagTeam].name.toUpperCase() : ''}` : lead ? `${lead} ${st.setsWon.A}-${st.setsWon.B} IN SETS` : `${v.teams[st.server].name.toUpperCase()} TO SERVE`;
+        : flag ? `${flag}${flagTeam ? ' – ' + v.teams[flagTeam].name.toUpperCase() : ''}` : `${v.teams[st.server].name.toUpperCase()} TO SERVE`;
       v.facts = [
         { cat: 'SCORE', big: v.table.A.map((a, i) => `${a}-${v.table.B[i]}`).join('  '), txt: `${v.periodLabel} · ${v.teams[st.server].name.toUpperCase()} SERVING` },
         ...v.teamStats.filter(s => s.a !== '0' || s.b !== '0').map(s => ({ cat: s.label, big: `${s.a} – ${s.b}`, txt: `${v.teams.A.short} v ${v.teams.B.short}` })),
@@ -865,8 +873,9 @@
   }));
   register(racketSport({
     id: 'padel', name: 'Padel', goldenName: 'GOLDEN POINT',
-    defaultVariant: 'golden',
+    defaultVariant: 'star',
     variants: {
+      star: { label: 'FIP / Premier Padel 2026: best of 3, star point', options: { bestOf: 3, scoring: 'star', finalSet: 'tiebreak' } },
       golden: { label: 'Best of 3, golden point', options: { bestOf: 3, scoring: 'golden', finalSet: 'tiebreak' } },
       adv: { label: 'Best of 3, advantage', options: { bestOf: 3, scoring: 'ad', finalSet: 'tiebreak' } },
       super: { label: 'Best of 3, golden point, super tie-break 3rd', options: { bestOf: 3, scoring: 'golden', finalSet: 'super' } },
@@ -988,6 +997,7 @@
     defaultVariant: 'bwf',
     variants: {
       bwf: { label: 'BWF: best of 3 × 21 (cap 30)', options: { bestOf: 3, points: 21, deciding: 21, cap: 30 } },
+      bwf15: { label: 'BWF from 2027: best of 3 × 15 (cap 21)', options: { bestOf: 3, points: 15, deciding: 15, cap: 21 } },
       bo5x11: { label: 'Best of 5 × 11 (cap 15)', options: { bestOf: 5, points: 11, deciding: 11, cap: 15 } },
     },
     options: { firstServer: 'A' },

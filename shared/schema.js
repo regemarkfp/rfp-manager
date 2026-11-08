@@ -25,19 +25,23 @@
   const COVERAGE = ['Standard', 'Minimum'];
   const PLAYER_EVENTS = ['All', 'Scoring only', 'None'];
   // Match settings a competition gives every match (a match can set its own). Same set as LIGR's match config.
+  // `sports` (scorer engine ids) limits a setting to the sports it means something in: the form only shows it
+  // once the match's (or its competition's) sport is one of them. No `sports` = every sport.
+  const TIMED = ['rugby', 'hockey', 'football', 'netball', 'basketball'];
+  const TEAM = [...TIMED, 'volleyball', 'baseball', 'cricket'];
   const MATCH_SETTINGS = (g) => [
-    { k: 'totalPeriods', l: 'Periods', t: 'number', ph: 'sport default', group: g },
-    { k: 'periodLength', l: 'Period length (min)', t: 'number', ph: 'sport default', group: g },
-    { k: 'breakLength', l: 'Break length (min)', t: 'number', ph: 'sport default', group: g, help: 'Half-time / break between periods.' },
-    { k: 'overtime', l: 'Overtime / extra time', t: 'bool', group: g },
-    { k: 'goldenPoint', l: 'Golden point (next score wins in overtime)', t: 'bool', group: g },
-    { k: 'kickingComp', l: 'Kicking competition / shoot-out if still level', t: 'bool', group: g },
-    { k: 'sinbinMin', l: 'Sin bin / suspension (min)', t: 'number', ph: 'sport default', group: g },
-    { k: 'red20', l: '20-minute red card (replacement after 20 min)', t: 'bool', group: g },
+    { k: 'totalPeriods', l: 'Periods (halves / quarters)', t: 'number', ph: 'sport default', group: g, sports: TIMED },
+    { k: 'periodLength', l: 'Period length (min)', t: 'number', ph: 'sport default', group: g, sports: TIMED },
+    { k: 'breakLength', l: 'Break length (min)', t: 'number', ph: 'sport default', group: g, help: 'Half-time / break between periods.', sports: TIMED },
+    { k: 'overtime', l: 'Overtime / extra time', t: 'bool', group: g, sports: TIMED },
+    { k: 'goldenPoint', l: 'Golden point (next score wins in extra time)', t: 'bool', group: g, sports: ['rugby'] },
+    { k: 'kickingComp', l: 'Kicking competition / shoot-out / penalties if still level', t: 'bool', group: g, sports: ['rugby', 'hockey', 'football'] },
+    { k: 'sinbinMin', l: 'Sin bin / suspension (min)', t: 'number', ph: 'sport default', group: g, sports: ['rugby', 'hockey', 'netball'] },
+    { k: 'red20', l: '20-minute red card (replacement after 20 min)', t: 'bool', group: g, sports: ['rugby'] },
     { k: 'statCoverage', l: 'Stats to capture', t: 'select', opts: COVERAGE, def: 'Standard', group: g, help: 'Minimum: scores and cards only. Standard: also the match statistics.' },
     { k: 'playerEvents', l: 'Ask for the player', t: 'select', opts: PLAYER_EVENTS, def: 'All', group: g, help: 'All: every event asks who. Scoring only: only scores and cards. None: team only (fastest).' },
-    { k: 'lineupSize', l: 'Starting line-up size', t: 'number', ph: 'sport default', group: g },
-    { k: 'benchSize', l: 'Max bench size', t: 'number', ph: 'sport default', group: g },
+    { k: 'lineupSize', l: 'Starting line-up size', t: 'number', ph: 'sport default', group: g, sports: TEAM },
+    { k: 'benchSize', l: 'Max bench size', t: 'number', ph: 'sport default', group: g, sports: TEAM },
   ];
   // music rights: how a track was used (as on a SAMRO / broadcaster cue sheet) and where it may be used
   const MUSIC_USAGE = ['Theme', 'Opening titles', 'Closing titles', 'Bumper / sting', 'Background', 'Featured', 'Signature', 'Source (live at venue)'];
@@ -67,14 +71,14 @@
       { k: 'templateFolder', l: 'CasparCG template folder', t: 'text', ph: 'rfp', help: 'Folder inside CasparCG\'s template path that holds this theme\'s templates (bug, lowerthird, fullframe, advert).' }] },
 
     competition: { label: 'Competition', plural: 'Competitions', group: 'Assets', title: (d) => [d.name, d.season].filter(Boolean).join(' '), cols: ['logo', 'name', 'sport', 'season', 'theme'], fields: [
-      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'graphicName', l: 'Graphic name', t: 'text', ph: 'The name', help: 'How the name reads on graphics.' }, { k: 'shortName', l: 'Short name', t: 'text', ph: 'CCC' },
-      { k: 'sport', l: 'Sport', t: 'combo', opts: 'sports' }, { k: 'format', l: 'Format / rules', t: 'combo', opts: 'formats', ph: 'Sport default', help: 'Used by every match in this competition unless the match sets its own.' }, { k: 'season', l: 'Season', t: 'text' },
-      { k: 'ageGroup', l: 'Age group', t: 'combo', opts: AGE_GROUPS }, { k: 'gender', l: 'Gender', t: 'select', opts: ['', ...GENDERS] }, { k: 'division', l: 'Division', t: 'combo', opts: DIVISIONS },
-      { k: 'primaryColor', l: 'Primary colour', t: 'color' }, { k: 'secondaryColor', l: 'Secondary colour', t: 'color' },
-      { k: 'logo', l: 'Logo', t: 'image' }, { k: 'watermark', l: 'Primary watermark', t: 'image' }, { k: 'watermark2', l: 'Secondary watermark', t: 'image' }, { k: 'theme', l: 'Theme', t: 'ref', ref: 'theme' },
-      { k: 'teams', l: 'Teams in this competition', t: 'list', fields: [{ k: 'team', l: 'Team', t: 'ref', ref: 'squad' }] },
+      { k: 'name', group: 'Competition', l: 'Name', t: 'text', req: true }, { k: 'graphicName', group: 'Competition', l: 'Graphic name', t: 'text', ph: 'The name', help: 'How the name reads on graphics.' }, { k: 'shortName', group: 'Competition', l: 'Short name', t: 'text', ph: 'CCC' },
+      { k: 'sport', group: 'Competition', l: 'Sport', t: 'combo', opts: 'sports' }, { k: 'format', group: 'Competition', l: 'Format / rules', t: 'combo', opts: 'formats', ph: 'Sport default', help: 'Used by every match in this competition unless the match sets its own.' }, { k: 'season', group: 'Competition', l: 'Season', t: 'text' },
+      { k: 'ageGroup', group: 'Competition', l: 'Age group', t: 'combo', opts: AGE_GROUPS }, { k: 'gender', group: 'Competition', l: 'Gender', t: 'select', opts: ['', ...GENDERS] }, { k: 'division', group: 'Competition', l: 'Division', t: 'combo', opts: DIVISIONS },
+      { k: 'primaryColor', group: 'Branding', l: 'Primary colour', t: 'color' }, { k: 'secondaryColor', group: 'Branding', l: 'Secondary colour', t: 'color' },
+      { k: 'logo', group: 'Branding', l: 'Logo', t: 'image' }, { k: 'watermark', group: 'Branding', l: 'Primary watermark', t: 'image' }, { k: 'watermark2', group: 'Branding', l: 'Secondary watermark', t: 'image' }, { k: 'theme', group: 'Branding', l: 'Theme', t: 'ref', ref: 'theme' },
+      { k: 'teams', group: 'Teams', l: 'Teams in this competition', t: 'list', fields: [{ k: 'team', l: 'Team', t: 'ref', ref: 'squad' }] },
       ...MATCH_SETTINGS('Match settings'),
-      { k: 'fieldGoalPoints', l: 'Field / drop goal points', t: 'number', ph: 'sport default', group: 'Match settings' },
+      { k: 'fieldGoalPoints', l: 'Field / drop goal points', t: 'number', ph: 'sport default', group: 'Match settings', sports: ['rugby'] },
       { k: 'music', l: 'Theme music', t: 'list', group: 'Theme music', help: 'Played from Graphics control → Music for every match of this competition. Admins and Producers set it.', fields: [
         { k: 'track', l: 'Track', t: 'ref', ref: 'track' }, { k: 'usage', l: 'Used as', t: 'combo', opts: MUSIC_USAGE, w: 170 }] },
       { k: 'pointsWin', l: 'Log points: win', t: 'number', ph: '3', group: 'Log' }, { k: 'pointsDraw', l: 'Log points: draw', t: 'number', ph: '1', group: 'Log' }, { k: 'pointsLoss', l: 'Log points: loss', t: 'number', ph: '0', group: 'Log' },
@@ -120,16 +124,16 @@
       { k: 'archived', l: 'Archived (greyed out in lists, left out of pickers)', t: 'bool' }] },
 
     fixture: { label: 'Match', plural: 'Fixtures & Results', group: 'Matches', title: (d) => d.name || d.autoName || 'Match', cols: ['startDate', 'startTime', 'name', 'sport', 'status'], fields: [
-      { k: 'name', l: 'Match name', t: 'text', ph: 'Generated from the teams unless you type one' }, { k: 'sport', l: 'Sport', t: 'combo', opts: 'sports', req: true, help: 'Decides the scorer and rules: Cricket, Rugby, Rugby Sevens, Football, Hockey, Netball, Tennis, Padel, Basketball, Volleyball, Badminton, Baseball, Athletics.' },
-      { k: 'competition', l: 'Competition', t: 'ref', ref: 'competition' },
-      { k: 'format', l: 'Format / rules', t: 'combo', opts: 'formats', ph: 'From the competition, else the sport default', help: 'The scorer opens with these rules, so nothing has to be set up at the match. Type the sport to filter the list.' },
-      { k: 'team1', l: 'Team 1', t: 'ref', ref: 'squad', sameSport: true }, { k: 'team2', l: 'Team 2', t: 'ref', ref: 'squad', sameSport: true },
-      { k: 'startDate', l: 'Start date', t: 'date' }, { k: 'startTime', l: 'Start time', t: 'time' }, { k: 'endDate', l: 'End date', t: 'date' }, { k: 'endTime', l: 'End time', t: 'time' },
-      { k: 'venue', l: 'Venue', t: 'ref', ref: 'venue', ph: 'Home team\'s venue' }, { k: 'status', l: 'Status', t: 'select', opts: STATUSES, def: 'Upcoming' },
-      { k: 'scorer', l: 'Scorer', t: 'member', roles: ['Scorer', 'Producer', 'Admin'] },
-      { k: 'commentators', l: 'Commentators', t: 'textarea', help: 'One per line. The scorer and the Commentators graphic take them from here.' },
-      { k: 'officials', l: 'Match officials', t: 'textarea', help: 'One per line as Role: Name, for example Referee: A Name. The scorer and the officials graphics take them from here.' },
-      { k: 'notes', l: 'Notes', t: 'textarea' },
+      { k: 'name', l: 'Match name', t: 'text', ph: 'Generated from the teams unless you type one', group: 'Match' }, { k: 'sport', l: 'Sport', t: 'combo', opts: 'sports', req: true, group: 'Match', help: 'Decides the scorer and rules: Cricket, Rugby, Rugby Sevens, Football, Hockey, Netball, Tennis, Padel, Basketball, Volleyball, Badminton, Baseball, Athletics.' },
+      { k: 'competition', l: 'Competition', t: 'ref', ref: 'competition', group: 'Match' },
+      { k: 'format', l: 'Format / rules', t: 'combo', opts: 'formats', group: 'Match', ph: 'From the competition, else the sport default', help: 'The scorer opens with these rules, so nothing has to be set up at the match. Type the sport to filter the list.' },
+      { k: 'team1', l: 'Team 1', t: 'ref', ref: 'squad', sameSport: true, group: 'Match' }, { k: 'team2', l: 'Team 2', t: 'ref', ref: 'squad', sameSport: true, group: 'Match' },
+      { k: 'startDate', l: 'Start date', t: 'date', group: 'When & where' }, { k: 'startTime', l: 'Start time', t: 'time', group: 'When & where' }, { k: 'endDate', l: 'End date', t: 'date', group: 'When & where' }, { k: 'endTime', l: 'End time', t: 'time', group: 'When & where' },
+      { k: 'venue', l: 'Venue', t: 'ref', ref: 'venue', ph: 'Home team\'s venue', group: 'When & where' }, { k: 'status', l: 'Status', t: 'select', opts: STATUSES, def: 'Upcoming', group: 'When & where' },
+      { k: 'scorer', l: 'Scorer', t: 'member', roles: ['Scorer', 'Producer', 'Admin'], group: 'People' },
+      { k: 'commentators', l: 'Commentators', t: 'textarea', group: 'People', help: 'One per line. The scorer and the Commentators graphic take them from here.' },
+      { k: 'officials', l: 'Match officials', t: 'textarea', group: 'People', help: 'One per line as Role: Name, for example Referee: A Name. The scorer and the officials graphics take them from here.' },
+      { k: 'notes', l: 'Notes', t: 'textarea', group: 'People' },
       ...MATCH_SETTINGS('Match settings (empty = from the competition)').map((f) => Object.assign({}, f, { def: undefined, opts: f.t === 'select' ? ['', ...f.opts] : f.opts, t: f.t === 'bool' ? 'select' : f.t }, f.t === 'bool' ? { opts: ['', 'Yes', 'No'] } : {})),
       RUNDOWN] },
 
