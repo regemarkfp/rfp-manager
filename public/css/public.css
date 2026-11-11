@@ -369,3 +369,10 @@ input:not([type=checkbox]):not([type=radio]):focus, select:focus, textarea:focus
 .pl-item .pl-n { color: var(--dim); text-align: center; font-size: 12px; }
 .pl-item .thumb { border-radius: 6px; } .pl-item .badge { font-size: 10px; } .pl-item b { font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 @media (max-width: 980px) { .pl-wrap { grid-template-columns: 1fr; } .pl-list { max-height: none; } }
+
+.yt-fail { position: absolute; inset: 0; z-index: 3; display: grid; place-content: center; justify-items: center; gap: 8px; text-align: center; padding: 20px; background: #0d0d0d; }
+.yt-fail p { margin: 0; color: var(--dim); max-width: 420px; } .yt-fail a { color: var(--accent); font-weight: 600; }
+.vod-meta .chlogo { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--panel2); flex: none; display: inline-grid; place-items: center; font-weight: 700; color: var(--dim); }
+/* the website's side menu: the app's icons */
+.side .nav-ico { display: inline-grid; place-items: center; width: 24px; flex: none; color: var(--dim); } .side a.on .nav-ico, .side a:hover .nav-ico { color: var(--text); }
+.stage:has(.yt-fail) .unmute { display: none; }

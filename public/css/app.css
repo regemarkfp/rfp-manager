@@ -419,3 +419,17 @@ table.t tr.picked td { background: rgba(0, 255, 130, 0.08); }
 .cms-rows { display: grid; gap: 6px; }
 .cms-lrow { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.02); }
 .pl-row { cursor: grab; } .pl-row + .pl-row { margin-top: 4px; }
+/* menu icons: the side menu on the website and the PC, and More in the Android app */
+.nav a { display: flex; align-items: center; gap: 10px; }
+.nav a .ico { flex: none; opacity: .75; } .nav a.on .ico, .nav a:hover .ico { opacity: 1; }
+.nav a .nl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shell.side-min .side > nav.nav { display: block; margin-top: 8px; }
+.shell.side-min .nav .nav-group, .shell.side-min .nav a .nl { display: none; }
+.shell.side-min .nav a { justify-content: center; padding: 8px 0; }
+.shell.side-min .nav a.on { clip-path: none; padding-left: 0; }
+.more-list a .more-ico { display: grid; place-items: center; width: 28px; color: var(--dim); flex: none; }
+/* six tabs at the bottom (Content added): a little narrower */
+.tabbar.many .tab { font-size: 10.5px; padding-left: 0; padding-right: 0; } .tabbar.many .tab .ind { width: 48px; }
+.shell.side-min .nav > div:not(.nav-group) { display: block !important; }
+.shell.side-min .side { overflow-y: auto; scrollbar-width: none; }
+.content-nav button { display: inline-flex; align-items: center; gap: 6px; } .content-nav .cn-ico { display: inline-grid; opacity: .8; }
