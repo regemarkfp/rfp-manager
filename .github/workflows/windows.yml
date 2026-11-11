@@ -46,7 +46,7 @@ jobs:
           $ver = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $stage = Join-Path $env:RUNNER_TEMP 'RFP Manager'
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          $skip = '^(android/|\.github/|tests/|shots/|render\.yaml$|config\.json$|data/|public/app/rfp-manager\.apk$)'
+          $skip = '^(android/|\.github/|tests/|shots/|render\.yaml$|config\.json$|data/|public/app/rfp-manager\.apk$|keystore\.properties$|.*\.keystore$)'
           foreach ($f in (git ls-files)) {
             if ($f -match $skip) { continue }
             $dest = Join-Path $stage $f

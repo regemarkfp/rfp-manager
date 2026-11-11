@@ -1,0 +1,101 @@
+# Builds RFP Manager for Linux whenever main changes (or by hand: Actions → Linux app → Run workflow): the whole
+# program with a portable Node.js (node/), the launcher (rfp-manager), install.sh / uninstall.sh, for PCs (x64) and
+# for ARM boards such as the Raspberry Pi 4 / 5 (arm64). Published as the release "linux-latest" (Releases on the repo
+# page) and kept as downloads on the workflow run. config.json and data/ are not in it. After installing, RFP Manager
+# updates itself from the website it is linked to, like on Windows.
+name: Linux app
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['android/**', 'public/app/**', '.github/workflows/android.yml', '.github/workflows/windows.yml', '**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: linux-app
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Package (x64 and arm64)
+        id: pkg
+        run: |
+          set -euo pipefail
+          ver=$(node -p "require('./package.json').version")
+          nodever=$(node -v)
+          out="$RUNNER_TEMP/out"; mkdir -p "$out"
+          skip='^(android/|\.github/|tests/|shots/|render\.yaml$|config\.json$|data/|public/app/rfp-manager\.apk$|keystore\.properties$|.*\.keystore$|.*\.exe$)'
+          for arch in x64 arm64; do
+            stage="$RUNNER_TEMP/$arch/rfp-manager"
+            mkdir -p "$stage"
+            git ls-files -z | while IFS= read -r -d '' f; do
+              [[ "$f" =~ $skip ]] && continue
+              mkdir -p "$stage/$(dirname "$f")"; cp -p "$f" "$stage/$f"
+            done
+            cp -p tools/linux/rfp-manager tools/linux/install.sh tools/linux/uninstall.sh "$stage/"
+            chmod +x "$stage/rfp-manager" "$stage/install.sh" "$stage/uninstall.sh" "$stage/run.sh"
+            # a portable Node.js for this kind of processor
+            curl -fsSL "https://nodejs.org/dist/$nodever/node-$nodever-linux-$arch.tar.xz" -o "$RUNNER_TEMP/node-$arch.tar.xz"
+            mkdir -p "$stage/node/bin"
+            tar -xJf "$RUNNER_TEMP/node-$arch.tar.xz" -C "$RUNNER_TEMP/$arch" "node-$nodever-linux-$arch/bin/node" "node-$nodever-linux-$arch/LICENSE"
+            mv "$RUNNER_TEMP/$arch/node-$nodever-linux-$arch/bin/node" "$stage/node/bin/node"
+            mv "$RUNNER_TEMP/$arch/node-$nodever-linux-$arch/LICENSE" "$stage/node/LICENSE"
+            cat > "$stage/START HERE.txt" <<TXT
+          RFP Manager $ver for Linux ($arch)
+
+          Install (no root needed):   ./install.sh            (add --autostart to start it when you log in)
+          Then open "RFP Manager" from the applications menu, or run:  rfp-manager
+          It opens in its own window (Chrome, Chromium, Edge or Brave in app mode; otherwise your web browser).
+          Try it without installing:  ./rfp-manager
+
+          Updating: unpack the new download and run ./install.sh again. Settings (config.json) and data are kept.
+          From then on RFP Manager also updates itself from the website this PC is linked to.
+          Node.js $nodever is included (node/).
+          TXT
+            sed -i 's/^          //' "$stage/START HERE.txt"
+            tar -C "$RUNNER_TEMP/$arch" -czf "$out/RFPManager-Linux-$arch.tar.gz" rfp-manager
+          done
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "out=$out" >> "$GITHUB_OUTPUT"
+          ls -la "$out"
+
+      - name: Try it (x64)
+        run: |
+          set -eu
+          t="$RUNNER_TEMP/try"; mkdir -p "$t"; tar -xzf "${{ steps.pkg.outputs.out }}/RFPManager-Linux-x64.tar.gz" -C "$t"
+          cd "$t/rfp-manager"
+          ./node/bin/node -v
+          PORT=18090 DATA_DIR="$t/data" ./node/bin/node --disable-warning=ExperimentalWarning server.js > "$t/log.txt" 2>&1 &
+          pid=$!
+          for i in $(seq 1 40); do curl -fs "http://127.0.0.1:18090/api/config" >/dev/null && break; sleep 0.5; done
+          curl -fs "http://127.0.0.1:18090/api/config" | head -c 300; echo
+          kill $pid || true
+          HOME="$t/home" ./install.sh
+          test -x "$t/home/.local/bin/rfp-manager" && test -f "$t/home/.local/share/applications/rfp-manager.desktop"
+          HOME="$t/home" "$t/home/.local/share/rfp-manager/rfp-manager" --status
+
+      - name: Publish the release "linux-latest"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete linux-latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create linux-latest "${{ steps.pkg.outputs.out }}"/*.tar.gz --target "$GITHUB_SHA" --latest=false \
+            --title "RFP Manager ${{ steps.pkg.outputs.version }} for Linux" \
+            --notes "PCs: RFPManager-Linux-x64.tar.gz. Raspberry Pi 4 / 5 and other 64-bit ARM: RFPManager-Linux-arm64.tar.gz. Unpack it (tar -xzf RFPManager-Linux-x64.tar.gz), then in the rfp-manager folder run ./install.sh (add --autostart to start it when you log in). Open RFP Manager from the applications menu or run rfp-manager. Node.js is included. Over an existing install: unpack and run ./install.sh again; settings and data are kept. Built from $GITHUB_SHA."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RFPManager-Linux-${{ steps.pkg.outputs.version }}
+          path: ${{ steps.pkg.outputs.out }}/*.tar.gz
