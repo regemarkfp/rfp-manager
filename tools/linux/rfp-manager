@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# RFP Manager on Linux: starts the program in the background (a systemd user service when installed, else a plain
+# background process) and opens it in its own window (Chrome / Chromium / Edge / Brave in app mode, else the web
+# browser). Running it again just opens another window. Exit code 75 (it updated itself) starts it again.
+#   rfp-manager            open RFP Manager (starting it first if needed)
+#   rfp-manager --screen /live/control.html   open a screen of it
+#   rfp-manager --console  run it in this terminal (keys: S status, Y sync, R reconnect CasparCG, P password, Q quit)
+#   rfp-manager --stop     stop it          rfp-manager --status   is it running, and where
+set -u
+here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+# the program folder: this folder when the script sits beside server.js, else the installed copy
+if [ -f "$here/server.js" ]; then app="$here"; elif [ -f "$here/../../server.js" ]; then app="$(cd "$here/../.." && pwd)"; else app="${RFP_HOME:-$HOME/.local/share/rfp-manager}"; fi
+node="$app/node/bin/node"; [ -x "$node" ] || node="$(command -v node || true)"
+if [ -z "$node" ]; then echo "RFP Manager needs Node.js 22.13 or newer (or the node folder from the Linux download)." >&2; exit 1; fi
+state="${XDG_STATE_HOME:-$HOME/.local/state}/rfp-manager"; mkdir -p "$state"
+port="$(cd "$app" && "$node" -e "try{const c=require('./config.json');process.stdout.write(String(process.env.PORT||c.port||8090))}catch(e){process.stdout.write(String(process.env.PORT||8090))}" 2>/dev/null)"
+url="http://localhost:${port:-8090}"
+up() { (exec 3<>"/dev/tcp/127.0.0.1/${port:-8090}") 2>/dev/null; }
+service() { systemctl --user cat rfp-manager.service >/dev/null 2>&1; }
+
+run_loop() {   # in the foreground: start again after an update (75)
+  cd "$app" || exit 1
+  [ -n "${RFP_BG:-}" ] && echo $$ >"$state/pid"
+  while :; do "$node" --disable-warning=ExperimentalWarning server.js; code=$?; [ "$code" = 75 ] || exit "$code"; done
+}
+start() {
+  up && return 0
+  if service; then systemctl --user start rfp-manager.service
+  else (cd "$app" && RFP_BG=1 setsid nohup "$0" --loop </dev/null >>"$state/rfp-manager.log" 2>&1 &)      # its own process group: --stop ends it all
+  fi
+  for _ in $(seq 1 60); do up && return 0; sleep 0.5; done
+  echo "RFP Manager did not start. See $state/rfp-manager.log (or: journalctl --user -u rfp-manager)" >&2
+  notify-send "RFP Manager" "It did not start – see $state/rfp-manager.log" 2>/dev/null
+  return 1
+}
+open_window() {
+  local target="$url${1:-/}"
+  for b in google-chrome google-chrome-stable chromium chromium-browser microsoft-edge microsoft-edge-stable brave-browser; do
+    if command -v "$b" >/dev/null 2>&1; then
+      # its own profile: own windows, own sign-in, the RFP icon in the dock / taskbar
+      nohup "$b" --app="$target" --class=rfp-manager --user-data-dir="$state/window" --no-first-run --no-default-browser-check >/dev/null 2>&1 &
+      return 0
+    fi
+  done
+  xdg-open "$target" >/dev/null 2>&1 &
+}
+
+case "${1:-}" in
+  --loop) run_loop ;;
+  --console) up && { echo "RFP Manager is already running ($url). Stop it first: rfp-manager --stop" >&2; exit 1; }; run_loop ;;
+  --stop)
+    if service; then systemctl --user stop rfp-manager.service; fi
+    if [ -f "$state/pid" ]; then
+      pg="$(cat "$state/pid")"; kill -TERM -- "-$pg" 2>/dev/null || kill -TERM "$pg" 2>/dev/null
+      for _ in $(seq 1 20); do kill -0 -- "-$pg" 2>/dev/null || break; sleep 0.25; done
+      kill -KILL -- "-$pg" 2>/dev/null; rm -f "$state/pid"
+    fi
+    echo "Stopped." ;;
+  --status) if up; then echo "Running: $url (program: $app)"; else echo "Not running (program: $app)"; fi ;;
+  --screen) start && open_window "${2:-/}" ;;
+  --help|-h) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) start && open_window "/" ;;
+esac

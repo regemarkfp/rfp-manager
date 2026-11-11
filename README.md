@@ -18,6 +18,11 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.17
+
+- **RFP Manager for Linux**: x64 PCs and 64-bit ARM (Raspberry Pi 4 / 5), with Node.js included, an installer for your user, an applications-menu entry with the screens, a background service that restarts after updates, and its own window. Built by GitHub ("Linux app" workflow) as the release **linux-latest**. See "The app on Linux" below.
+- The Windows download no longer includes stray Android signing files that had landed in the repository's top folder.
+
 ### 1.0.16
 
 - **Content holds it all**: Live streams, VOD and Playlists are tabs of Content (Library · Live streams · VOD · Playlists · Website); the Streaming menu has just Content.
@@ -155,6 +160,29 @@ If the WebView2 SDK could not be fetched, or the WebView2 Runtime is missing (ra
 https://go.microsoft.com/fwlink/p/?LinkId=2124703), the windows open in Edge / Chrome app mode instead and the console
 says why. It still needs Node.js installed (or a `node\node.exe` in this folder). `run.bat` keeps working as before,
 and phones, tablets and other PCs still use the web addresses.
+
+### The app on Linux (Ubuntu, Debian, Mint, Fedora, Raspberry Pi OS 64-bit …)
+
+Download **RFPManager-Linux-x64.tar.gz** (PCs) or **RFPManager-Linux-arm64.tar.gz** (Raspberry Pi 4 / 5 and other 64-bit
+ARM) from the release **linux-latest** on GitHub (built by the "Linux app" workflow whenever main changes). Node.js is
+included. Then:
+
+```
+tar -xzf RFPManager-Linux-x64.tar.gz
+cd rfp-manager
+./install.sh              # or ./install.sh --autostart to start it when you log in
+```
+
+It installs for your user only (no sudo): the program in `~/.local/share/rfp-manager`, **RFP Manager** in the
+applications menu (right-click it for Graphics control, Scorer, Timeline, Console and Stop), the `rfp-manager` command,
+and a systemd user service that keeps it running and starts it again after an update. RFP Manager opens in its own
+window (Chrome, Chromium, Edge or Brave in app mode, with its own profile; otherwise your web browser). Commands:
+`rfp-manager` (open), `rfp-manager --screen /live/control.html`, `rfp-manager --console` (in a terminal, with the
+console keys), `rfp-manager --status`, `rfp-manager --stop`. To try it without installing, run `./rfp-manager` in the
+unpacked folder. Updating: unpack the new download and run `./install.sh` again (config.json and data are kept); it also
+updates itself from the website it is linked to. Remove it with `~/.local/share/rfp-manager/uninstall.sh`
+(`--everything` also removes its settings and data). MIDI and X-keys need access to `/dev/snd` and `/dev/hidraw*`
+(the `audio` group and a udev rule).
 
 ### Where things are kept, and a forgotten password
 
