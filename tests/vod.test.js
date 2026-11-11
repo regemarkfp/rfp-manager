@@ -149,6 +149,37 @@ test('VOD: chunked upload, series and seasons, who may watch, tickets for a vide
   // the production team watches everything free, hidden ones included; sales list the purchases
   assert.equal((await admin.get('/api/public/v/' + hidden)).data.needs, null);
   assert.equal((await admin.get(`/api/sales?team=${team}`)).data.list.filter((x) => x.status === 'Paid').length, 3);
+  // subtitles: an SRT becomes WebVTT; the player gets the tracks with the video's token; a default track
+  const srt = '1\r\n00:00:01,000 --> 00:00:03,500\r\nWelcome to the final\r\n\r\n2\r\n00:00:04,000 --> 00:00:06,000\r\n<i>Kick-off</i>\r\n';
+  assert.equal((await admin.post(`/api/vod/${ep2}/subtitles?team=${team}&lang=en&label=English`, 'not subtitles', { 'content-type': 'text/plain' })).status, 400);
+  let sb = await admin.post(`/api/vod/${ep2}/subtitles?team=${team}&lang=en&label=English`, srt, { 'content-type': 'text/plain' });
+  assert.equal(sb.status, 200, JSON.stringify(sb.data));
+  sb = await admin.post(`/api/vod/${ep2}/subtitles?team=${team}&lang=af&label=Afrikaans&default=1`, 'WEBVTT\n\n00:01.000 --> 00:02.000\nWelkom\n', { 'content-type': 'text/plain' });
+  assert.deepEqual(sb.data.list.map((x) => [x.label, x.lang, x.default, x.cues]), [['English', 'en', false, 2], ['Afrikaans', 'af', true, 1]]);
+  assert.equal((await guest.post(`/api/vod/${ep2}/subtitles?team=${team}&lang=en`, srt, { 'content-type': 'text/plain' })).status, 401, 'not signed in');
+  const ws = (await guest.get('/api/public/v/' + ep2)).data.subtitles;
+  assert.deepEqual(ws.map((x) => [x.label, x.lang, x.default]), [['English', 'en', false], ['Afrikaans', 'af', true]]);
+  const vtt = await fetch(app.url + ws[0].url);
+  assert.equal(vtt.headers.get('content-type'), 'text/vtt; charset=utf-8');
+  assert.equal(await vtt.text(), 'WEBVTT\n\n1\n00:00:01.000 --> 00:00:03.500\nWelcome to the final\n\n2\n00:00:04.000 --> 00:00:06.000\n<i>Kick-off</i>\n');
+  assert.equal((await fetch(app.url + ws[0].url.replace(/t=.*/, 't=1.x'))).status, 403);
+  assert.deepEqual((await guest.get('/api/public/v/' + ep1)).data.subtitles, [], 'no tracks without access');
+  const sid = sb.data.list[0].id;
+  assert.deepEqual((await admin.put(`/api/vod/${ep2}/subtitles/${sid}?team=${team}`, { default: true })).data.list.map((x) => x.default), [true, false]);
+  assert.deepEqual((await admin.del(`/api/vod/${ep2}/subtitles/${sid}?team=${team}`)).data.list.map((x) => x.label), ['Afrikaans']);
+  assert.equal((await admin.get(`/api/vod?team=${team}`)).data.list.find((x) => x.id === ep2).subtitles, 1);
+  // a YouTube item gets our own file (the team's own video): same item, it plays the file once ready
+  await admin.put(`/api/docs/vodvideo/vod_ytown12345?team=${team}`, { data: { title: 'Our final on YouTube', channel: 'chan_tv', source: 'YouTube', youtube: 'abcdefghijk', visibility: 'Public' } });
+  assert.equal((await guest.get('/api/public/v/vod_ytown12345')).data.youtube, 'abcdefghijk');
+  const own = await upload(admin, team, crypto.randomBytes(900), { name: 'final.mp4', replace: 'vod_ytown12345', quality: 'small' });
+  assert.equal(own, 'vod_ytown12345');
+  assert.equal((await guest.get('/api/public/v/vod_ytown12345')).data.youtube, 'abcdefghijk', 'YouTube until the file is ready');
+  await admin.post(`/api/vod/${own}/done?team=${team}`);
+  await until(async () => (await app.store.get(own)).data.source === 'Upload', 3000, 'switched to the file');
+  const ow = (await guest.get('/api/public/v/' + own)).data;
+  assert.deepEqual([ow.youtube, /^\/vodfiles\/vod_ytown12345\/video/.test(ow.src), ow.title], ['', true, 'Our final on YouTube']);
+  assert.equal((await app.store.get(own)).data.ytOrigin, 'abcdefghijk');
+  assert.equal((await admin.post(`/api/vod?team=${team}`, { size: 10, name: 'again.mp4', replace: own })).status, 409, 'it has a file now');
   // views count once per viewer and hour
   assert.equal((await guest.post('/api/public/v/' + ep2 + '/view', {})).data.counted, true);
   assert.equal((await guest.post('/api/public/v/' + ep2 + '/view', {})).data.counted, false);
