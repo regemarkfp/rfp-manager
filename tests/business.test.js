@@ -98,6 +98,7 @@ test('company and fan features', async (t) => {
   assert.equal(app.invoices.termsOf({ terms: ninjaTerms }, { bank: 'Bank', conditions: 'New terms' }), 'Pay within 14 days & quote the number.');
   assert.equal(app.invoices.termsOf({ terms: '<p>Terms and Conditions</p><p>Old</p>' }, { bank: 'B', conditions: 'C', docTerms: 'Default terms' }), 'Default terms');
   assert.match(app.invoices.termsOf({ terms: ninjaTerms }, {}), /^BANKING DETAILS\nBank Name: Test/);
+  assert.equal(Buffer.from(require('../lib/pdf').winAnsi('\u200bPlease \ufeffread 🏠')).toString('latin1'), 'Please read ');
   assert.equal(app.invoices.htmlText('<ul><li><p>one</p></li><li>two</li></ul>'), '- one\n- two');
 
   // ---- crew: clashes, an answer from the email, their own days off
