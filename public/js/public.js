@@ -824,7 +824,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   }
   function attach(pb, media, opts) {
     const unmute = el('button', { class: 'unmute', onclick: (e) => { e.stopPropagation(); media.muted = false; window.RFPPlayer.saveSound(media); media.play().catch(() => {}); unmute.remove(); } }, '🔊 Tap for sound');
-    const b = window.RFPPlayer.mount(media, { player: pb.box, color: opts.color || '', live: !!opts.live, since: opts.since || 0, prev: opts.prev, next: opts.next, prevLabel: opts.prevLabel, nextLabel: opts.nextLabel, onList: opts.onList, listLabel: opts.listLabel, onUnmute: () => unmute.remove() });
+    const b = window.RFPPlayer.mount(media, { player: pb.box, color: opts.color || '', live: !!opts.live, since: opts.since || 0, prev: opts.prev, next: opts.next, prevLabel: opts.prevLabel, nextLabel: opts.nextLabel, onList: opts.onList, listLabel: opts.listLabel, subtitles: opts.subtitles || [], onUnmute: () => unmute.remove() });
     pb.ctrl.replaceChildren(b.el); pb.box.classList.add('has-bar');
     setTimeout(() => window.RFPPlayer.playWithSound(media, () => pb.stage.append(unmute)), 30);
     return b;
@@ -880,7 +880,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       });
       const flat = v.series ? v.series.seasons.flatMap((x) => x.episodes) : [];
       const at = flat.findIndex((e) => e.id === v.id);
-      attach(pb, media, { color: v.channel.color, prev: at > 0 ? () => go(flat[at - 1].id) : null, next: v.next ? () => go(v.next.id) : null, prevLabel: 'Previous episode', nextLabel: 'Next episode',
+      attach(pb, media, { subtitles: v.subtitles, color: v.channel.color, prev: at > 0 ? () => go(flat[at - 1].id) : null, next: v.next ? () => go(v.next.id) : null, prevLabel: 'Previous episode', nextLabel: 'Next episode',
         onList: v.series ? () => { const t = document.querySelector('.eps'); if (t) t.scrollIntoView({ behavior: 'smooth' }); } : null, listLabel: 'Episodes' });
       stage = pb.box;
     }
@@ -967,7 +967,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
         m.addEventListener('timeupdate', () => { if (Date.now() - last > 5000 && m.duration) { last = Date.now(); savePos(v.id, m.currentTime, m.duration); } });
         m.addEventListener('ended', () => { savePos(v.id, m.duration, m.duration); onEnd(); });
         m.addEventListener('error', () => { if (m.error && typeof m.error === 'string') notice('This video cannot play', m.error, '', '', 6); });
-        attach(pb, m, common);
+        attach(pb, m, { ...common, subtitles: v.subtitles });
         return;
       }
       // a live stream: on air → live; over → its newest recording; not yet → when it starts
@@ -1190,12 +1190,14 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   }
   function side() {
     const p = location.pathname;
-    const link = (href, label, icon) => el('a', { href, 'data-nav': '', class: p === href ? 'on' : '' }, el('span', {}, icon), label);
+    const I = { '⌂': 'home', '▦': 'apps', '✉': 'mail', '◎': 'trophy', '⚑': 'shield', '⬇': 'download', '♥': 'heart', '▶': 'library', '★': 'subs', '◉': 'tv', '⚙': 'login' };
+    const ico = (g) => el('span', { class: 'nav-ico' }, window.RFPIcons ? window.RFPIcons.svg(I[g] || 'chevron', 22) : g);
+    const link = (href, label, icon) => el('a', { href, 'data-nav': '', class: p === href ? 'on' : '' }, ico(icon), label);
     const subs = D && D.me ? D.channels.filter((c) => (D.me.subscriptions || []).includes(c.id)) : [];
     $('side').replaceChildren(link('/', 'Home', '⌂'), link('/browse', 'Browse', '▦'), link('/book', 'Book services', '✉'), link('/matches', 'Matches', '◎'), link('/teams', 'Teams', '⚑'), link('/software', 'Software', '⬇'), D && D.me ? link('/following', 'Following' + ((D.me.follows || []).length ? ` (${D.me.follows.length})` : ''), '♥') : null, link('/videos', 'Videos', '▶'), link('/subscriptions', 'Subscriptions', '★'), link('/channels', 'Channels', '◉'),
       subs.length ? [el('hr'), el('h4', {}, 'Subscriptions'), subs.map((c) => el('a', { href: '/c/' + c.slug, 'data-nav': '', class: p === '/c/' + c.slug ? 'on' : '' }, c.logo ? el('img', { class: 'chip-logo', src: img(c.logo), alt: '' }) : el('span', { class: 'chip-logo' }), c.name))] : null,
-      D && D.me && D.me.teams ? [el('hr'), el('a', { href: '/app', class: 'studio-link' }, el('span', {}, '⚙'), 'Studio (your production team)')] : null,
-      D && !D.me ? [el('hr'), el('a', { href: '#', class: 'studio-link', onclick: (e) => { e.preventDefault(); signIn('Production team members: sign in to open your Studio.'); } }, el('span', {}, '⚙'), 'Production teams: sign in')] : null);
+      D && D.me && D.me.teams ? [el('hr'), el('a', { href: '/app', class: 'studio-link' }, ico('⚙'), 'Studio (your production team)')] : null,
+      D && !D.me ? [el('hr'), el('a', { href: '#', class: 'studio-link', onclick: (e) => { e.preventDefault(); signIn('Production team members: sign in to open your Studio.'); } }, ico('⚙'), 'Production teams: sign in')] : null);
   }
   function meBox() {
     const m = D && D.me;
@@ -1319,5 +1321,5 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     document.body.append(wrap);
   }
   load();
-  setInterval(async () => { try { D = await get('/api/public/home'); if (!/^\/(c|match|team|software|client|player|track)\//.test(location.pathname) && !['/', '/book', '/teams', '/following', '/notifications', '/software'].includes(location.pathname)) render(); } catch (e) { /* next time */ } }, 30000);   // live now / viewers
+  setInterval(async () => { try { D = await get('/api/public/home'); if (!/^\/(c|match|team|software|client|player|track|v|s|p|portal|release)\//.test(location.pathname) && !['/', '/book', '/teams', '/following', '/notifications', '/software'].includes(location.pathname)) render(); } catch (e) { /* next time */ } }, 30000);   // live now / viewers
 })();

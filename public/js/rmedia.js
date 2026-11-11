@@ -37,15 +37,25 @@
     host.append(box);
     let p = null, state = -1, tick = null, vol = 1, mute = false, rate = 1, wantPlay = false, ready = false, lastDur = 0, err = '';
     const waiters = [];
+    // YouTube's player did not come (a blocked network or an ad blocker, or the owner forbids it): say so, with a way out
+    const failed = (msg) => {
+      if (box.querySelector('.yt-fail')) return;
+      const f = document.createElement('div'); f.className = 'yt-fail';
+      const b = document.createElement('b'); b.textContent = msg || 'YouTube did not load here';
+      const t = document.createElement('p'); t.textContent = 'Something on this network or in this browser (an ad blocker, a VPN or filtering DNS) may be blocking YouTube.';
+      const a = document.createElement('a'); a.href = 'https://www.youtube.com/watch?v=' + encodeURIComponent(id); a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Watch it on YouTube ↗';
+      f.append(b, t, a); box.append(f);
+    };
+    const giveUp = setTimeout(() => { if (!ready) failed(); }, 12000);
     const ST = { ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 };
     const startTick = () => { if (!tick) tick = setInterval(() => { if (!box.isConnected) { destroy(); return; } fire('timeupdate'); fire('progress'); const d = p && p.getDuration ? p.getDuration() : 0; if (d && d !== lastDur) { lastDur = d; fire('durationchange'); } }, 250); };
     loadApi().then(() => {
       p = new window.YT.Player(slot, {
-        host: 'https://www.youtube-nocookie.com', videoId: id, width: '100%', height: '100%',
+        host: 'https://www.youtube.com', videoId: id, width: '100%', height: '100%',
         playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3, fs: 0, cc_load_policy: 0, start: Math.floor(opts.start || 0), origin: location.origin },
         events: {
           onReady: () => {
-            ready = true;
+            ready = true; clearTimeout(giveUp);
             p.setVolume(Math.round(vol * 100)); if (mute) p.mute(); else p.unMute();
             if (rate !== 1) p.setPlaybackRate(rate);
             lastDur = p.getDuration() || 0;
@@ -59,11 +69,11 @@
             else if (state === ST.BUFFERING) fire('waiting');
             else if (state === ST.ENDED) { fire('pause'); fire('ended'); }
           },
-          onError: (e) => { err = ({ 2: 'Bad video id', 5: 'This video cannot play here', 100: 'This video was removed or is private', 101: 'Its owner does not allow it on other websites', 150: 'Its owner does not allow it on other websites' })[e.data] || 'YouTube could not play it'; fire('error'); },
+          onError: (e) => { err = ({ 2: 'Bad video id', 5: 'This video cannot play here', 100: 'This video was removed or is private', 101: 'Its owner does not allow it on other websites', 150: 'Its owner does not allow it on other websites' })[e.data] || 'YouTube could not play it'; failed(err); fire('error'); },
         },
       });
-    }).catch((e) => { err = e.message; fire('error'); });
-    function destroy() { clearInterval(tick); tick = null; try { if (p && p.destroy) p.destroy(); } catch (e) { /* gone */ } }
+    }).catch((e) => { err = e.message; clearTimeout(giveUp); failed(err); fire('error'); });
+    function destroy() { clearTimeout(giveUp); clearInterval(tick); tick = null; try { if (p && p.destroy) p.destroy(); } catch (e) { /* gone */ } }
     Object.defineProperties(media, {
       paused: { get: () => state !== ST.PLAYING && state !== ST.BUFFERING },
       ended: { get: () => state === ST.ENDED },
@@ -86,6 +96,8 @@
       waiters.push(w);
       setTimeout(() => { const i = waiters.indexOf(w); if (i >= 0 && !(state === ST.PLAYING || state === ST.BUFFERING)) { waiters.splice(i, 1); const e = new Error('Autoplay with sound was refused'); e.name = mute ? 'AbortError' : 'NotAllowedError'; no(e); } }, ready ? 2500 : 6000);
     });
+    // YouTube's own captions (the video's, or YouTube's automatic ones) on or off
+    media.captions = (on) => { if (!p || !ready) return; try { if (on) { p.loadModule('captions'); p.setOption('captions', 'track', { languageCode: (navigator.language || 'en').slice(0, 2) }); } else p.unloadModule('captions'); } catch (e) { /* not for this video */ } };
     media.pause = () => { wantPlay = false; if (p && ready) p.pauseVideo(); };
     media.destroy = () => { destroy(); box.remove(); };
     media.el = box;

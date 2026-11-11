@@ -60,7 +60,7 @@
     const chans = App.sorted('channel');
     if (!chans.length) { toast('Make a channel first (Streaming → Channels)', 'error'); return; }
     const sers = App.sorted('vodseries');
-    const meta = { channel: preset.channel || (chans[0] && chans[0].id), series: preset.series || '', season: preset.season || 1, episode: preset.episode || '', visibility: 'Public' };
+    const meta = { channel: preset.channel || (chans[0] && chans[0].id), series: preset.series || '', season: preset.season || 1, episode: preset.episode || '', visibility: 'Public', quality: 'standard', ...(preset.replace ? { replace: preset.replace } : {}) };
     if (meta.series) { const s = App.get(meta.series); if (s && s.channel) meta.channel = s.channel; }
     const sel = (opts, k, after) => h('select', { onchange: (e) => { meta[k] = e.target.value; if (after) after(); } }, opts.map(([v, t]) => h('option', { value: v, selected: String(meta[k]) === String(v) }, t)));
     const nextEp = () => { const eps = App.list('vodvideo').filter((v) => v.data.series === meta.series && Number(v.data.season || 1) === Number(meta.season || 1)); return eps.reduce((m, v) => Math.max(m, Number(v.data.episode) || 0), 0) + 1; };
@@ -74,13 +74,16 @@
     };
     paintSeries();
     const total = [...files].reduce((n, f) => n + f.size, 0);
-    modal({ title: files.length > 1 ? `Upload ${files.length} videos` : 'Upload a video', body: h('div', { class: 'stack' },
+    if (preset.replace) files = files.slice(0, 1);
+    modal({ title: preset.replace ? 'Play from our own file instead of YouTube' : files.length > 1 ? `Upload ${files.length} videos` : 'Upload a video', body: h('div', { class: 'stack' },
       h('p', { class: 'dim', style: { marginTop: 0 } }, [...files].map((f) => f.name).slice(0, 6).join(', ') + (files.length > 6 ? ` and ${files.length - 6} more` : '') + ` · ${size(total)}`),
       h('div', { class: 'form' },
-        h('label', { class: 'f' }, h('span', {}, 'Channel'), sel(chans.map((c) => [c.id, c.data.name]), 'channel')),
-        h('label', { class: 'f' }, h('span', {}, 'Who sees it'), sel([['Public', 'Public'], ['Unlisted', 'Unlisted (link only)'], ['Hidden', 'Hidden (only us)']], 'visibility')),
-        h('label', { class: 'f' }, h('span', {}, 'Series'), sel([['', '— not in a series —'], ...sers.map((s) => [s.id, s.data.title])], 'series', paintSeries)), seriesBits),
-      h('p', { class: 'help' }, 'Titles come from the file names; change them, add a description, poster and price afterwards. Keep this tab open while it uploads (other screens are fine).')),
+        preset.replace ? null : h('label', { class: 'f' }, h('span', {}, 'Channel'), sel(chans.map((c) => [c.id, c.data.name]), 'channel')),
+        preset.replace ? null : h('label', { class: 'f' }, h('span', {}, 'Who sees it'), sel([['Public', 'Public'], ['Unlisted', 'Unlisted (link only)'], ['Hidden', 'Hidden (only us)']], 'visibility')),
+        h('label', { class: 'f' }, h('span', {}, 'File size on the server'), sel([['standard', 'Standard – up to 1080p, best picture'], ['small', 'Small – 720p, about a third of the size'], ['smallest', 'Smallest – 480p, for talks and slow connections']], 'quality')),
+        preset.replace ? null : h('label', { class: 'f' }, h('span', {}, 'Series'), sel([['', '— not in a series —'], ...sers.map((s) => [s.id, s.data.title])], 'series', paintSeries)), preset.replace ? null : seriesBits),
+      preset.replace ? h('p', { class: 'help' }, 'Its title, playlists, series and subtitles stay. YouTube keeps playing until the file is ready, then the website plays the file from your server.') : null,
+      preset.replace ? null : h('p', { class: 'help' }, 'Titles come from the file names; change them, add a description, poster and price afterwards. Keep this tab open while it uploads (other screens are fine).')),
     actions: [{ label: 'Cancel' }, { label: 'Upload', primary: true, onClick: () => {
       let n = Number(meta.episode) || 0;
       for (const f of files) uploads.push({ name: f.name, size: f.size, sent: 0, state: 'waiting', file: f, meta: { ...meta, episode: meta.series && n ? n++ : '' } });
@@ -96,10 +99,10 @@
     tab = tab === 'series' ? 'series' : 'videos';
     const body = h('div', { 'data-nosubnav': '' }, h('div', { class: 'card dim' }, 'Loading…'));
     const upBox = h('div', {});
-    let files = new Map(), info = { ffmpeg: true }, filter = '', timer = null;
+    let files = new Map(), subs = new Map(), info = { ffmpeg: true }, filter = '', timer = null;
     const can = App.canEdit('vodvideo');
     const load = async () => {
-      try { const r = await api('GET', '/api/vod?team=' + App.team); files = new Map(r.list.map((x) => [x.id, x.file])); info = r; } catch (e) { body.replaceChildren(h('div', { class: 'card' }, e.message)); return false; }
+      try { const r = await api('GET', '/api/vod?team=' + App.team); files = new Map(r.list.map((x) => [x.id, x.file])); subs = new Map(r.list.map((x) => [x.id, x.subtitles || 0])); info = r; } catch (e) { body.replaceChildren(h('div', { class: 'card' }, e.message)); return false; }
       return true;
     };
     const paintUploads = () => {
@@ -128,6 +131,8 @@
           can ? h('a', { class: 'btn sm', href: '#/edit/vodvideo/' + v.id }, 'Edit') : null,
           f && f.status === 'ready' && d.visibility !== 'Hidden' ? h('a', { class: 'btn sm', href: site() + '/v/' + v.id, target: '_blank', rel: 'noopener' }, 'Watch ↗') : null,
           f && f.status === 'ready' && d.visibility === 'Hidden' ? h('a', { class: 'btn sm', href: site() + '/v/' + v.id, target: '_blank', rel: 'noopener', title: 'Only your production team can open it' }, 'Preview ↗') : null,
+          can && d.source === 'YouTube' ? h('button', { class: 'sm', title: 'Your own video: download it from YouTube Studio, then upload the file here', onclick: () => picker({ replace: v.id }) }, 'Use own file') : null,
+          can && App.vodSubtitles ? h('button', { class: 'sm', title: 'Subtitles', onclick: () => App.vodSubtitles(v.id, paint) }, 'CC' + (subs.get(v.id) ? ' ' + subs.get(v.id) : '')) : null,
           can ? h('button', { class: 'sm danger', onclick: async () => { if (!(await confirmBox(`Delete "${d.title}"? The video file is deleted from the server for good.`))) return; try { await App.remove('vodvideo', v.id); paint(); } catch (e) { oops(e); } } }, 'Delete') : null));
     };
     const order = (a, b) => (Number(a.data.season) || 0) - (Number(b.data.season) || 0) || (Number(a.data.episode) || 0) - (Number(b.data.episode) || 0) || String(a.data.title).localeCompare(String(b.data.title));
@@ -170,6 +175,7 @@
     const drop = (e) => { e.preventDefault(); el.classList.remove('drop-over'); if (can && e.dataTransfer.files.length) chooseFiles([...e.dataTransfer.files].filter((f) => /^video\//.test(f.type) || /\.(mkv|mts|m2ts|mxf|ts|mov|mp4)$/i.test(f.name))); };
     const el = h('div', { ondragover: (e) => { e.preventDefault(); el.classList.add('drop-over'); }, ondragleave: () => el.classList.remove('drop-over'), ondrop: drop },
       pageHead('VOD', can ? h('button', { class: 'primary', onclick: () => picker({}) }, '+ Upload VOD') : null, can && App.youtubeImport ? h('button', { onclick: () => App.youtubeImport({}, () => paint()) }, '+ From YouTube') : null, can ? h('button', { onclick: () => App.editModal('vodseries', () => { location.hash = '#/vod/series'; paint(); }, { visibility: 'Public', channel: (App.sorted('channel')[0] || {}).id }) }, '+ New series') : null),
+      App.contentNav ? App.contentNav('vod') : null,
       h('p', { class: 'dim', style: { marginTop: '-8px' } }, 'Video on demand for your channels: drop files here or press Upload, or bring in YouTube videos. Big files are fine – they go up in pieces and carry on after a dropped connection. The server makes a web copy that starts at once and a poster frame. Sell a video on its own, a whole series, or let the channel pass cover it.'),
       upBox, body);
     return { el, keepScroll: true, destroy: () => clearInterval(timer) };

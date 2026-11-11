@@ -17,6 +17,7 @@
     list: 'M4 6h2M9 6h11M4 12h2M9 12h11M4 18h2M9 18h11',
     full: 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5',
     exitfull: 'M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5',
+    cc: 'M3 6h18v12H3zM10.5 10.2a2.2 2.2 0 1 0 0 3.6M17.5 10.2a2.2 2.2 0 1 0 0 3.6',
   };
   const FILLED = new Set(['play', 'pause', 'prev', 'next']);
   function icon(name) {
@@ -62,6 +63,15 @@
   .pb-menu button.on::before { content: '\\25CF'; color: var(--pb-accent, #00ff82); }
   .pb-menu button:not(.on)::before { content: '\\25CF'; color: transparent; }
   .pb-menu small { color: #8e8e93; margin-left: auto; }
+  .pb-btn.lit { color: var(--pb-accent, #00ff82); }
+  .pb-subs { position: absolute; left: 4%; right: 4%; bottom: 7%; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; text-align: center; font: 600 clamp(14px, 3.4cqw, 34px)/1.3 'Segoe UI', system-ui, sans-serif; container-type: normal; }
+  .stage { container-type: inline-size; }
+  .pb-subs span { padding: 2px 10px; border-radius: 4px; background: rgba(0,0,0,.6); color: #fff; }
+  .pb-subs[data-size=s] { font-size: clamp(12px, 2.6cqw, 26px); } .pb-subs[data-size=l] { font-size: clamp(17px, 4.3cqw, 44px); } .pb-subs[data-size=xl] { font-size: clamp(20px, 5.4cqw, 56px); }
+  .pb-subs[data-color=yellow] span { color: #ffe600; } .pb-subs[data-color=green] span { color: #00ff82; } .pb-subs[data-color=cyan] span { color: #5ff3ff; }
+  .pb-subs[data-bg=solid] span { background: #000; } .pb-subs[data-bg=none] span { background: none; text-shadow: 0 0 3px #000, 0 0 3px #000, 1px 1px 2px #000, -1px -1px 2px #000; }
+  .pb-subs[data-pos=top] { bottom: auto; top: 6%; }
+  .player:fullscreen .pb-subs { bottom: 10%; }
   .player:fullscreen { background: #000; display: flex; flex-direction: column; }
   .player:fullscreen .stage { flex: 1; aspect-ratio: auto; border-radius: 0; }
   .player:fullscreen .pbar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; border-radius: 0; background: rgba(22,22,24,.92); opacity: 0; transition: opacity .2s; }
@@ -86,7 +96,7 @@
     const openMenu = (b, title, items) => {
       if (menu && menu.dataset.for === title) return closeMenu();
       closeMenu();
-      menu = el('div', 'pb-menu', el('b', '', title), items.map((it) => { const x = el('button', it.on ? 'on' : '', it.label, it.note ? el('small', '', it.note) : null); x.type = 'button'; x.addEventListener('click', (e) => { e.stopPropagation(); it.pick(); closeMenu(); }); return x; }));
+      menu = el('div', 'pb-menu', el('b', '', title), items.map((it) => { const x = el('button', it.on ? 'on' : '', it.label, it.note ? el('small', '', it.note) : null); x.type = 'button'; x.addEventListener('click', (e) => { e.stopPropagation(); if (it.pick() !== 'keep') closeMenu(); }); return x; }));
       menu.dataset.for = title;
       b.classList.add('on'); bar.classList.add('menu');
       (player || bar.parentNode).append(menu);
@@ -135,6 +145,49 @@
       if (document.pictureInPictureEnabled && video.requestPictureInPicture) items.push({ label: 'Picture in picture', pick: () => { video.requestPictureInPicture().catch(() => {}); } });
       openMenu(gear, 'Settings', items);
     });
+    // subtitles: our own tracks (WebVTT, drawn over the picture so they look the same for files, YouTube and live),
+    // YouTube's own captions, and how they look (size, colour, background), kept in this browser
+    let subs = opts.subtitles || [], subOn = -1, cues = [], ytCc = false;
+    const subBox = el('div', 'pb-subs');
+    const stageEl = opts.stage || (player && player.querySelector('.stage'));
+    if (stageEl) stageEl.append(subBox);
+    const styleSubs = () => { const st = subStyle(); subBox.dataset.size = st.size; subBox.dataset.bg = st.bg; subBox.dataset.color = st.color; subBox.dataset.pos = st.pos; };
+    styleSubs();
+    const pickSub = async (i) => {
+      subOn = i; cues = []; subBox.replaceChildren();
+      try { localStorage.setItem(SUBLANG, i >= 0 ? subs[i].lang || subs[i].label : 'off'); } catch (e) { /* private window */ }
+      if (i < 0) return;
+      try { const r = await fetch(subs[i].url); cues = parseVtt(await r.text()); } catch (e) { cues = []; }
+      paintSubs();
+    };
+    let lastCue = '';
+    function paintSubs() {
+      if (subOn < 0 || !cues.length) { if (lastCue) { subBox.replaceChildren(); lastCue = ''; } return; }
+      const t = video.currentTime;
+      const now = cues.filter((c) => t >= c.start && t < c.end).map((c) => c.text);
+      const key = now.join('\n');
+      if (key === lastCue) return;
+      lastCue = key;
+      subBox.replaceChildren(...now.map((tx) => el('span', '', ...tx.split('\n').flatMap((ln, j) => (j ? [document.createElement('br'), ln] : [ln])))));
+    }
+    video.addEventListener('timeupdate', paintSubs);
+    video.addEventListener('seeked', paintSubs);
+    const ccBtn = btn('cc', 'Subtitles', () => {
+      const items = [{ label: 'Off', on: subOn < 0 && !ytCc, pick: () => { pickSub(-1); if (ytCc && video.captions) { video.captions(false); ytCc = false; } paint(); } }];
+      subs.forEach((s, i) => items.push({ label: s.label || s.lang || 'Subtitles', note: s.lang && s.label !== s.lang ? s.lang : '', on: subOn === i, pick: () => { if (ytCc && video.captions) { video.captions(false); ytCc = false; } pickSub(i); paint(); } }));
+      if (video.captions) items.push({ label: 'YouTube\'s captions', note: 'auto', on: ytCc, pick: () => { pickSub(-1); ytCc = true; video.captions(true); paint(); } });
+      const st = subStyle();
+      const sub = (title, key, choices) => ({ label: title, note: choices.find((c) => c[0] === st[key])[1] + ' ›', pick: () => { closeMenu(); openMenu(ccBtn, title, choices.map(([v, l]) => ({ label: l, on: subStyle()[key] === v, pick: () => { saveSubStyle({ [key]: v }); styleSubs(); } }))); return 'keep'; } });
+      items.push(sub('Text size', 'size', [['s', 'Small'], ['m', 'Normal'], ['l', 'Large'], ['xl', 'Very large']]),
+        sub('Text colour', 'color', [['white', 'White'], ['yellow', 'Yellow'], ['green', 'Green'], ['cyan', 'Cyan']]),
+        sub('Background', 'bg', [['dark', 'Dark box'], ['solid', 'Black box'], ['none', 'None (outline)']]),
+        sub('Position', 'pos', [['bottom', 'Bottom'], ['top', 'Top']]));
+      openMenu(ccBtn, 'Subtitles', items);
+    });
+    // the viewer's language from last time, else the track marked as the default
+    const pref = (() => { try { return localStorage.getItem(SUBLANG) || ''; } catch (e) { return ''; } })();
+    const startSub = () => { if (pref === 'off') return; const i = subs.findIndex((s) => pref && (s.lang === pref || s.label === pref)); const d = subs.findIndex((s) => s.default); if (i >= 0 || d >= 0) pickSub(i >= 0 ? i : d); };
+    startSub();
     const list = btn('list', opts.listLabel || 'Videos', () => opts.onList && opts.onList());
     list.disabled = !opts.onList;
     const fullBtn = btn('full', 'Full screen', () => toggleFull());
@@ -144,7 +197,7 @@
       else if (t.requestFullscreen) t.requestFullscreen().catch(() => {});
       else if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
     };
-    bar.append(prev, play, next, cur, seek, len, volBtn, vol, trackBtn, gear, list, fullBtn);
+    bar.append(prev, play, next, cur, seek, len, volBtn, vol, trackBtn, ccBtn, gear, list, fullBtn);
 
     function paint() {
       play.replaceChildren(icon(video.paused ? 'play' : 'pause'));
@@ -154,6 +207,7 @@
       vol.firstChild.style.width = a.volume * 100 + '%'; vol.classList.toggle('muted', a.muted);
       fullBtn.replaceChildren(icon(document.fullscreenElement ? 'exitfull' : 'full'));
       trackBtn.style.display = tracks && tracks.list().length > 1 ? '' : 'none';
+      ccBtn.style.display = subs.length || video.captions ? '' : 'none'; ccBtn.classList.toggle('lit', subOn >= 0 || ytCc);
       if (opts.live) {
         const b = behind();
         liveTag.classList.toggle('behind', b);
@@ -188,8 +242,26 @@
     document.addEventListener('keydown', onKey);
     paint();
     const setAudio = (el2) => { if (aud) aud.removeEventListener('volumechange', paint); aud = el2 || null; if (aud) aud.addEventListener('volumechange', paint); paint(); };
-    return { el: bar, setTracks: (t) => { tracks = t; paint(); }, paint, setAudio };
+    return { el: bar, setTracks: (t) => { tracks = t; paint(); }, setSubtitles: (l) => { subs = l || []; subOn = -1; cues = []; subBox.replaceChildren(); startSub(); paint(); }, paint, setAudio };
   }
+  // subtitles: a small WebVTT (and SRT) reader → [{ start, end, text }]
+  function parseVtt(text) {
+    const t = (s) => { const m = /(?:(\d+):)?(\d{1,2}):(\d{2})[.,](\d{1,3})/.exec(s); return m ? (Number(m[1] || 0) * 3600) + Number(m[2]) * 60 + Number(m[3]) + Number(m[4].padEnd(3, '0')) / 1000 : NaN; };
+    const out = [];
+    for (const block of String(text || '').replace(/\r/g, '').split(/\n{2,}/)) {
+      const lines = block.split('\n');
+      const i = lines.findIndex((l) => l.includes('-->'));
+      if (i < 0) continue;
+      const [a, b] = lines[i].split('-->');
+      const start = t(a), end = t(b);
+      const txt = lines.slice(i + 1).join('\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').trim();
+      if (Number.isFinite(start) && Number.isFinite(end) && txt) out.push({ start, end, text: txt });
+    }
+    return out;
+  }
+  const SUBSTYLE = 'rfp.subs', SUBLANG = 'rfp.subs.lang';
+  function subStyle() { try { return { size: 'm', color: 'white', bg: 'dark', pos: 'bottom', ...JSON.parse(localStorage.getItem(SUBSTYLE) || '{}') }; } catch (e) { return { size: 'm', color: 'white', bg: 'dark', pos: 'bottom' }; } }
+  function saveSubStyle(x) { try { localStorage.setItem(SUBSTYLE, JSON.stringify({ ...subStyle(), ...x })); } catch (e) { /* private window */ } }
   // the viewer's own sound settings (mute, volume), kept in this browser: every video starts with them
   const SOUND = 'rfp.sound';
   function sound() {
@@ -206,5 +278,5 @@
       return undefined;
     });
   }
-  window.RFPPlayer = { mount, sound, saveSound, playWithSound };
+  window.RFPPlayer = { mount, sound, saveSound, playWithSound, parseVtt };
 })();

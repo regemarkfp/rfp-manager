@@ -6,6 +6,9 @@
 'use strict';
 (() => {
   const site = () => location.origin;
+  // Content's own tabs: everything the channels show, each part one tap away (the menu has just Content)
+  App.contentNav = (on) => h('div', { class: 'tabs content-nav' }, [['library', '#/content', 'Library'], ['streams', '#/streams', 'Live streams'], ['vod', '#/vod', 'VOD'], ['playlists', '#/playlists', 'Playlists'], ['website', '#/content/website', 'Website']]
+    .map(([k, href, label]) => h('button', { class: k === on ? 'on' : '', onclick: () => { location.hash = href; } }, h('span', { class: 'cn-ico' }, window.RFPIcons.svg({ library: 'library', streams: 'live', vod: 'movie', playlists: 'playlist', website: 'apps' }[k], 18)), label)));
   const dur = (s) => { s = Math.round(s || 0); const hh = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; return s ? (hh ? hh + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0') : ''; };
   const tagsOf = (d) => String(d.tags || '').split(',').map((t) => t.trim()).filter(Boolean);
   let files = new Map(), streams = new Map();
@@ -113,7 +116,7 @@
     const can = App.canEdit('vodvideo');
     const F = App.contentFilter || (App.contentFilter = { q: '', type: '', channel: '', category: '', tag: '', visibility: '' });
     const selected = new Set();
-    const tabs = () => h('div', { class: 'tabs' }, h('button', { class: tab === 'library' ? 'on' : '', onclick: () => { location.hash = '#/content'; } }, 'Library'), h('button', { class: tab === 'website' ? 'on' : '', onclick: () => { location.hash = '#/content/website'; } }, 'Website'));
+    const tabs = () => App.contentNav(tab);
     const paintLibrary = () => {
       const all = library();
       const list = all.filter((x) => (!F.type || x.type === F.type) && (!F.channel || x.channel === F.channel) && (!F.category || x.category === F.category) && (!F.tag || x.tags.includes(F.tag)) && (!F.visibility || x.visibility === F.visibility)
@@ -156,7 +159,7 @@
         h('td', {}, typePill(x)), h('td', { class: 'small' }, x.category), h('td', { class: 'small' }, x.visibility),
         h('td', { class: 'small nowrap' }, h('span', { class: 'pill' + (/Live/.test(x.status) ? ' live' : /Failed|No file/.test(x.status) ? ' warn' : x.status === 'Ready' ? ' ok' : '') }, x.status)),
         h('td', { class: 'small nowrap dim' }, x.updated ? new Date(x.updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''),
-        h('td', { class: 'nowrap' }, h('a', { class: 'btn sm', href: x.edit }, 'Edit'), ' ', h('a', { class: 'btn sm', href: site() + x.open, target: '_blank', rel: 'noopener' }, '↗'))));
+        h('td', { class: 'nowrap' }, h('a', { class: 'btn sm', href: x.edit }, 'Edit'), ' ', x.kind === 'vod' && can ? [h('button', { class: 'sm', title: 'Subtitles', onclick: () => App.vodSubtitles(x.id) }, 'CC'), ' '] : null, h('a', { class: 'btn sm', href: site() + x.open, target: '_blank', rel: 'noopener' }, '↗'))));
       body.replaceChildren(tabs(), filters, bulk,
         list.length ? h('div', { class: 'card', style: { padding: '0' } }, h('div', { class: 'tablewrap' }, h('table', { class: 't cms-table' }, h('tr', {}, h('th', {}, can ? allBox : ''), h('th', {}, ''), h('th', {}, `Title (${list.length})`), h('th', {}, 'Type'), h('th', {}, 'Category'), h('th', {}, 'Who sees it'), h('th', {}, 'Status'), h('th', {}, 'Changed'), h('th', {}, '')), rows)))
           : h('div', { class: 'card empty' }, all.length ? 'Nothing matches these filters.' : 'The library is empty. Upload VOD, add YouTube videos, make a series or a playlist, or set up a live stream.'));
@@ -273,7 +276,7 @@
     };
     paint();
     return { el: h('div', {}, pageHead('Playlists', can ? h('button', { class: 'primary', onclick: () => App.editModal('vodplaylist', (d) => { location.hash = '#/playlists/' + d.id; }, { visibility: 'Public', channel: (App.sorted('channel')[0] || {}).id, items: [] }) }, '+ New playlist') : null,
-      can ? h('button', { onclick: () => App.youtubeImport({}, (r) => { if (r.playlists[0]) location.hash = '#/playlists/' + r.playlists[0].id; else paint(); }) }, '+ From YouTube') : null), body) };
+      can ? h('button', { onclick: () => App.youtubeImport({}, (r) => { if (r.playlists[0]) location.hash = '#/playlists/' + r.playlists[0].id; else paint(); }) }, '+ From YouTube') : null), App.contentNav('playlists'), body) };
   }
   function playlistEditor(id) {
     const body = h('div', { 'data-nosubnav': '' }, h('div', { class: 'card dim' }, 'Loading…'));
@@ -307,6 +310,49 @@
         h('p', { class: 'dim small' }, 'Live streams in a playlist play live while they are on air, show when they start before that, and play their recording afterwards.'));
     };
     paint();
-    return { el: h('div', {}, pageHead(h('span', {}, h('a', { href: '#/playlists' }, 'Playlists'), ' › ', App.title('vodplaylist', id))), body), keepScroll: true };
+    return { el: h('div', {}, pageHead(h('span', {}, h('a', { href: '#/playlists' }, 'Playlists'), ' › ', App.title('vodplaylist', id))), App.contentNav('playlists'), body), keepScroll: true };
   }
+})();
+
+// ---- subtitles of a VOD (uploads and YouTube): .srt or .vtt files per language; viewers pick them in the player (CC)
+(() => {
+  const LANGS = [['en', 'English'], ['af', 'Afrikaans'], ['zu', 'isiZulu'], ['xh', 'isiXhosa'], ['st', 'Sesotho'], ['tn', 'Setswana'], ['nso', 'Sepedi'], ['ts', 'Xitsonga'], ['ss', 'siSwati'], ['ve', 'Tshivenda'], ['nr', 'isiNdebele'],
+    ['pt', 'Portuguese'], ['fr', 'French'], ['de', 'German'], ['es', 'Spanish'], ['nl', 'Dutch'], ['sw', 'Kiswahili'], ['zh', 'Chinese'], ['ar', 'Arabic'], ['hi', 'Hindi']];
+  App.vodSubtitles = async (id, done) => {
+    const v = App.docs.get(id);
+    const box = h('div', {});
+    const can = App.canEdit('vodvideo');
+    const paint = async () => {
+      let list = [];
+      try { list = (await api('GET', `/api/vod/${id}/subtitles?team=${App.team}`)).list; } catch (e) { box.replaceChildren(h('p', {}, e.message)); return; }
+      const lang = h('select', {}, LANGS.map(([c, n]) => h('option', { value: c }, n)), h('option', { value: '' }, 'Other / none'));
+      const label = h('input', { placeholder: 'Name shown to viewers (empty = the language)' });
+      const def = h('input', { type: 'checkbox' });
+      const file = h('input', { type: 'file', accept: '.srt,.vtt,text/vtt' });
+      const up = h('button', { class: 'primary', onclick: async () => {
+        const f = file.files[0];
+        if (!f) return toast('Choose a .srt or .vtt file', 'error');
+        if (f.size > 2 * 1024 * 1024) return toast('Subtitle files can be up to 2 MB', 'error');
+        up.disabled = true;
+        try {
+          const name = label.value.trim() || (LANGS.find(([c]) => c === lang.value) || [, 'Subtitles'])[1];
+          await api('POST', `/api/vod/${id}/subtitles?team=${App.team}&lang=${encodeURIComponent(lang.value)}&label=${encodeURIComponent(name)}&default=${def.checked ? 1 : 0}`, f, { 'content-type': 'text/plain' });
+          toast('Subtitles added'); paint(); if (done) done();
+        } catch (e) { oops(e); up.disabled = false; }
+      } }, 'Upload');
+      box.replaceChildren(
+        list.length ? h('table', { class: 't' }, h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Language'), h('th', {}, 'Lines'), h('th', {}, 'Default'), h('th', {}, '')),
+          list.map((x) => h('tr', {}, h('td', {}, x.label), h('td', {}, (LANGS.find(([c]) => c === x.lang) || [x.lang, x.lang || '–'])[1]), h('td', {}, String(x.cues || '')),
+            h('td', {}, can ? h('input', { type: 'checkbox', checked: !!x.default, title: 'Shown when a viewer has not chosen yet', onchange: async (e) => { try { await api('PUT', `/api/vod/${id}/subtitles/${x.id}?team=${App.team}`, { default: e.target.checked }); paint(); } catch (er) { oops(er); } } }) : (x.default ? '✓' : '')),
+            h('td', {}, can ? h('button', { class: 'sm danger', onclick: async () => { if (await confirmBox(`Delete the ${x.label} subtitles?`)) { await api('DELETE', `/api/vod/${id}/subtitles/${x.id}?team=${App.team}`).catch(oops); paint(); if (done) done(); } } }, 'Delete') : null))))
+          : h('p', { class: 'dim', style: { marginTop: 0 } }, 'No subtitles yet.'),
+        can ? h('div', { class: 'card', style: { marginTop: '12px' } }, h('h3', { style: { marginTop: 0 } }, 'Add subtitles'),
+          h('div', { class: 'form' }, h('label', { class: 'f' }, h('span', {}, 'Language'), lang), h('label', { class: 'f' }, h('span', {}, 'Name'), label),
+            h('label', { class: 'f wide' }, h('span', {}, 'File (.srt or .vtt)'), file), h('label', { class: 'f row wide' }, def, h('span', {}, 'Show these unless the viewer chooses otherwise'))),
+          h('div', { style: { marginTop: '10px' } }, up),
+          h('p', { class: 'help' }, 'Viewers turn subtitles on and choose the language, size, colour and background under CC in the player. They show over uploaded VOD and YouTube videos alike.')) : null);
+    };
+    paint();
+    modal({ title: 'Subtitles · ' + (v ? v.data.title : ''), wide: true, body: box, actions: [{ label: 'Close' }] });
+  };
 })();

@@ -212,7 +212,7 @@ function navFor() {
     ['Productions', ifs(['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment'], money && ['#/list/releaseForm', 'Release forms'], ['#/list/expense', ed ? 'Expenses' : 'My expenses'], web && ['#/availability', 'My availability'])],
     ['Sport', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions'], ['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues']]],
     ['Live & graphics', ifs(App.pcs && ['#/pcs', 'Production PCs'], pc && ['#/monitors', 'Monitors'], pc && ['#/templates', 'Templates'], ['#/list/theme', 'Themes'], pc && ['#/adverts', 'Advert playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'])],
-    web ? ['Streaming', ifs(['#/list/channel', 'Channels'], ed && ['#/streams', 'Live streams'], ed && ['#/content', 'Content'], ed && ['#/vod', 'VOD'], ed && ['#/playlists', 'Playlists'], ed && ['#/analytics', 'Analytics'], ed && ['#/sales', 'Ticket sales'], ['#/streamads', 'Stream adverts'])] : null,
+    web ? ['Streaming', ifs(['#/list/channel', 'Channels'], ed && ['#/content', 'Content'], ed && ['#/analytics', 'Analytics'], ed && ['#/sales', 'Ticket sales'], ['#/streamads', 'Stream adverts'])] : null,
     ['Adverts & sponsors', ifs(['#/list/advert', 'Adverts'], money && ['#/list/adSlot', 'Ad spaces (clients)'], ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log'], money && ['#/sponsors', 'Sponsor reports'])],
     ['Media & music', ifs(['#/images', 'Images'], ['#/list/track', 'Music library'], pc && ['#/music', 'Music playout'], ed && ['#/musicrights', 'Music use report'])],
     ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report']].concat(local ? [['#/bibles', 'Bibles']] : [])],
@@ -225,6 +225,7 @@ const navStore = { get: (k) => { try { return localStorage.getItem(k); } catch (
 // is this menu link the page we are on?
 function navOn(href) {
   const here = location.hash || '#/';
+  if (href === '#/content' && /^#\/(streams|vod|playlists)(\/|$)/.test(here)) return true;           // Content holds live streams, VOD and playlists
   return href === '#/' ? here === '#/' : here === href || here.startsWith(href + '/') || (href.startsWith('#/list/') && here.startsWith('#/edit/' + href.slice(7) + '/')) || (href === '#/fixtures' && /^#\/(rundown\/fixture|edit\/fixture)\//.test(here));
 }
 function shell(content) {
@@ -246,7 +247,7 @@ function shell(content) {
         const parts = [];
         const paint = () => parts.forEach((p) => { const o = p.g === openG; p.list.style.display = o ? '' : 'none'; p.head.textContent = (o ? '▾ ' : '▸ ') + p.g; });
         const nav = h('nav', { class: 'nav' }, NAV.map(([g, links]) => {
-          const list = h('div', {}, links.map(([href, label]) => h('a', { href, class: on(href) ? 'on' : '', onclick: () => root.classList.remove('open') }, label)));
+          const list = h('div', {}, links.map(([href, label]) => h('a', { href, class: on(href) ? 'on' : '', title: label, onclick: () => root.classList.remove('open') }, icon(window.RFPIcons.forLink(href, g), 20), h('span', { class: 'nl' }, label))));
           if (!g) return list;
           const head = h('div', { class: 'nav-group', role: 'button', tabindex: '0', title: 'Open this part of the menu (the others close)', style: { cursor: 'pointer', userSelect: 'none' },
             onclick: () => { openG = openG === g ? '' : g; navStore.set('rfp-nav-open', openG); paint(); }, onkeydown: (e) => { if (e.key === 'Enter') head.click(); } }, g);
@@ -300,36 +301,18 @@ const ANDROID = (() => {
   try { const q = new URLSearchParams(location.search).get('android'); if (q !== null) sessionStorage.setItem('rfp-android', q === '1' ? '1' : '0'); return ua || sessionStorage.getItem('rfp-android') === '1'; } catch (e) { return ua; }
 })();
 if (ANDROID) document.documentElement.classList.add('android-app');
-// Material-style icons (24×24)
-const ICONS = {
-  home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
-  trophy: 'M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z',
-  video: 'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z',
-  calendar: 'M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z',
-  menu: 'M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z',
-  bell: 'M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z',
-  receipt: 'M18 17H6v-2h12v2zm0-4H6v-2h12v2zm0-4H6V7h12v2zM3 22l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5L18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20z',
-  people: 'M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z',
-  monitor: 'M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z',
-  tune: 'M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z',
-  chevron: 'M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z',
-};
-function icon(name, size) {
-  const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg'), path = document.createElementNS(ns, 'path');
-  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('width', size || 24); svg.setAttribute('height', size || 24); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('fill', 'currentColor');
-  path.setAttribute('d', ICONS[name] || ICONS.monitor); svg.append(path);
-  return svg;
-}
+// the icons (public/js/icons.js, shared with the public website)
+const ICONS = window.RFPIcons.paths;
+const icon = (name, size) => window.RFPIcons.svg(name, size);
 // the bottom tabs: the main screens for this role, then More (everything else)
 function androidTabs() {
   const flat = navFor().flatMap(([, links]) => links);
   const find = (href) => flat.find(([x]) => x === href);
-  const want = { Coach: ['#/', '#/fixtures', '#/list/player'], Crew: ['#/', '#/calendar', '#/list/expense'], Official: ['#/', '#/fixtures'] }[App.role] || (App.cfg.bridge ? ['#/', '#/monitors', '#/templates'] : ['#/', '#/fixtures', '#/list/production', '#/calendar']);
+  const want = { Coach: ['#/', '#/fixtures', '#/list/player'], Crew: ['#/', '#/calendar', '#/list/expense'], Official: ['#/', '#/fixtures'] }[App.role] || (App.cfg.bridge ? ['#/', '#/monitors', '#/templates'] : ['#/', '#/fixtures', '#/list/production', '#/calendar', '#/content']);
   let tabs = want.map(find).filter(Boolean);
   if (tabs.length < 2) tabs = flat.filter(([x]) => x !== '#/settings').slice(0, 4);
-  const NAMES = { '#/': 'Home', '#/fixtures': 'Matches', '#/list/production': 'Productions', '#/list/expense': 'Expenses', '#/list/player': 'Players' };
-  const ICON = { '#/': 'home', '#/fixtures': 'trophy', '#/list/production': 'video', '#/calendar': 'calendar', '#/list/expense': 'receipt', '#/list/player': 'people', '#/monitors': 'monitor', '#/templates': 'tune' };
-  return tabs.map(([href, label]) => ({ href, label: NAMES[href] || label.replace(/\s*\(\d+\)$/, ''), icon: ICON[href] || 'monitor' }));
+  const NAMES = { '#/': 'Home', '#/fixtures': 'Matches', '#/list/production': 'Productions', '#/list/expense': 'Expenses', '#/list/player': 'Players', '#/content': 'Content' };
+  return tabs.map(([href, label]) => ({ href, label: NAMES[href] || label.replace(/\s*\(\d+\)$/, ''), icon: href === '#/' ? 'home' : window.RFPIcons.forLink(href) }));
 }
 function androidShell(content) {
   const tabs = androidTabs();
@@ -347,7 +330,7 @@ function androidShell(content) {
       local ? null : h('a', { href: '#/notifications', class: 'appbar-icon' + (navOn('#/notifications') ? ' on' : ''), 'aria-label': 'Notifications' }, icon('bell'), App.unread ? h('span', { class: 'badge' }, App.unread > 99 ? '99+' : String(App.unread)) : null),
       h('a', { href: '#/settings', class: 'appbar-icon', 'aria-label': 'Settings and account' }, App.avatar(App.me.image, App.me.name || App.me.email, 30))),
     h('main', { class: 'main' }, content),
-    h('nav', { class: 'tabbar no-print', 'aria-label': 'Main' },
+    h('nav', { class: 'tabbar no-print' + (tabs.length >= 5 ? ' many' : ''), 'aria-label': 'Main' },
       tabs.map((t) => h('a', { href: t.href, class: 'tab' + (navOn(t.href) ? ' on' : '') }, h('span', { class: 'ind' }, icon(t.icon)), h('span', { class: 'lbl' }, t.label))),
       h('a', { href: '#/more', class: 'tab' + (!inTabs && !navOn('#/notifications') ? ' on' : '') }, h('span', { class: 'ind' }, icon('menu')), h('span', { class: 'lbl' }, 'More'))));
 }
@@ -359,7 +342,7 @@ App.pages.more = () => {
     h('a', { class: 'more-me', href: '#/settings' }, App.avatar(App.me.image, App.me.name || App.me.email, 44), h('div', { class: 'grow' }, h('b', {}, App.me.name || App.me.email), h('div', { class: 'dim small' }, [App.me.email, App.role].filter(Boolean).join(' · '))), icon('chevron')),
     App.pcs ? h('div', { class: 'more-pc', id: 'pc-picker' }, pcPicker()) : null,
     groups.map(([g, links]) => h('div', { class: 'more-group' }, g ? h('div', { class: 'more-head' }, g) : null,
-      h('div', { class: 'more-list' }, links.map(([href, label]) => h('a', { href }, h('span', { class: 'grow' }, label), icon('chevron', 20)))))),
+      h('div', { class: 'more-list' }, links.map(([href, label]) => h('a', { href }, h('span', { class: 'more-ico' }, icon(window.RFPIcons.forLink(href, g), 22)), h('span', { class: 'grow' }, label), icon('chevron', 20)))))),
     h('div', { class: 'more-foot' },
       h('div', { class: 'sync', id: 'sync' }, h('span', { class: 'led' }), h('span', {}, '')),
       h('div', { class: 'dim small' }, 'RFP Manager ' + (App.cfg.version || '')),
