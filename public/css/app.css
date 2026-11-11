@@ -433,3 +433,7 @@ table.t tr.picked td { background: rgba(0, 255, 130, 0.08); }
 .shell.side-min .nav > div:not(.nav-group) { display: block !important; }
 .shell.side-min .side { overflow-y: auto; scrollbar-width: none; }
 .content-nav button { display: inline-flex; align-items: center; gap: 6px; } .content-nav .cn-ico { display: inline-grid; opacity: .8; }
+
+/* quotes & invoices: ticks to choose many */
+table.t th.tick, table.t td.tick { width: 34px; padding-right: 0; } table.t td.tick input, table.t th.tick input { width: 18px; height: 18px; margin: 0; cursor: pointer; }
+table.t tr.picked td { background: rgba(0, 255, 130, .07); }

@@ -100,20 +100,64 @@
     if (!App.can('edit')) return { el: h('div', {}, pageHead('Quotes & invoices'), h('div', { class: 'card empty' }, 'Producers and Admins see this.')) };
     const body = h('div', {}, h('div', { class: 'card dim' }, 'Loading…'));
     let tab = App.moneyTab || 'owed', find = '';
+    const picked = new Set();
+    // ---- many at once: tick them, then one action for all (what cannot be done to one is listed, the rest goes ahead)
+    async function runBulk(action, extra = {}, what = '') {
+      const ids = [...picked];
+      try {
+        const r = await api('POST', `/api/invoices/bulk?${T()}`, { ids, action, ...extra });
+        const ok = r.done.length, bad = r.failed.length;
+        if (ok) toast(`${what || 'Done'}: ${ok} of ${ids.length}` + (r.made && r.made.length ? ` (${r.made.length} new)` : ''));
+        if (bad) UI.modal({ title: `${bad} could not be done`, body: h('ul', {}, r.failed.map((f) => h('li', {}, h('b', {}, f.number || f.id), ': ', f.error))), actions: [{ label: 'OK', primary: true }] });
+        r.done.forEach((id) => { if (action === 'delete') picked.delete(id); });
+        if (action === 'delete' || action === 'convert') picked.clear();
+      } catch (e) { oops(e); }
+      paint();
+    }
+    function bulkBar(docs) {
+      const sel = docs.filter((x) => picked.has(x.id));
+      if (!sel.length) return null;
+      const quotes = sel.filter((x) => x.kind === 'quote').length, invoices = sel.length - quotes;
+      const ids = () => [...picked].map(enc).join(',');
+      const statuses = quotes && invoices ? [] : quotes ? ['Draft', 'Sent', 'Accepted', 'Declined'] : ['Draft', 'Sent', 'Paid', 'Cancelled'];
+      const owed = sel.filter((x) => x.kind === 'invoice' && x.balance > 0 && !['Draft', 'Cancelled'].includes(x.status));
+      return h('div', { class: 'bulk-bar' },
+        h('b', {}, `${sel.length} chosen`), h('span', { class: 'dim small' }, [quotes ? `${quotes} quote${quotes > 1 ? 's' : ''}` : '', invoices ? `${invoices} invoice${invoices > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ') + ' · ' + money(sel.reduce((n, x) => n + (Number(x.total) || 0), 0))),
+        h('span', { class: 'grow' }),
+        h('button', { class: 'sm', onclick: async () => { if (await confirmBox(`Email ${sel.length} to their clients (with their CC accounts)? Each goes to the client's email.`, 'Send')) runBulk('send', {}, 'Sent'); } }, 'Email'),
+        statuses.length ? h('select', { class: 'sm', onchange: (e) => { const st = e.target.value; e.target.value = ''; if (st) runBulk('status', { status: st }, 'Marked ' + st); } }, h('option', { value: '' }, 'Mark as…'), statuses.map((st) => h('option', { value: st }, st))) : null,
+        owed.length ? h('button', { class: 'sm', onclick: () => {
+          const m = { date: UI.today ? UI.today() : new Date().toISOString().slice(0, 10), method: 'EFT', ref: '' };
+          UI.modal({ title: `Mark ${owed.length} paid`, body: h('div', { class: 'form' }, h('p', { class: 'help wide' }, `A payment of what is still owed is added to each (${money(owed.reduce((n, x) => n + x.balance, 0))} in all).`),
+            h('label', { class: 'f' }, h('span', {}, 'Paid on'), h('input', { type: 'date', value: m.date, oninput: (e) => { m.date = e.target.value; } })),
+            h('label', { class: 'f' }, h('span', {}, 'How'), h('select', { onchange: (e) => { m.method = e.target.value; } }, ['EFT', 'Cash', 'Card', 'PayFast', 'Other'].map((v) => h('option', { value: v }, v)))),
+            h('label', { class: 'f wide' }, h('span', {}, 'Reference (optional)'), h('input', { oninput: (e) => { m.ref = e.target.value; } }))),
+          actions: [{ label: 'Cancel' }, { label: 'Mark paid', primary: true, onClick: () => runBulk('paid', m, 'Paid') }] });
+        } }, 'Mark paid') : null,
+        quotes ? h('button', { class: 'sm', onclick: async () => { if (await confirmBox(`Make invoices of ${quotes} quote${quotes > 1 ? 's' : ''}?`, 'Convert')) runBulk('convert', {}, 'Converted'); } }, 'To invoices') : null,
+        h('button', { class: 'sm', onclick: async () => { if (await confirmBox(`Copy ${sel.length} as new drafts (new numbers, today's date)?`, 'Copy')) runBulk('duplicate', {}, 'Copied'); } }, 'Copy'),
+        h('button', { class: 'sm', onclick: () => App.openDoc(`/api/invoices/bulk.zip?${T()}&ids=${ids()}`) }, 'PDFs (ZIP)'),
+        h('button', { class: 'sm', onclick: () => App.openDoc(`/api/invoices/export.csv?${T()}&ids=${ids()}`) }, 'Spreadsheet'),
+        h('button', { class: 'sm ghost danger', onclick: async () => { if (await confirmBox(`Delete ${sel.length}? This cannot be undone. Invoices with payments are skipped (cancel those instead).`)) runBulk('delete', {}, 'Deleted'); } }, 'Delete'),
+        h('button', { class: 'sm ghost', onclick: () => { picked.clear(); paint(); } }, 'Clear'));
+    }
     async function paint() {
       let r; try { r = await api('GET', `/api/invoices?${T()}`); } catch (e) { body.replaceChildren(h('div', { class: 'card' }, e.message)); return; }
       const tile = (l, v) => h('div', { class: 'tile' }, h('b', {}, v), h('span', {}, l));
       const q = find.toLowerCase();
       let list = tab === 'owed' ? r.docs.filter((x) => x.kind === 'invoice' && ['Sent', 'Partial', 'Overdue'].includes(x.state)) : tab === 'quotes' ? r.docs.filter((x) => x.kind === 'quote') : tab === 'invoices' ? r.docs.filter((x) => x.kind === 'invoice') : r.docs;
       if (q) list = list.filter((x) => [x.number, x.clientName, x.title, x.productionName, x.state].some((v) => String(v || '').toLowerCase().includes(q)));
+      for (const id of [...picked]) if (!r.docs.some((x) => x.id === id)) picked.delete(id);
+      const all = list.length && list.every((x) => picked.has(x.id));
+      const tick = (x) => h('td', { class: 'tick', onclick: (e) => e.stopPropagation() }, h('input', { type: 'checkbox', 'aria-label': 'Choose ' + x.number, checked: picked.has(x.id), onchange: (e) => { if (e.target.checked) picked.add(x.id); else picked.delete(x.id); paint(); } }));
       body.replaceChildren(
         h('div', { class: 'cards', style: { marginBottom: '14px' } }, tile('Owed to you', money(r.owed)), tile('Overdue', money(r.overdue)), tile('Quotes waiting', money(r.quotesOpen)), tile('Crew still to pay', money(r.crewOwed))),
         h('div', { class: 'tabs' }, [['owed', 'Owed'], ['quotes', 'Quotes'], ['invoices', 'Invoices'], ['all', 'Everything'], ['crew', 'Crew to pay']].map(([k, l]) => h('button', { class: k === tab ? 'on' : '', onclick: () => { tab = App.moneyTab = k; paint(); } }, l))),
         tab === 'crew' ? (r.crew.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {}, r.crew.map((c) => h('tr', {}, h('td', {}, c.date), h('td', {}, c.name, h('div', { class: 'dim small' }, c.role)), h('td', {}, h('a', { href: '#/edit/production/' + c.production }, c.productionName)), h('td', { class: 'r' }, money(c.amount)))))))
           : h('div', { class: 'card empty' }, 'Every crew member has been paid.'))
-          : [h('input', { type: 'search', placeholder: 'Find a number, client, production…', value: find, style: { maxWidth: '360px', marginBottom: '10px' }, oninput: UI.debounce((e) => { find = e.target.value; paint(); }, 250) }),
-            list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, ['Number', 'Client', 'For', 'Date', 'Status', 'Total', 'Balance'].map((x, i) => h('th', { class: i >= 5 ? 'r' : '' }, x)))),
-              h('tbody', {}, list.map((x) => h('tr', { class: 'click', onclick: () => go(x.id) }, h('td', { class: 'nowrap' }, h('b', {}, x.number), x.source && x.source.system === 'invoiceninja' ? h('span', { class: 'pill', style: { marginLeft: '6px' }, title: 'Imported from Invoice Ninja' }, 'IN') : null),
+          : [bulkBar(r.docs), h('input', { type: 'search', placeholder: 'Find a number, client, production…', value: find, style: { maxWidth: '360px', marginBottom: '10px' }, oninput: UI.debounce((e) => { find = e.target.value; paint(); }, 250) }),
+            list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, h('th', { class: 'tick' }, h('input', { type: 'checkbox', title: 'Choose all shown', 'aria-label': 'Choose all shown', checked: all, onchange: (e) => { list.forEach((x) => (e.target.checked ? picked.add(x.id) : picked.delete(x.id))); paint(); } })), ['Number', 'Client', 'For', 'Date', 'Status', 'Total', 'Balance'].map((x, i) => h('th', { class: i >= 5 ? 'r' : '' }, x)))),
+              h('tbody', {}, list.map((x) => h('tr', { class: 'click' + (picked.has(x.id) ? ' picked' : ''), onclick: () => go(x.id) }, tick(x), h('td', { class: 'nowrap' }, h('b', {}, x.number), x.source && x.source.system === 'invoiceninja' ? h('span', { class: 'pill', style: { marginLeft: '6px' }, title: 'Imported from Invoice Ninja' }, 'IN') : null),
                 h('td', {}, x.clientName || h('span', { class: 'dim' }, '—')), h('td', { class: 'small' }, x.title || x.productionName || ''), h('td', { class: 'nowrap small' }, x.date), h('td', {}, pill(x.state), x.signature ? h('span', { class: 'dim small', title: 'Signed by ' + x.signature.name }, ' ✍') : null),
                 h('td', { class: 'r num' }, money(x.total)), h('td', { class: 'r num' }, x.kind === 'invoice' ? money(x.balance) : ''))))))
               : h('div', { class: 'card empty' }, tab === 'owed' ? 'Nothing owed to you right now.' : 'None yet.')]);
@@ -216,10 +260,13 @@
           App.cfg.mail ? h('button', { class: 'primary', onclick: async () => {
             if (dirty) { try { await save(); } catch (e) { return oops(e); } }
             const m = { to: x.clientEmail || (client && (client.data.email || ((client.data.contacts || []).find((c) => c.primary && c.email) || (client.data.contacts || []).find((c) => c.email) || {}).email)) || '', note: '' };
+            // the client's CC accounts (Clients → CC accounts, and contact people ticked CC), changeable for this email
+            m.cc = client ? [...new Set([...String(client.data.ccEmails || '').split(/[\s,;]+/), ...(client.data.contacts || []).filter((c) => c.cc).map((c) => c.email)].map((e) => String(e || '').trim()).filter((e) => /@/.test(e) && e.toLowerCase() !== String(m.to).toLowerCase()))].join('\n') : '';
             UI.modal({ title: `Email ${x.number}`, body: h('div', { class: 'form' }, h('label', { class: 'f wide' }, h('span', {}, 'To'), h('input', { type: 'email', value: m.to, oninput: (e) => { m.to = e.target.value; } })),
+              h('label', { class: 'f wide' }, h('span', {}, 'CC (copies, one per line)'), h('textarea', { rows: 2, placeholder: 'accounts@…', oninput: (e) => { m.cc = e.target.value; } }, m.cc)),
               h('label', { class: 'f wide' }, h('span', {}, 'Message (optional)'), h('textarea', { rows: 3, oninput: (e) => { m.note = e.target.value; } })),
               h('p', { class: 'help wide' }, quote ? 'They get the PDF and a link to their client portal, where they sign the quote. The production is confirmed when they sign.' : 'They get the PDF and a link to their portal to pay (PayFast, when it is set up).')),
-            actions: [{ label: 'Cancel' }, { label: 'Send', primary: true, onClick: async () => { const r = await api('POST', `/api/invoices/${enc(id)}/send?${T()}`, m); toast('Sent to ' + r.to); load(); } }] });
+            actions: [{ label: 'Cancel' }, { label: 'Send', primary: true, onClick: async () => { const r = await api('POST', `/api/invoices/${enc(id)}/send?${T()}`, m); toast('Sent to ' + r.to + (r.cc && r.cc.length ? ` and ${r.cc.length} CC` : '')); load(); } }] });
           } }, x.status === 'Draft' ? 'Email' : 'Email again') : null,
           quote && !x.convertedTo ? h('button', { onclick: async () => { try { if (dirty) await save(); const r = await api('POST', `/api/invoices/${enc(id)}/convert?${T()}`); toast(`Invoice ${r.doc.number} made`); go(r.doc.id); } catch (e) { oops(e); } } }, 'Convert to invoice') : null,
           x.convertedTo ? h('a', { class: 'btn', href: '#/doc/' + x.convertedTo }, 'Its invoice ›') : null, x.quote ? h('a', { class: 'btn', href: '#/doc/' + x.quote }, '‹ The quote') : null,

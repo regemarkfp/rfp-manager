@@ -37,12 +37,62 @@ test('company and fan features', async (t) => {
   const sent = await admin.post(`/api/invoices/${inv.id}/send${q}`, {});
   assert.equal(sent.data.to, 'client@example.com');
   assert.ok(app.mail.outbox.some((m) => m.to.includes('client@example.com') && m.attachments.length === 1));
+  // CC accounts: the client's copies (CC accounts and contacts ticked CC), each with the PDF and a portal link of their own
+  const cli = await app.store.get((await app.store.get(inv.id)).data.client);
+  await put('client', cli.id, { ...cli.data, ccEmails: 'Accounts@Example.com\nclient@example.com\nnot-an-email', contacts: [...(cli.data.contacts || []), { name: 'Bursar', email: 'bursar@example.com', cc: true }, { name: 'Coach', email: 'coach@example.com' }] });
+  const n0 = app.mail.outbox.length;
+  const sent2 = await admin.post(`/api/invoices/${inv.id}/send${q}`, {});
+  assert.deepEqual([sent2.data.to, sent2.data.cc], ['client@example.com', ['accounts@example.com', 'bursar@example.com']]);
+  const copies = app.mail.outbox.slice(n0);
+  assert.deepEqual(copies.map((m) => m.to[0]), ['client@example.com', 'accounts@example.com', 'bursar@example.com']);
+  assert.ok(copies.every((m) => m.attachments.length === 1) && /A copy: this was sent to client@example.com/.test(copies[1].text));
+  assert.ok(/\/portal\//.test(copies[2].html), 'a portal link of their own');
+  assert.deepEqual((await app.store.get(inv.id)).data.sentCc, ['accounts@example.com', 'bursar@example.com']);
+  // CC changed for one email (the Email box)
+  assert.deepEqual((await admin.post(`/api/invoices/${inv.id}/send${q}`, { cc: 'only@example.com' })).data.cc, ['only@example.com']);
   await admin.put(`/api/invoices/${inv.id}${q}`, { due: '2020-01-01' });
   let ov = (await admin.get(`/api/invoices${q}`)).data;
   assert.equal(ov.overdue, 6440, 'sent and past due: overdue');
   await admin.put(`/api/invoices/${inv.id}${q}`, { status: 'Paid' });
   ov = (await admin.get(`/api/invoices${q}`)).data;
   assert.equal(ov.owed, 0);
+
+  // many at once (the list's ticks): what cannot be done to one is reported, the rest goes ahead
+  const quote1 = ov.docs.find((x) => x.kind === 'quote');
+  const bulk = async (ids, action, extra = {}) => { const x = await admin.post(`/api/invoices/bulk${q}`, { ids, action, ...extra }); assert.equal(x.status, 200, JSON.stringify(x.data)); return x.data; };
+  let bk = await bulk([quote1.id, inv.id], 'status', { status: 'Sent' });
+  assert.deepEqual([bk.done, bk.failed.length], [[quote1.id, inv.id], 0], 'Sent is a status of both');
+  bk = await bulk([quote1.id, inv.id], 'status', { status: 'Accepted' });
+  assert.deepEqual([bk.done, bk.failed.map((f) => f.number)], [[quote1.id], ['RFPINV0001']]);
+  bk = await bulk([inv.id], 'duplicate');
+  const copy = bk.made[0];
+  assert.ok(copy && copy.id !== inv.id);
+  const copyId = copy.id || copy.doc && copy.doc.id;
+  assert.equal((await app.store.get(copyId)).data.status, 'Draft');
+  bk = await bulk([copyId], 'paid');
+  assert.match(bk.failed[0].error, /draft/);
+  await bulk([copyId], 'status', { status: 'Sent' });
+  bk = await bulk([copyId, quote1.id], 'paid', { date: today, method: 'Cash' });
+  assert.deepEqual([bk.done, bk.failed.map((f) => f.error)], [[copyId], ['not an invoice']]);
+  const paidCopy = (await app.store.get(copyId)).data;
+  assert.deepEqual([paidCopy.status, paidCopy.payments.length, paidCopy.payments[0].amount, paidCopy.payments[0].method], ['Paid', 1, 6440, 'Cash']);
+  const n1 = app.mail.outbox.length;
+  bk = await bulk([quote1.id, copyId], 'send');
+  assert.equal(bk.done.length, 2); assert.ok(app.mail.outbox.length >= n1 + 2);
+  // their PDFs in one ZIP, a spreadsheet
+  const zipped = await admin.get(`/api/invoices/bulk.zip${q}&ids=${quote1.id},${copyId}`);
+  assert.equal(zipped.status, 200); assert.equal(zipped.data.toString('latin1', 0, 2), 'PK');
+  assert.equal((zipped.data.toString('latin1').match(/%PDF/g) || []).length, 2);
+  const sheet = (await admin.get(`/api/invoices/export.csv${q}&ids=${quote1.id},${copyId}`)).data.toString('utf8');
+  assert.match(sheet, /^\uFEFFType,Number,Date/); assert.equal(sheet.trim().split('\r\n').length, 3);
+  // delete: one with payments is kept (cancel it instead); a quote goes
+  bk = await bulk([copyId, quote1.id], 'delete');
+  assert.deepEqual([bk.done, bk.failed.map((f) => f.id)], [[quote1.id], [copyId]]);
+  assert.ok(!(await admin.get(`/api/invoices${q}`)).data.docs.some((x) => x.id === quote1.id));
+  assert.equal((await admin.post(`/api/invoices/bulk${q}`, { ids: [], action: 'delete' })).status, 400);
+  await admin.del(`/api/invoices/${copyId}/payments/0${q}`);
+  assert.deepEqual((await bulk([copyId], 'delete')).done, [copyId]);
+  await bulk([inv.id], 'status', { status: 'Paid' });
 
   // ---- crew: clashes, an answer from the email, their own days off
   const cl = (await admin.get(`/api/productions/production_1/clashes${q}`)).data.list.map((c) => c.kind).sort();

@@ -248,13 +248,14 @@
 
     client: { label: 'Client', plural: 'Clients', group: 'Productions', title: (d) => d.name, cols: ['logo', 'name', 'kind', 'email', 'phone', 'discount'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true, ph: 'Grey College' }, { k: 'logo', l: 'Logo', t: 'image' }, { k: 'kind', l: 'Kind', t: 'combo', opts: ['School', 'Club', 'Church', 'Union / federation', 'Company', 'Production company', 'Broadcaster', 'Individual', 'Other'] },
-      { k: 'email', l: 'Email (accounts)', t: 'text', help: 'Quotes and invoices go here; the main contact\'s email if empty.' }, { k: 'phone', l: 'Phone', t: 'phone' }, { k: 'website', l: 'Website', t: 'text' },
+      { k: 'email', l: 'Email (accounts)', t: 'text', help: 'Quotes and invoices go here; the main contact\'s email if empty.' },
+      { k: 'ccEmails', l: 'CC accounts', t: 'textarea', rows: 2, ph: 'accounts@school.co.za\ncreditors@school.co.za', help: 'Also get a copy of every quote and invoice emailed to this client (one address per line). Tick CC on contact people below to copy them too. Each gets the PDF and a link to the client portal.' }, { k: 'phone', l: 'Phone', t: 'phone' }, { k: 'website', l: 'Website', t: 'text' },
       { k: 'vatNo', l: 'VAT number', t: 'text' }, { k: 'regNo', l: 'Registration / ID number', t: 'text' },
       { k: 'address', l: 'Address', t: 'textarea', ph: '2 Payne Road\nBryanston, Johannesburg 2191\nSouth Africa' },
       { k: 'discount', l: 'Custom discount (%)', t: 'number', ph: '0', help: 'Given on every new quote and invoice for this client (you can still change it per document).' },
       { k: 'rates', l: 'Custom rates', t: 'list', help: 'A different price for this client on certain products or services.', fields: [{ k: 'service', l: 'Product / service', t: 'ref', ref: 'service' }, { k: 'rate', l: 'Their price', t: 'money', w: 140 }] },
       { k: 'terms', l: 'Payment terms (days)', t: 'number', ph: 'your default', help: 'Due date of their invoices.' },
-      { k: 'contacts', l: 'Contact people', t: 'list', fields: [{ k: 'name', l: 'Name', t: 'text' }, { k: 'role', l: 'Role', t: 'text', w: 150 }, { k: 'email', l: 'Email', t: 'text' }, { k: 'phone', l: 'Phone', t: 'phone' }, { k: 'primary', l: 'Main', t: 'bool', w: 60 }] },
+      { k: 'contacts', l: 'Contact people', t: 'list', fields: [{ k: 'name', l: 'Name', t: 'text' }, { k: 'role', l: 'Role', t: 'text', w: 150 }, { k: 'email', l: 'Email', t: 'text' }, { k: 'phone', l: 'Phone', t: 'phone' }, { k: 'primary', l: 'Main', t: 'bool', w: 60 }, { k: 'cc', l: 'CC', t: 'bool', w: 50 }] },
       { k: 'notes', l: 'Private notes', t: 'textarea' }] },
     service: { label: 'Product / service', plural: 'Products & services', group: 'Productions', title: (d) => d.name, cols: ['name', 'category', 'rate', 'unit', 'active'], fields: [
       { k: 'name', l: 'Item', t: 'text', req: true, ph: 'Full Day Tariff' }, { k: 'description', l: 'Description', t: 'textarea', ph: 'Booking fee for full day of work up to 10 hours' },

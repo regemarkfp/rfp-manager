@@ -18,6 +18,15 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.19
+
+- **Manage many quotes and invoices at once**: tick them in **Quotes & invoices** (or tick the top box for everything shown) and a bar offers: **Email** (each to its client, with their CC accounts), **Mark as…** a status, **Mark paid** (adds a payment of what is still owed, with the date and how), **To invoices** (quotes), **Copy** (new drafts with new numbers), **PDFs (ZIP)** (all their PDFs in one file), **Spreadsheet** (CSV for Excel or your bookkeeper) and **Delete**. What cannot be done to one (an invoice with payments cannot be deleted, a draft cannot be marked paid) is listed; the rest goes ahead.
+- **Quote and invoice PDFs**: the terms and conditions always start at the top of a new page, after the page with the totals.
+
+### 1.0.18
+
+- **CC accounts for clients**: on a client, **CC accounts** (one address per line) and a **CC** tick on contact people. Every quote and invoice emailed to the client also goes to them: the same email with the PDF, marked as a copy, and a client-portal link of their own (to see, sign or pay). The Email box shows the CC list and you can change it for that one email; the document keeps who got copies.
+
 ### 1.0.17
 
 - **RFP Manager for Linux**: x64 PCs and 64-bit ARM (Raspberry Pi 4 / 5), with Node.js included, an installer for your user, an applications-menu entry with the screens, a background service that restarts after updates, and its own window. Built by GitHub ("Linux app" workflow) as the release **linux-latest**. See "The app on Linux" below.
