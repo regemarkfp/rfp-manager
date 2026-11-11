@@ -18,6 +18,23 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.16
+
+- **Content holds it all**: Live streams, VOD and Playlists are tabs of Content (Library · Live streams · VOD · Playlists · Website); the Streaming menu has just Content.
+- **Smaller files on the server**: when uploading VOD, choose the size – Standard (up to 1080p), Small (720p, about a third) or Smallest (480p).
+- **Your own YouTube videos as files**: on a YouTube item, "Use own file" uploads the video (downloaded from YouTube Studio) into the same item. Title, playlists, series and subtitles stay; YouTube plays until the file is ready, then the website plays it from your server in your player – no YouTube player, adverts or logo.
+
+### 1.0.15
+
+- **VOD kept stopping on the website**: the video, series and playlist pages were redrawn every 30 seconds (the front page's "what is live" refresh), which stopped the player. They are left alone now.
+- **Subtitles**: upload .srt or .vtt files per language for any VOD, uploaded or YouTube (VOD → CC, or CC in Content), and mark one as the default. In the player, **CC** turns them on and picks the language; the viewer also sets the text size, colour, background and position, kept in their browser with their language for next time. YouTube videos can also show YouTube's own captions.
+
+### 1.0.14
+
+- **Content tab** at the bottom of the Android app (Producers and Admins).
+- **Icons everywhere**: every link in the side menu (website and production PC), the Android app's More list, and the public website's menu use the app's icons. The narrow side menu («) now shows the icons instead of hiding the menu.
+- YouTube in our player: plays through youtube.com (youtube-nocookie.com is blocked by many ad blockers and filtering DNS); when YouTube cannot load at all it says so, with a "Watch it on YouTube" link. The channel logo under a video is the right size again.
+
 ### 1.0.13
 
 - **Content** (Streaming → Content), the CMS: one library of everything your channels show – VOD, YouTube videos, series, playlists and live streams – with search, filters (type, channel, category, tag, who sees it), categories and tags, and changing many at once (who sees it, category, tags, publish date, add to a playlist, delete).
