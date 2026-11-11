@@ -93,6 +93,12 @@ test('company and fan features', async (t) => {
   await admin.del(`/api/invoices/${copyId}/payments/0${q}`);
   assert.deepEqual((await bulk([copyId], 'delete')).done, [copyId]);
   await bulk([inv.id], 'status', { status: 'Paid' });
+  // terms from Invoice Ninja (HTML, with the bank details and an old copy of the terms and conditions) print as plain text
+  const ninjaTerms = '<h4><strong>BANKING DETAILS<br></strong>Bank Name: Test<br>Account Number: 000</h4><p>Pay within <strong>14 days</strong> &amp; quote the number.</p><h4><strong>Terms and Conditions</strong></h4><p>Old terms</p>';
+  assert.equal(app.invoices.termsOf({ terms: ninjaTerms }, { bank: 'Bank', conditions: 'New terms' }), 'Pay within 14 days & quote the number.');
+  assert.equal(app.invoices.termsOf({ terms: '<p>Terms and Conditions</p><p>Old</p>' }, { bank: 'B', conditions: 'C', docTerms: 'Default terms' }), 'Default terms');
+  assert.match(app.invoices.termsOf({ terms: ninjaTerms }, {}), /^BANKING DETAILS\nBank Name: Test/);
+  assert.equal(app.invoices.htmlText('<ul><li><p>one</p></li><li>two</li></ul>'), '- one\n- two');
 
   // ---- crew: clashes, an answer from the email, their own days off
   const cl = (await admin.get(`/api/productions/production_1/clashes${q}`)).data.list.map((c) => c.kind).sort();
