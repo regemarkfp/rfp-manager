@@ -257,9 +257,24 @@
       h('button', { class: 'sm', onclick: () => transfersPanel(id) }, 'Transfers'),
       h('button', { class: 'sm', onclick: () => activityPanel(id) }, 'Activity'),
       h('button', { class: 'sm', onclick: () => peoplePanel(id, s, reload) }, s.role === 'manager' ? `People (${(s.members || []).length})` : 'Emails'));
+    // previews in the list and the tiles: photos and video stills (ffmpeg on the server, or the browser itself for
+    // mp4 / webm / mov), the first lines of text files, a page icon for PDFs; the file type when there is nothing to show
+    const WEBV = /\.(mp4|m4v|webm|mov)$/i;
     const thumbOf = (x) => {
-      const t = h('div', { class: 'thumb' + (x.dir ? ' folder' : '') }, x.dir ? 'FOLDER' : (x.name.split('.').pop() || '').toUpperCase().slice(0, 5));
-      if (!x.dir && (x.kind === 'image' || (x.kind === 'video' && r.ffmpeg))) { const img = new Image(); img.onload = () => { t.style.backgroundImage = `url("${img.src}")`; t.textContent = ''; }; img.loading = 'lazy'; img.src = `/api/share/${enc(id)}/thumb?path=${enc(x.path)}`; }
+      const ext = (x.name.split('.').pop() || '').toUpperCase().slice(0, 5);
+      const t = h('div', { class: 'thumb' + (x.dir ? ' folder' : '') + ' k-' + x.kind }, h('span', { class: 'tlabel' }, x.dir ? 'FOLDER' : ext));
+      if (x.dir) return t;
+      const fileUrl = `/api/share/${enc(id)}/file?path=${enc(x.path)}&download=0`;
+      const asVideo = () => { if (!WEBV.test(x.name)) return; const v = h('video', { src: fileUrl + '#t=1', muted: true, preload: 'metadata', playsinline: true }); v.muted = true; v.addEventListener('loadeddata', () => t.classList.add('has'), { once: true }); v.addEventListener('error', () => v.remove(), { once: true }); t.prepend(v); };
+      if (x.kind === 'image' || (x.kind === 'video' && r.ffmpeg)) {
+        const img = h('img', { alt: '', loading: 'lazy', decoding: 'async', src: `/api/share/${enc(id)}/thumb?path=${enc(x.path)}` });
+        img.addEventListener('load', () => t.classList.add('has'), { once: true });
+        img.addEventListener('error', () => { img.remove(); if (x.kind === 'video') asVideo(); }, { once: true });
+        t.prepend(img);
+      } else if (x.kind === 'video') asVideo();
+      else if (x.kind === 'text' && x.size > 0 && viewMode === 'tiles') {
+        fetch(fileUrl, { credentials: 'same-origin', headers: { range: 'bytes=0-599' } }).then((res) => (res.ok ? res.text() : '')).then((txt) => { if (txt) { t.prepend(h('pre', { class: 'tsnip' }, txt.slice(0, 600))); t.classList.add('has', 'text'); } }).catch(() => {});
+      }
       return t;
     };
     const openItem = (x) => (x.dir ? go(url(x.path)) : preview(id, files, files.indexOf(x), s, reload));

@@ -18,6 +18,10 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.2.7
+
+- **File previews in File Sharing**: photos and video stills show in the list and the tiles (with ffmpeg on the server for every format; without it photos still show, and mp4 / webm / mov stills come from the browser), text files show their first lines in the tiles, with the file type in a small corner label. (Before, the previews never loaded.)
+
 ### 1.2.6
 
 - **File Sharing in the RegemarkFP slant**: the upload panel, the + button, fields, tags, the progress (a slanted bar with the percentage instead of a ring), Previous transfers and the removal notice all have the slanted edges of the rest of the site.
