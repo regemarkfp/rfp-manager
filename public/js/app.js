@@ -214,7 +214,7 @@ function navFor() {
     ['Live & graphics', ifs(App.pcs && ['#/pcs', 'Production PCs'], pc && ['#/monitors', 'Monitors'], pc && ['#/templates', 'Templates'], ['#/list/theme', 'Themes'], pc && ['#/adverts', 'Advert playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'], pc && ['#/variables', 'Variables by sport'], pc && ['/rl/control', 'Rocket League'])],
     web ? ['Streaming', ifs(['#/list/channel', 'Channels'], ed && ['#/content', 'Content'], ed && ['#/youtube', 'YouTube Live'], ed && ['#/analytics', 'Analytics'], ed && ['#/sales', 'Ticket sales'], ['#/streamads', 'Stream adverts'])] : null,
     ['Adverts & sponsors', ifs(['#/list/advert', 'Adverts'], money && ['#/list/adSlot', 'Ad spaces (clients)'], ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log'], money && ['#/sponsors', 'Sponsor reports'])],
-    ['Media & music', ifs(['#/images', 'Images'], ['#/list/track', 'Music library'], pc && ['#/music', 'Music playout'], ed && ['#/musicrights', 'Music use report'])],
+    ['Media & music', ifs(['#/images', 'Images'], web && ed && ['#/sharing', 'File sharing'], ['#/list/track', 'Music library'], pc && ['#/music', 'Music playout'], ed && ['#/musicrights', 'Music use report'])],
     ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report']].concat(local ? [['#/bibles', 'Bibles']] : [])],
     ['', [['#/settings', 'Settings']]],
   ].filter(Boolean);

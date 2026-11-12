@@ -71,7 +71,7 @@
     '#/pcs': 'computer', '#/monitors': 'monitor', '#/templates': 'layers', '#/list/theme': 'palette', '#/adverts': 'play', '#/list/dashboard': 'tune', '#/list/timeline': 'timeline', '#/automation': 'bolt', '#/variables': 'code', '/rl/control': 'game',
     '#/list/channel': 'tv', '#/streams': 'live', '#/content': 'library', '#/vod': 'movie', '#/playlists': 'playlist', '#/analytics': 'chart', '#/youtube': 'live', '#/sales': 'payments', '#/streamads': 'adframe',
     '#/list/advert': 'campaign', '#/list/adSlot': 'quilt', '#/list/playlist': 'numbered', '#/playlog': 'history', '#/sponsors': 'report',
-    '#/images': 'image', '#/list/track': 'note', '#/music': 'queue', '#/musicrights': 'copyright',
+    '#/images': 'image', '#/sharing': 'people', '#/list/track': 'note', '#/music': 'queue', '#/musicrights': 'copyright',
     '#/list/song': 'songs', '#/ccli': 'report', '#/bibles': 'book', '#/settings': 'settings',
   };
   const forLink = (href, group) => (group === 'Worship' && href === '#/list/service' ? 'church' : group === '' && href === '#/' ? 'dashboard' : BY_HREF[href] || (/\/sharing\/?$|^https?:\/\/sharing\./.test(href) ? 'download' : 'chevron'));

@@ -19,6 +19,9 @@ label.f { display: grid; gap: 4px; margin-bottom: 12px; } label.f span { font-si
 .top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 10px 20px; background: #0b0b0b; border-bottom: 1px solid var(--line); }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 800; font-size: 18px; letter-spacing: .02em; }
 .brand img { height: 30px; } .brand span { font-style: italic; }
+.prod { color: var(--dim); font-size: 15px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding-left: 12px; border-left: 1px solid var(--line); }
+.prod:empty { display: none; }
+@media (max-width: 600px) { .prod { font-size: 13px; } .brand { font-size: 16px; } }
 #me { display: flex; align-items: center; gap: 10px; font-size: 14px; }
 main { max-width: 1400px; margin: 0 auto; padding: 20px; }
 h1 { font-size: 26px; margin: 0 0 4px; } h2 { font-size: 18px; margin: 0 0 12px; }

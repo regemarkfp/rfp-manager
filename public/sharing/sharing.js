@@ -63,6 +63,7 @@
   async function route() {
     const p = location.pathname.slice(BASE.length) || '/';
     stopPolls();
+    $('prod').textContent = ''; document.title = 'File Sharing · RegemarkFP';
     let m;
     if ((m = /^\/invite\/([\w-]+)\/?$/.exec(p))) return invitePage(m[1]);
     if (!ME) await whoami();
@@ -120,6 +121,8 @@
     const main = $('main');
     let r; try { r = await api('GET', `/api/share/${enc(id)}/list?path=${enc(rel)}`); } catch (e) { fill(main, h('div', { class: 'card narrow' }, h('h1', {}, 'Shared folder'), h('p', {}, e.message), h('a', { href: BASE + '/' }, '← My folders'))); return; }
     const s = r.share, canEdit = s.role !== 'viewer', sel = new Set();
+    $('prod').textContent = s.productionName || ''; $('prod').title = s.productionName ? 'Production: ' + s.productionName : '';
+    document.title = s.name + ' · File Sharing';
     const url = (p) => '/f/' + id + '/' + (p ? p.split('/').map(enc).join('/') : '');
     const parts = rel ? rel.split('/') : [];
     const crumbs = h('div', { class: 'crumbs' }, h('a', { href: BASE + '/', onclick: (e) => { e.preventDefault(); go('/'); } }, 'My folders'), h('i', {}, '›'),

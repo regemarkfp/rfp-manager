@@ -132,6 +132,22 @@ test('sharing: production folder, invites, resumable uploads, rights, ZIP, comme
   while (!app.mail.outbox.some((m) => /new comment|new file/.test(m.subject)) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 40));
   assert.ok(app.mail.outbox.some((m) => /new (file|comment)/.test(m.subject)), 'summary email');
 
+  // the folder knows its production's name (shown next to "File Sharing")
+  assert.equal((await viewer.get(`/api/share/${id}/list`)).data.share.productionName, 'Cup final · 2026-11-20');
+  // Media → File sharing: everyone invited to the team's folders; only Producers and Admins
+  const pp = await admin.get('/api/share-people?team=' + team);
+  assert.equal(pp.status, 200, JSON.stringify(pp.data));
+  assert.deepEqual(pp.data.folders.map((f) => [f.id, f.productionName, f.members]), [[id, 'Cup final · 2026-11-20', 2]]);
+  assert.deepEqual(pp.data.people.map((p) => [p.email, p.name, p.accepted, p.folders.map((f) => f.role)]), [['client@example.com', 'Client', true, ['viewer']], ['editor@example.com', 'Editor', true, ['editor']]]);
+  assert.ok(pp.data.people[1].lastSeen > 0);
+  assert.equal((await viewer.get('/api/share-people?team=' + team)).status, 403);
+  // the invite again: the same link
+  const before2 = app.mail.outbox.length;
+  const rs = await admin.post(`/api/share/${id}/people/${encodeURIComponent('client@example.com')}/resend`, {});
+  assert.equal(rs.data.sent, true); assert.equal(rs.data.url, link);
+  assert.equal(app.mail.outbox.length, before2 + 1);
+  assert.equal((await editor.post(`/api/share/${id}/people/${encodeURIComponent('client@example.com')}/resend`, {})).status, 403);
+
   // removed from the folder: no access any more; the invite link stops working
   await admin.del(`/api/share/${id}/people/${encodeURIComponent('client@example.com')}`);
   assert.equal((await viewer.get(`/api/share/${id}/list`)).status, 403);
@@ -141,7 +157,7 @@ test('sharing: production folder, invites, resumable uploads, rights, ZIP, comme
   const onHost = (p, host) => new Promise((ok, no) => require('node:http').get(app.url + p, { headers: { host } }, (r) => { let b = ''; r.on('data', (d) => { b += d; }); r.on('end', () => ok({ status: r.statusCode, body: b })); }).on('error', no));
   const page = await onHost('/f/' + id + '/Day%201', 'sharing.site.example');
   assert.equal(page.status, 200); assert.match(page.body, /sharing\.js/);
-  assert.doesNotMatch((await onHost('/', 'sharing.site.example')).body, /<title>(?!Sharing)/, 'the subdomain front page is Sharing');
+  assert.doesNotMatch((await onHost('/', 'sharing.site.example')).body, /<title>(?!File Sharing)/, 'the subdomain front page is Sharing');
   assert.match((await onHost('/', 'sharing.other.example')).body, /sharing\.js/, 'any sharing.<name> is the Sharing site');
   assert.match(await (await fetch(app.url + '/sharing/invite/' + token)).text(), /sharing\.js/);
   assert.match(await (await fetch(app.url + '/sharing/sharing.js')).text(), /Uploads go in 32 MB pieces/);

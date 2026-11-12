@@ -18,6 +18,15 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.2.3
+
+- **Media & music → File sharing** (Studio, Producers and Admins): everyone invited to the team's shared folders on one page – each person with their folders and their role in each (change it right there), joined or not, last seen. Send an invitation again (↻), take someone out of one folder or out of everything, add them to more folders, or **+ Invite people** to several folders at once. Search, filter by folder or by joined / not opened yet, and tick people to change their role, add them to folders or remove them in one go. Below: the folders with their production, how many people, last activity, Invite and Open.
+- **The Sharing site's header** now says **File Sharing**, with the folder's production next to it (smaller, not bold) when the folder belongs to one.
+
+### 1.2.2
+
+- **sharing.<website> opens Sharing by itself**: any address starting with `sharing.` is the Sharing site, even before `SHARING_URL` / `sharingUrl` is set (set it anyway: invite emails and the Studio's Shared folder button use it).
+
 ### 1.2.1
 
 - **Video player on phones and in the Android app**: double-tap the left or right half of the picture to go 10 seconds back or forward (each tap more straight after adds 10 seconds; live streams only go forward up to live); a single tap plays / pauses. Full screen turns the phone sideways by itself for a wide (16:9) video and back when you leave it; upright videos stay upright (the Android app does this from app build 2.0.x with this version; browsers where they allow it). YouTube videos: YouTube's own title bar, logo and "More videos" are trimmed off on phones, tablets and in the app, and a pause or the end shows our own cover instead of YouTube's suggestions.
