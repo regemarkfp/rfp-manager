@@ -664,6 +664,83 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const any = live.length + up.length + vids.length + mLive.length + mUp.length + mRes.length + chans.length;
     return any ? out : el('div', { class: 'empty' }, q ? 'Nothing matches your search.' : 'Nothing to show yet. Live streams, videos and matches appear here.');
   }
+  // ---- Browse: search and filters over everything public (/browse?q=&kind=&channel=&category=&sport=&when=&price=&sort=)
+  const BROWSE_KEYS = ['q', 'kind', 'channel', 'category', 'sport', 'when', 'price', 'sort'];
+  const KINDS = [['', 'All'], ['live', 'Live'], ['upcoming', 'Coming up'], ['video', 'Videos'], ['series', 'Series'], ['playlist', 'Playlists'], ['match', 'Matches'], ['channel', 'Channels']];
+  const browseState = () => { const sp = new URLSearchParams(location.search), f = {}; for (const k of BROWSE_KEYS) f[k] = sp.get(k) || ''; return f; };
+  const browseUrl = (f, path = '/browse') => { const sp = new URLSearchParams(); for (const k of BROWSE_KEYS) if (f[k]) sp.set(k, f[k]); const qs = sp.toString(); return path + (qs ? '?' + qs : ''); };
+  function resultCard(x) {
+    if (x.kind === 'series') return seriesCard(x);
+    if (x.kind === 'playlist') return playlistCard(x);
+    if (x.kind === 'match') return matchCard(x);
+    if (x.kind === 'channel') return chanChip(x);
+    return streamCard(x);
+  }
+  const resultBox = (kind, items) => (kind === 'match' ? el('div', { class: 'matches' }, items.map(matchCard)) : kind === 'channel' ? el('div', { class: 'chans', style: { flexWrap: 'wrap' } }, items.map(chanChip)) : el('div', { class: 'grid' }, items.map(resultCard)));
+  async function browsePage(opts = {}) {
+    const f = { ...browseState(), ...(opts.kind && !new URLSearchParams(location.search).has('kind') ? { kind: opts.kind } : {}) };
+    const filtered = BROWSE_KEYS.some((k) => f[k]);
+    const path = opts.path || '/browse';
+    query = f.q.toLowerCase();
+    const go = (patch) => { const n = { ...f, ...patch }; if (patch.q !== undefined) query = String(patch.q || '').toLowerCase(); history.pushState(null, '', browseUrl(n, path)); render(); };
+    const box = $('search').querySelector('input'); if (box && f.q && box.value !== f.q) box.value = f.q;
+    // nothing chosen: the home page as laid out, with the filters above it
+    if (!filtered && !opts.kind) return [filterBar(f, go, null), home()];
+    let r;
+    try { r = await get('/api/public/search?' + new URLSearchParams({ ...Object.fromEntries(BROWSE_KEYS.filter((k) => f[k]).map((k) => [k, f[k]])), limit: f.kind ? 48 : 96 })); } catch (e) { return el('div', { class: 'empty' }, e.message); }
+    const out = [filterBar(f, go, r)];
+    if (!r.total) out.push(el('div', { class: 'empty' }, f.q ? `Nothing matches “${f.q}”${filtered && Object.keys(f).some((k) => k !== 'q' && k !== 'sort' && f[k]) ? ' with these filters' : ''}.` : 'Nothing matches these filters.',
+      el('p', {}, el('a', { href: path, 'data-nav': '', onclick: () => { query = ''; if (box) box.value = ''; } }, 'Clear the search and filters'))));
+    else if (f.kind) {
+      const grid = resultBox(f.kind, r.items);
+      out.push(el('h2', { class: 'sec' }, (KINDS.find((k) => k[0] === f.kind) || [0, 'Results'])[1], el('span', { class: 'count' }, r.total)), grid);
+      let offset = r.items.length;
+      if (offset < r.total) {
+        const more = el('button', { class: 'more-btn', onclick: async () => {
+          more.disabled = true;
+          try {
+            const n = await get('/api/public/search?' + new URLSearchParams({ ...Object.fromEntries(BROWSE_KEYS.filter((k) => f[k]).map((k) => [k, f[k]])), offset, limit: 48 }));
+            for (const x of n.items) grid.append(resultCard(x));
+            offset += n.items.length; more.disabled = false;
+            if (offset >= n.total) more.remove(); else more.textContent = `Show more (${n.total - offset})`;
+          } catch (e) { more.disabled = false; more.textContent = e.message; }
+        } }, `Show more (${r.total - offset})`);
+        out.push(el('div', { style: { textAlign: 'center', margin: '18px 0' } }, more));
+      }
+    } else {
+      // everything: a section per kind, best matches first
+      const groups = new Map();
+      for (const x of r.items) { if (!groups.has(x.kind)) groups.set(x.kind, []); groups.get(x.kind).push(x); }
+      for (const [k, label] of KINDS.slice(1)) {
+        const list = groups.get(k); if (!list) continue;
+        const n = r.counts[k] || list.length, shown = list.slice(0, k === 'match' ? 8 : 12);
+        out.push(section(label, resultBox(k, shown), n), n > shown.length ? el('p', { class: 'see-all' }, el('a', { href: browseUrl({ ...f, kind: k }, path), 'data-nav': '' }, `See all ${n} ${label.toLowerCase()} →`)) : null);
+      }
+    }
+    return out;
+  }
+  function filterBar(f, go, r) {
+    const counts = r ? r.counts : null, facets = r ? r.facets : { channels: (D.channels || []).map((c) => ({ value: c.id, name: c.name })), categories: [], sports: [] };
+    const total = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : null;
+    const pick = (key, label, opts) => (opts.length || f[key] ? el('select', { class: 'fsel' + (f[key] ? ' on' : ''), 'aria-label': label, onchange: (e) => go({ [key]: e.target.value }) },
+      el('option', { value: '' }, label), opts.map(([v, t]) => el('option', { value: v, selected: f[key] === v ? true : null }, t)), f[key] && !opts.some(([v]) => v === f[key]) ? el('option', { value: f[key], selected: true }, f[key]) : null) : null);
+    const n = (x) => (x.n ? ` (${x.n})` : '');
+    const any = BROWSE_KEYS.some((k) => k !== 'q' && k !== 'sort' && f[k]);
+    return el('div', { class: 'browse-bar' },
+      el('div', { class: 'chips kinds' }, KINDS.map(([k, label]) => {
+        const c = counts ? (k ? counts[k] || 0 : total) : null;
+        return counts && k && !c && f.kind !== k ? null : el('button', { class: 'chip noslant' + (f.kind === k ? ' on' : ''), onclick: () => go({ kind: k }) }, label, c !== null ? el('span', { class: 'n' }, c) : null);
+      })),
+      el('div', { class: 'filters' },
+        pick('channel', 'Any channel', facets.channels.map((c) => [c.value, c.name + n(c)])),
+        pick('category', 'Any category', facets.categories.map((c) => [c.value, c.value + n(c)])),
+        pick('sport', 'Any sport', facets.sports.map((c) => [c.value, c.value + n(c)])),
+        pick('when', 'Any time', [['today', 'Today'], ['week', 'This week'], ['month', 'This month'], ['year', 'This year']]),
+        pick('price', 'Free or paid', [['free', 'Free'], ['paid', 'Paid']]),
+        r ? pick('sort', f.q ? 'Best match' : 'Newest first', [...(f.q ? [['newest', 'Newest first']] : []), ['oldest', 'Oldest first'], ['az', 'A–Z']]) : null,
+        any || f.q ? el('button', { class: 'chip noslant clear', onclick: () => { const box = $('search').querySelector('input'); if (box) box.value = ''; query = ''; go(Object.fromEntries(BROWSE_KEYS.map((k) => [k, k === 'kind' ? f.kind : '']))); } }, '✕ Clear') : null,
+        f.q ? el('span', { class: 'sub' }, `Results for “${f.q}”`) : null));
+  }
   function videosPage() {
     const vids = videosOf(D.videos).filter((s) => match(query, s.title, s.channel.name));
     return [el('h2', { class: 'sec' }, 'Videos'), vids.length ? el('div', { class: 'grid' }, vids.map((s) => streamCard(s))) : el('div', { class: 'empty' }, 'No videos yet.')];
@@ -720,6 +797,27 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       load();
       return box;
     };
+    // the Videos tab: search, category, series and order, right on the page
+    const channelVideos = (list) => {
+      const sp = new URLSearchParams(location.search), F = { q: sp.get('q') || '', category: sp.get('category') || '', series: sp.get('series') || '', sort: sp.get('sort') || '' };
+      const grid = el('div', {});
+      const cats = [...new Set(list.map((v) => v.category).filter(Boolean))].sort(), serNames = new Map(sers.map((x) => [x.id, x.title]));
+      const inSeries = [...new Set(list.map((v) => v.series).filter((id) => id && serNames.has(id)))];
+      const paint = () => {
+        const words = F.q.toLowerCase().split(/\s+/).filter(Boolean);
+        const out = list.filter((v) => (!F.category || v.category === F.category) && (!F.series || v.series === F.series) && words.every((w) => [v.title, v.of, v.category, v.tags].join(' ').toLowerCase().includes(w)));
+        if (F.sort === 'oldest') out.reverse(); else if (F.sort === 'az') out.sort((a, b) => String(a.title).localeCompare(String(b.title))); else if (F.sort === 'longest') out.sort((a, b) => (b.duration || 0) - (a.duration || 0));
+        grid.replaceChildren(out.length ? el('div', { class: 'grid' }, out.map((x) => streamCard(x, { noChannel: true }))) : el('div', { class: 'empty' }, 'No video matches.'));
+        const u = new URLSearchParams({ tab: 'videos' }); for (const [k, v] of Object.entries(F)) if (v) u.set(k, v); history.replaceState(null, '', `/c/${ch.slug}?${u}`);
+      };
+      const set = (k) => (e) => { F[k] = e.target.value; paint(); };
+      const pick = (k, label, opts) => (opts.length ? el('select', { class: 'fsel', onchange: set(k) }, el('option', { value: '' }, label), opts.map(([v, t]) => el('option', { value: v, selected: F[k] === v ? true : null }, t))) : null);
+      paint();
+      return [el('div', { class: 'browse-bar' }, el('div', { class: 'filters' },
+        el('input', { class: 'fsel', type: 'search', placeholder: `Search ${list.length} videos`, value: F.q, style: { maxWidth: '320px', flex: '1 1 200px', cursor: 'text' }, oninput: (e) => { F.q = e.target.value; clearTimeout(paint.t); paint.t = setTimeout(paint, 200); } }),
+        pick('category', 'Any category', cats.map((x) => [x, x])), pick('series', 'Any series', inSeries.map((id) => [id, serNames.get(id)])),
+        el('select', { class: 'fsel', onchange: set('sort') }, [['', 'Newest first'], ['oldest', 'Oldest first'], ['az', 'A–Z'], ['longest', 'Longest']].map(([v, t]) => el('option', { value: v, selected: F.sort === v ? true : null }, t))))), grid];
+    };
     const pls = c.playlists || [];
     const CB = {
       live: (tt) => section(tt || 'Live now', live.length ? el('div', { class: 'grid' }, live.map((x) => streamCard(x, { noChannel: true }))) : null),
@@ -732,7 +830,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       : t === 'about' ? el('div', { class: 'about' }, ch.description || 'No description yet.', el('p', {}, `${c.subscribers} subscriber${c.subscribers === 1 ? '' : 's'} · ${ch.owner === 'Production company' ? 'by ' + ch.company : ch.owner + ' channel · ' + ch.company}`))
       : t === 'series' ? (sers.length ? el('div', { class: 'grid' }, sers.map(seriesCard)) : el('div', { class: 'empty' }, 'No series yet.'))
       : t === 'playlists' ? (pls.length ? el('div', { class: 'grid' }, pls.map(playlistCard)) : el('div', { class: 'empty' }, 'No playlists yet.'))
-      : t === 'videos' ? (vids.length ? el('div', { class: 'grid' }, vids.map((s) => streamCard(s, { noChannel: true }))) : el('div', { class: 'empty' }, 'No videos yet.'))
+      : t === 'videos' ? (vids.length ? channelVideos(vids) : el('div', { class: 'empty' }, 'No videos yet.'))
         : c.layout ? laidOut(c.layout, CB, { noChannel: true })
         : [section('Live now', live.length ? el('div', { class: 'grid' }, live.map((s) => streamCard(s, { noChannel: true }))) : null), section('Coming up', up.length ? el('div', { class: 'grid' }, up.slice(0, 8).map((s) => streamCard(s, { noChannel: true }))) : null),
           section('Series', sers.length ? el('div', { class: 'grid' }, sers.slice(0, 8).map(seriesCard)) : null),
@@ -1306,7 +1404,8 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     else if (/^\/p\/[\w-]+\/?$/.test(p)) view = await playlistPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')));
     else if (/^\/s\/[\w-]+\/?$/.test(p)) view = await seriesPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')));
     else if (p.startsWith('/c/')) view = await channelPage(decodeURIComponent(p.slice(3).replace(/\/$/, '')), params.get('tab'));
-    else if (p === '/videos') view = videosPage();
+    else if (p === '/browse' || p === '/search') view = await browsePage();
+    else if (p === '/videos') view = await browsePage({ kind: 'video', path: '/videos' });
     else if (p === '/matches') view = matchesPage();
     else if (p === '/channels') view = channelsPage();
     else if (p === '/subscriptions') view = subscriptionsPage();
@@ -1325,8 +1424,22 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   });
   window.addEventListener('popstate', render);
   $('menu').addEventListener('click', () => document.body.classList.toggle('side-open'));
-  $('search').addEventListener('submit', (e) => { e.preventDefault(); query = e.target.querySelector('input').value.trim().toLowerCase(); if (!['/browse', '/videos', '/matches', '/channels', '/teams'].includes(location.pathname)) history.pushState(null, '', '/browse'); render(); });
-  $('search').querySelector('input').addEventListener('input', (e) => { if (!e.target.value) { query = ''; render(); } });
+  // the search box: on Matches, Channels and Teams it narrows that page; everywhere else it searches everything (/browse?q=)
+  const LOCAL_SEARCH = ['/matches', '/channels', '/teams'];
+  $('search').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = e.target.querySelector('input').value.trim();
+    query = v.toLowerCase();
+    if (LOCAL_SEARCH.includes(location.pathname)) { render(); return; }
+    const keep = ['/browse', '/search', '/videos'].includes(location.pathname) ? browseState() : {};
+    history.pushState(null, '', browseUrl({ ...keep, q: v, sort: '' }, location.pathname === '/videos' ? '/videos' : '/browse')); window.scrollTo(0, 0); render();
+  });
+  $('search').querySelector('input').addEventListener('input', (e) => {
+    if (e.target.value) return;
+    query = '';
+    if (!LOCAL_SEARCH.includes(location.pathname) && new URLSearchParams(location.search).has('q')) { const f = browseState(); f.q = ''; history.replaceState(null, '', browseUrl(f, location.pathname)); }
+    render();
+  });
 
   async function load() {
     try { D = await get('/api/public/home'); } catch (e) { $('main').replaceChildren(el('div', { class: 'empty' }, 'Cannot reach the website right now. ', el('a', { href: '/' }, 'Try again'))); return; }

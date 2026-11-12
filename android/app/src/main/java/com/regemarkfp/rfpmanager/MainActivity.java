@@ -9,6 +9,7 @@ import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -89,6 +90,8 @@ public class MainActivity extends AppCompatActivity implements App.TokenListener
     private WebView web;
     private SwipeRefreshLayout swipe;
     private FrameLayout root, fullscreen;
+    // the video going full screen is upright (portrait): set by the page just before (RFPNative.videoPortrait)
+    private volatile boolean videoPortrait = false;
     private LinearLayout offline;
     private ProgressBar progress;
     private View customView;
@@ -226,6 +229,8 @@ public class MainActivity extends AppCompatActivity implements App.TokenListener
                 c.hide(WindowInsetsCompat.Type.systemBars());
                 c.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
                 getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                // a wide video fills the screen sideways (either way round, with the sensor); an upright one stays as it is
+                if (!videoPortrait) setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
             }
             @Override public void onHideCustomView() { hideCustomView(); }
 
@@ -454,6 +459,7 @@ public class MainActivity extends AppCompatActivity implements App.TokenListener
             return (m.toLowerCase().startsWith(b.toLowerCase()) ? m : cap(b) + " " + m).trim();
         }
         @JavascriptInterface public String appVersion() { return BuildConfig.VERSION_NAME; }
+        @JavascriptInterface public void videoPortrait(boolean upright) { videoPortrait = upright; }
         @JavascriptInterface public boolean notificationsAllowed() {
             return androidx.core.app.NotificationManagerCompat.from(MainActivity.this).areNotificationsEnabled();
         }
@@ -524,6 +530,8 @@ public class MainActivity extends AppCompatActivity implements App.TokenListener
         customCallback = null;
         WindowCompat.getInsetsController(getWindow(), root).show(WindowInsetsCompat.Type.systemBars());
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        videoPortrait = false;
     }
 
     // ---- no connection

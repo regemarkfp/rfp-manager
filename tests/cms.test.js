@@ -95,6 +95,25 @@ test('Content: YouTube import and sync, playlists with live streams, the website
   assert.ok(home.videos.some((x) => x.href === '/v/' + solo && x.youtube));
   assert.equal(home.layout, null, 'automatic until arranged');
 
+  // Browse: search and filters over everything public
+  const find = async (q) => (await guest.get('/api/public/search?' + new URLSearchParams(q))).data;
+  let sr = await find({ q: 'highlights' });
+  assert.ok(sr.total >= 2, JSON.stringify(sr.counts));
+  assert.ok(sr.items.some((x) => x.kind === 'playlist' && x.title === 'Season highlights'));
+  assert.equal(sr.sort, 'relevant');
+  sr = await find({ q: 'highlights', kind: 'video' });
+  assert.ok(sr.items.length && sr.items.every((x) => x.kind === 'video'));
+  assert.ok(sr.counts.playlist >= 1, 'the kind counts ignore the kind filter');
+  sr = await find({ category: 'Highlights' });
+  assert.ok(sr.items.length && sr.items.every((x) => x.category === 'Highlights'));
+  assert.ok((await find({})).facets.categories.some((c) => c.value === 'Highlights'));
+  assert.ok((await find({})).facets.channels.some((c) => c.value === 'chan_tv'));
+  assert.equal((await find({ q: 'zzzz nothing like this' })).total, 0);
+  sr = await find({ kind: 'video', sort: 'az', limit: 1 });
+  assert.equal(sr.items.length, 1); assert.ok(sr.total >= 3);
+  const page2 = await find({ kind: 'video', sort: 'az', limit: 1, offset: 1 });
+  assert.ok(page2.items[0].title.localeCompare(sr.items[0].title) >= 0);
+
   // the front page arranged by a site admin: a featured series of rows; only site admins may
   const outsider = client(app.url);
   await outsider.post('/api/auth/signup', { name: 'Other', email: 'other@example.com', password: 'correct horse' });

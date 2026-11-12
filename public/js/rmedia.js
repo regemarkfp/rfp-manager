@@ -35,6 +35,22 @@
     sheet.addEventListener('dblclick', () => fire('dblclick'));
     box.append(slot, sheet);
     host.append(box);
+    // on phones, tablets and in the Android app YouTube's own bits (the title bar on top, its logo and "More videos"
+    // at the bottom) are cut off: YouTube's player is made taller than the picture by `trim` px above and below, with the
+    // picture itself exactly where it would be; the box hides what sticks out. When paused or ended our sheet covers
+    // what YouTube puts over the picture.
+    const trim = opts.trim !== undefined ? opts.trim : /RFPManagerAndroid/.test(navigator.userAgent) || (window.matchMedia && matchMedia('(pointer: coarse)').matches) ? 64 : 0;
+    if (trim) {
+      box.classList.add('trim');
+      const fit = () => {
+        const f = box.querySelector('iframe') || slot;
+        const W = box.clientWidth, H = box.clientHeight; if (!W || !H) return;
+        const vw = Math.min(W, H * 16 / 9), vh = vw * 9 / 16;
+        Object.assign(f.style, { position: 'absolute', inset: 'auto', left: (W - vw) / 2 + 'px', top: (H - vh) / 2 - trim + 'px', width: vw + 'px', height: vh + 2 * trim + 'px' });
+      };
+      if (window.ResizeObserver) new ResizeObserver(fit).observe(box);
+      box._fit = fit; setTimeout(fit, 0);
+    }
     let p = null, state = -1, tick = null, vol = 1, mute = false, rate = 1, wantPlay = false, ready = false, lastDur = 0, err = '', cc = false;
     const waiters = [];
     // YouTube's player did not come (a blocked network or an ad blocker, or the owner forbids it): say so, with a way out
@@ -56,6 +72,7 @@
         events: {
           onReady: () => {
             ready = true; clearTimeout(giveUp);
+            if (box._fit) box._fit();
             p.setVolume(Math.round(vol * 100)); if (mute) p.mute(); else p.unMute();
             if (rate !== 1) p.setPlaybackRate(rate);
             lastDur = p.getDuration() || 0;
@@ -67,6 +84,7 @@
           onApiChange: () => applyCc(),
           onStateChange: (e) => {
             state = e.data;
+            box.classList.toggle('paused', state === ST.PAUSED); box.classList.toggle('ended', state === ST.ENDED);
             if (state === ST.PLAYING) { fire('play'); fire('playing'); waiters.splice(0).forEach((w) => w.ok()); if (!ccApplied) { ccApplied = true; applyCc(); setTimeout(applyCc, 1200); } }
             else if (state === ST.PAUSED) fire('pause');
             else if (state === ST.BUFFERING) fire('waiting');

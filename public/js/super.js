@@ -1,4 +1,4 @@
-/* The superuser page (analytics.<website> or /super): sign in, set the password from the emailed link, and see the
+/* The superuser page (universe.<website> or /super): sign in, set the password from the emailed link, and see the
  * website's health and every production company. Only Admins who accepted the terms are named. */
 (function () {
   'use strict';
@@ -268,6 +268,59 @@
     return box;
   }
 
+  // ---- Updates: this server from GitHub – check, install now, at a set time, or on a schedule
+  const at2 = (t) => (t ? new Date(t).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '–');
+  const DAYN = { daily: 'Every day', weekdays: 'Weekdays (Mon–Fri)', mon: 'Mondays', tue: 'Tuesdays', wed: 'Wednesdays', thu: 'Thursdays', fri: 'Fridays', sat: 'Saturdays', sun: 'Sundays' };
+  function updatesCards(u, reload) {
+    const sv = u.server || {};
+    const act = (label, fn, cls) => el('button', { class: cls || '', onclick: async (e) => { const b = e.currentTarget; b.disabled = true; try { await fn(); } catch (err) { alert(err.message); } b.disabled = false; reload(); } }, label);
+    const sel = (opts, value, attrs = {}) => el('select', { class: 'sel', ...attrs }, opts.map(([v, t]) => el('option', { value: v, selected: v === value ? '' : null }, t)));
+    // 1. this version and GitHub's
+    const state = u.error ? el('b', { class: 'bad' }, 'Could not check') : !u.latest ? el('b', { class: 'dim' }, 'Not checked yet') : u.newer ? el('b', { class: 'warn' }, `${u.latest} is available`) : el('b', { class: 'ok' }, 'Up to date');
+    const status = el('div', { class: 'card' }, el('h2', {}, 'Version'),
+      el('div', { class: 'tiles' },
+        el('div', { class: 'tile' }, el('b', {}, u.version), el('span', {}, 'Running now')),
+        el('div', { class: 'tile' }, el('b', {}, u.latest || '–'), el('span', {}, 'On GitHub (' + u.repo + ')')),
+        el('div', { class: 'tile' }, state, el('span', {}, 'Checked ' + (u.checkedAt ? at2(u.checkedAt) : 'never'))),
+        sv.ready ? el('div', { class: 'tile' }, el('b', { class: sv.running ? 'warn' : sv.result === 'success' || !sv.result ? '' : 'bad' }, sv.running ? 'Updating…' : sv.result === 'success' ? 'OK' : sv.result || '–'), el('span', {}, 'Last run ' + at2(sv.lastEnd || sv.lastStart))) : null),
+      u.error ? el('p', { class: 'bad small' }, u.error) : null,
+      el('div', { class: 'row', style: 'margin-top:14px' },
+        act('Check for updates', () => api('POST', '/api/super/updates/check'), 'ghost'),
+        sv.ready ? act(u.newer ? `Install ${u.latest} now` : 'Install now', async () => {
+          if (!confirm(`Install ${u.newer ? u.latest : 'the newest version'} now? The website restarts (about a minute); live streams keep running in MediaMTX. If the new version does not start, the old one is put back.`)) throw new Error('Not started');
+          await api('POST', '/api/super/updates/install', {}); setTimeout(reload, 4000);
+        }) : null,
+        sv.ready && !u.newer ? act('Reinstall', async () => { if (!confirm('Download and install the same version again?')) throw new Error('Not started'); await api('POST', '/api/super/updates/install', { force: true }); }, 'ghost') : null,
+        sv.running ? el('span', { class: 'warn small' }, 'An update is running: the page may be away for a minute.') : null),
+      !sv.ready ? el('p', { class: 'small warn' }, sv.error ? `Installing from here is not set up yet (${sv.error}).` : 'Installing from here is not set up yet.', ' Run once on the server: ', el('code', {}, 'sudo rfp-autoupdate'), '.') : null);
+    // 2. what is new
+    const notes = u.newer && u.notes.length ? el('div', { class: 'card' }, el('h2', {}, `What is new (${u.notes.length} version${u.notes.length > 1 ? 's' : ''})`),
+      u.notes.map((n) => el('div', { style: 'margin-bottom:12px' }, el('b', {}, n.version), el('ul', { class: 'small', style: 'margin:6px 0 0;padding-left:20px' },
+        n.text.split('\n').filter((l) => /^- /.test(l)).map((l) => el('li', {}, l.slice(2).replace(/\*\*/g, '').replace(/`/g, '')))))) ) : null;
+    // 3. install later / on a schedule (the server's timer)
+    const oDate = el('input', { type: 'date', style: 'width:auto;margin:0', value: new Date(Date.now() + 864e5).toISOString().slice(0, 10) }), oTime = el('input', { type: 'time', style: 'width:auto;margin:0', value: '02:00' });
+    const sDays = sel(Object.entries(DAYN), sv.days || 'daily'), sTime = el('input', { type: 'time', style: 'width:auto;margin:0', value: sv.time || '04:30' });
+    const plan = sv.ready ? el('div', { class: 'card' }, el('h2', {}, 'Install later'),
+      el('p', { class: 'small dim', style: 'margin-top:0' }, 'Times are the server\'s clock. Each run installs only when GitHub has a newer version.'),
+      el('div', { class: 'row' }, el('b', { style: 'min-width:150px' }, 'Once'), oDate, oTime, act(sv.once ? 'Move it' : 'Plan it', () => api('POST', '/api/super/updates/once', { date: oDate.value, time: oTime.value })),
+        sv.once ? [el('span', { class: 'ok small' }, 'Planned for ' + at2(sv.once)), act('Cancel', () => api('POST', '/api/super/updates/cancel'), 'ghost sm')] : null),
+      el('div', { class: 'row', style: 'margin-top:12px' }, el('b', { style: 'min-width:150px' }, 'Automatically'), sDays, sTime,
+        act(sv.auto ? 'Save' : 'Turn on', () => api('POST', '/api/super/updates/schedule', { days: sDays.value, time: sTime.value })),
+        sv.auto ? act('Turn off', () => api('POST', '/api/super/updates/schedule', { off: true }), 'ghost') : null,
+        el('span', { class: 'small ' + (sv.auto ? 'ok' : 'dim') }, sv.auto ? `${DAYN[sv.days] || sv.calendar} at ${sv.time} · next ${at2(sv.next)}` : 'Off: updates only when you install them'))) : null;
+    // 4. checking (here): how often, and the email
+    const st = u.settings;
+    const check = el('div', { class: 'card' }, el('h2', {}, 'Checking for updates'),
+      el('div', { class: 'row' }, el('b', { style: 'min-width:150px' }, 'Check GitHub'),
+        sel([['hourly', 'Every hour'], ['6h', 'Every 6 hours'], ['daily', 'Once a day'], ['off', 'Never (only with the button)']], st.check, { onchange: async (e) => { await api('PUT', '/api/super/updates/settings', { check: e.target.value }).catch((err) => alert(err.message)); reload(); } }),
+        el('label', { class: 'small', style: 'display:flex;gap:6px;align-items:center;cursor:pointer' }, el('input', { type: 'checkbox', style: 'width:auto;margin:0', checked: st.email ? '' : null, onchange: async (e) => { await api('PUT', '/api/super/updates/settings', { email: e.target.checked }).catch((err) => alert(err.message)); } }), 'Email the superusers when a new version is out')));
+    // 5. the updater's own log
+    const logBox = el('pre', { class: 'code', style: 'max-height:360px;overflow:auto;display:none' });
+    const logCard = sv.ready ? el('div', { class: 'card' }, el('div', { class: 'row', style: 'justify-content:space-between' }, el('h2', { style: 'margin:0' }, 'Update log'),
+      el('button', { class: 'ghost sm', onclick: async () => { const r = await api('GET', '/api/super/updates/log').catch((e) => ({ log: e.message })); logBox.textContent = r.log || r.error || 'Nothing yet.'; logBox.style.display = ''; logBox.classList.add('open'); logBox.scrollTop = logBox.scrollHeight; } }, 'Show')), logBox) : null;
+    return [status, notes, plan, check, logCard];
+  }
+
   async function load(quiet) {
     clearTimeout(timer); timer = null;
     const y = window.scrollY;
@@ -275,14 +328,15 @@
     const me = await api('GET', '/api/super/me').catch(() => ({}));
     if (!me.email) { $('who').replaceChildren(); if (quiet) return; return loginForm(); }
     $('who').replaceChildren(me.email + ' · ', el('a', { href: '#', onclick: async (e) => { e.preventDefault(); await api('POST', '/api/super/logout'); load(); } }, 'Sign out'));
-    const tab = location.hash === '#nas' ? 'nas' : location.hash.startsWith('#files') ? 'files' : 'overview';
+    const tab = location.hash === '#nas' ? 'nas' : location.hash === '#updates' ? 'updates' : location.hash.startsWith('#files') ? 'files' : 'overview';
     if (tab === 'files' && !quiet) filesPath = decodeURIComponent(location.hash.slice(7).replace(/^\//, ''));
-    const tabs = el('div', { class: 'tabs' }, [['overview', 'Overview'], ['nas', 'NAS'], ['files', 'Files']].map(([k, label]) => el('a', { href: k === 'overview' ? '#' : '#' + k, class: k === tab ? 'on' : '', onclick: (e) => { e.preventDefault(); history.replaceState(null, '', k === 'overview' ? location.pathname : '#' + k); load(); } }, label)));
+    const tabs = el('div', { class: 'tabs' }, [['overview', 'Overview'], ['nas', 'NAS'], ['files', 'Files'], ['updates', 'Updates']].map(([k, label]) => el('a', { href: k === 'overview' ? '#' : '#' + k, class: k === tab ? 'on' : '', onclick: (e) => { e.preventDefault(); history.replaceState(null, '', k === 'overview' ? location.pathname : '#' + k); load(); } }, label)));
     const stamp = el('span', { class: 'small dim' }, `Updated ${new Date().toLocaleTimeString('en-GB')}`);
     const autoBox = el('label', { class: 'small dim', style: 'display:flex;gap:6px;align-items:center;cursor:pointer' }, el('input', { type: 'checkbox', checked: auto ? '' : null, style: 'width:auto;margin:0', onchange: (e) => { auto = e.target.checked; try { localStorage.setItem('su-auto', auto ? '1' : '0'); } catch (x) { /* ignore */ } later(); } }), 'Auto refresh (30 s)');
     const head = (title) => el('div', { class: 'row', style: 'justify-content:space-between' }, el('h1', {}, title), el('div', { class: 'row' }, stamp, autoBox, el('button', { class: 'ghost', onclick: () => load() }, 'Refresh')));
     try {
-      if (tab === 'files') { if (uploading && quiet) return later(); show(tabs, head('Files'), await filesCard()); }
+      if (tab === 'updates') { const u = await api('GET', '/api/super/updates'); if (quiet && document.querySelector('#main pre.code.open')) return later(); show(tabs, head('Updates'), updatesCards(u, () => load(true))); if (u.server && u.server.running) setTimeout(() => { if (location.hash === '#updates') load(true); }, 5000); }
+      else if (tab === 'files') { if (uploading && quiet) return later(); show(tabs, head('Files'), await filesCard()); }
       else if (tab === 'nas') { const [n, u] = await Promise.all([api('GET', '/api/super/nas'), api('GET', '/api/super/nas/users').catch((e) => ({ ready: false, users: [], info: { error: e.message } }))]); show(tabs, head('NAS'), nasCards(n), usersCard(u)); if (n.measuring) setTimeout(() => { if (location.hash === '#nas') load(true); }, 8000); }
       else { const o = await api('GET', '/api/super/overview'); show(tabs, head('RegemarkFP overview'), healthCard(o.health), companiesCard(o.companies)); }
     } catch (e) { if (!quiet) show(tabs, el('div', { class: 'card bad' }, e.message)); }

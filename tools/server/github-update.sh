@@ -14,6 +14,8 @@ set -euo pipefail
 REPO=regemarkfp/rfp-manager; BRANCH=main; INSTALL=""; FORCE=""
 ETC=/etc/rfp-manager; APP=/opt/rfp-manager; DATA=/var/lib/rfp-manager; SVC=rfpsvc
 [ -f "$ETC/update-repo" ] && REPO="$(cat "$ETC/update-repo")"
+# "Install now (reinstall)" on the Universe page leaves this flag for one run
+[ -f "$ETC/update-force" ] && { FORCE=1; rm -f "$ETC/update-force"; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --install) INSTALL=1; shift ;;
@@ -54,10 +56,29 @@ EOF
   echo "This server now updates from github.com/$REPO ($BRANCH): every night at 04:30, or now with: sudo rfp-autoupdate"
 fi
 
+# the small root helpers the website may run through sudo (nothing else): NAS users, and updates from the Universe page
+install_helpers() {
+  # the NAS's Samba users from the Universe page: a small root helper the website may run, and nothing else
+  if [ -f "$APP/tools/server/nas-users.sh" ] && { [ -f "$ETC/nas" ] || grep -q "^\[NAS\]" /etc/samba/smb.conf 2>/dev/null; } && command -v smbpasswd >/dev/null; then
+    install -m 755 -o root -g root "$APP/tools/server/nas-users.sh" /usr/local/sbin/rfp-nas-users
+    echo "$SVC ALL=(root) NOPASSWD: /usr/local/sbin/rfp-nas-users" > /etc/sudoers.d/rfp-nas.tmp
+    chmod 440 /etc/sudoers.d/rfp-nas.tmp
+    if visudo -cf /etc/sudoers.d/rfp-nas.tmp >/dev/null; then mv /etc/sudoers.d/rfp-nas.tmp /etc/sudoers.d/rfp-nas; else rm -f /etc/sudoers.d/rfp-nas.tmp; fi
+  fi
+
+  # updates from the Universe page (check, install now, schedule): a small root helper the website may run, and nothing else
+  if [ -f "$APP/tools/server/update-ctl.sh" ]; then
+    install -m 755 -o root -g root "$APP/tools/server/update-ctl.sh" /usr/local/sbin/rfp-update-ctl
+    echo "$SVC ALL=(root) NOPASSWD: /usr/local/sbin/rfp-update-ctl" > /etc/sudoers.d/rfp-update.tmp
+    chmod 440 /etc/sudoers.d/rfp-update.tmp
+    if visudo -cf /etc/sudoers.d/rfp-update.tmp >/dev/null; then mv /etc/sudoers.d/rfp-update.tmp /etc/sudoers.d/rfp-update; else rm -f /etc/sudoers.d/rfp-update.tmp; fi
+  fi
+}
+
 REMOTE="$(curl -fsSL --retry 3 --max-time 60 "https://raw.githubusercontent.com/$REPO/$BRANCH/package.json?t=$(date +%s)" | jq -r .version)"
 LOCAL="$(jq -r .version "$APP/package.json")"
 [ -n "$REMOTE" ] && [ "$REMOTE" != null ] || { echo "Could not read the version on GitHub"; exit 1; }
-if [ -z "$FORCE" ] && { [ "$REMOTE" = "$LOCAL" ] || [ "$(printf '%s\n%s\n' "$REMOTE" "$LOCAL" | sort -V | tail -1)" = "$LOCAL" ]; }; then echo "Up to date ($LOCAL)"; exit 0; fi
+if [ -z "$FORCE" ] && { [ "$REMOTE" = "$LOCAL" ] || [ "$(printf '%s\n%s\n' "$REMOTE" "$LOCAL" | sort -V | tail -1)" = "$LOCAL" ]; }; then install_helpers; echo "Up to date ($LOCAL)"; exit 0; fi
 echo "Updating $LOCAL -> $REMOTE from github.com/$REPO"
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
@@ -74,13 +95,7 @@ chown -R root:root "$APP"; chown -R "$SVC:$SVC" "$DATA" 2>/dev/null || true
 if [ -f "$APP/tools/server/github-update.sh" ] && ! cmp -s "$APP/tools/server/github-update.sh" /usr/local/bin/rfp-autoupdate; then
   install -m 755 "$APP/tools/server/github-update.sh" /usr/local/bin/rfp-autoupdate
 fi
-# the NAS's Samba users from the Universe page: a small root helper the website may run, and nothing else
-if [ -f "$APP/tools/server/nas-users.sh" ] && { [ -f "$ETC/nas" ] || grep -q "^\[NAS\]" /etc/samba/smb.conf 2>/dev/null; } && command -v smbpasswd >/dev/null; then
-  install -m 755 -o root -g root "$APP/tools/server/nas-users.sh" /usr/local/sbin/rfp-nas-users
-  echo "$SVC ALL=(root) NOPASSWD: /usr/local/sbin/rfp-nas-users" > /etc/sudoers.d/rfp-nas.tmp
-  chmod 440 /etc/sudoers.d/rfp-nas.tmp
-  if visudo -cf /etc/sudoers.d/rfp-nas.tmp >/dev/null; then mv /etc/sudoers.d/rfp-nas.tmp /etc/sudoers.d/rfp-nas; else rm -f /etc/sudoers.d/rfp-nas.tmp; fi
-fi
+install_helpers
 
 # the encoders' address can change without a setup command: /etc/rfp-manager/stream-host
 if [ -f "$ETC/stream-host" ] && [ -f "$ETC/env" ]; then

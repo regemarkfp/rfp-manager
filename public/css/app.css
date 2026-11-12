@@ -437,3 +437,13 @@ table.t tr.picked td { background: rgba(0, 255, 130, 0.08); }
 /* quotes & invoices: ticks to choose many */
 table.t th.tick, table.t td.tick { width: 34px; padding-right: 0; } table.t td.tick input, table.t th.tick input { width: 18px; height: 18px; margin: 0; cursor: pointer; }
 table.t tr.picked td { background: rgba(0, 255, 130, .07); }
+
+/* list filters, sortable columns, picking rows (bulk edit) */
+.list-filters { gap: 8px; flex-wrap: wrap; margin: -4px 0 12px; }
+.list-filters select, .list-filters input[type=date] { width: auto; flex: 0 1 200px; padding: 6px 10px; }
+.list-filters select.on { border-color: var(--accent, #00ff82); color: var(--accent, #00ff82); }
+.list-filters .dates { gap: 6px; flex-wrap: nowrap; } .list-filters .dates input { flex: 0 1 150px; }
+table.t th.sortable { cursor: pointer; user-select: none; white-space: nowrap; } table.t th.sortable:hover, table.t th.sorted { color: var(--accent, #00ff82); }
+table.t tr.picked td { background: rgba(0, 255, 130, .07); }
+.fx-pick { display: flex; align-items: center; gap: 10px; } .fx-pick > input { width: 18px; height: 18px; flex: none; cursor: pointer; } .fx-pick > .fx { flex: 1; min-width: 0; } .fx-pick.picked { background: rgba(0, 255, 130, .07); }
+.gallery .g .g-pick { position: absolute; top: 8px; left: 8px; width: 18px; height: 18px; z-index: 2; cursor: pointer; } .gallery .g.picked { outline: 2px solid var(--accent, #00ff82); }

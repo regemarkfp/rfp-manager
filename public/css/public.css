@@ -390,3 +390,22 @@ input:not([type=checkbox]):not([type=radio]):focus, select:focus, textarea:focus
 .cm .rm { background: none; border: 0; color: var(--dim); padding: 0 4px; font-size: 12px; cursor: pointer; clip-path: none; }
 .cform { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; } .cform textarea { margin: 0; resize: vertical; min-height: 42px; font: inherit; } .cform .err { grid-column: 1 / -1; margin: 0; }
 @media (max-width: 1000px) { .watch { grid-template-columns: minmax(0, 1fr); } .watch-side { position: static; max-height: none; } .watch-side .clist { max-height: 420px; } }
+
+/* Browse: search and filters */
+.browse-bar { display: grid; gap: 10px; margin: 4px 0 18px; }
+.browse-bar .kinds { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; } .browse-bar .kinds::-webkit-scrollbar { display: none; }
+.browse-bar .chip { white-space: nowrap; display: inline-flex; gap: 6px; align-items: center; }
+.browse-bar .chip.on::before { content: none; }
+.browse-bar .chip .n { font-size: 12px; color: var(--dim); } .browse-bar .chip.on .n { color: var(--accent); }
+.browse-bar .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.fsel { font: inherit; color: var(--text); background: #121212; border: 1px solid var(--line); border-radius: 18px; padding: 7px 12px; max-width: 220px; cursor: pointer; }
+.fsel.on { border-color: var(--accent); color: var(--accent); background: #00ff8215; }
+.browse-bar .clear { color: var(--dim); }
+.see-all { margin: -6px 0 22px; } .see-all a { color: var(--accent); font-weight: 600; }
+.more-btn { min-width: 220px; }
+@media (max-width: 640px) { .fsel { flex: 1 1 calc(50% - 8px); max-width: none; } }
+
+/* YouTube in our player: trimmed on phones (rmedia.js), covered when paused or ended */
+.yt-box { overflow: hidden; background: #000; }
+.yt-box.paused .yt-sheet, .yt-box.ended .yt-sheet { background: rgba(0,0,0,.55) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%23000' fill-opacity='.55'/%3E%3Cpath d='M9.5 7.5v9l7-4.5z' fill='%23fff'/%3E%3C/svg%3E") center / 68px no-repeat; }
+.yt-box.ended .yt-sheet { background-color: #000; }

@@ -88,7 +88,7 @@
   // what deleting says: a club takes its teams with it (players stay)
   const teamsOf = (ids) => App.list('squad').filter((s) => ids.includes(s.data.club));
   function deleteText(type, ids) {
-    const e = E[type], n = ids.length, what = n === 1 ? `this ${e.label.toLowerCase()}` : `these ${n} ${e.plural.toLowerCase()}`;
+    const e = E[type] || { label: type === 'image' ? 'Image' : 'Item', plural: type === 'image' ? 'Images' : 'Items' }, n = ids.length, what = n === 1 ? `this ${e.label.toLowerCase()}` : `these ${n} ${e.plural.toLowerCase()}`;
     const t = type === 'club' ? teamsOf(ids).length : 0;
     return `Delete ${what}${t ? ` and ${n === 1 ? 'its' : 'their'} ${t} team${t === 1 ? '' : 's'}` : ''}? ${t ? 'The players stay in the players database. ' : ''}This cannot be undone.`;
   }
@@ -102,20 +102,23 @@
   }
   // the fields that can be set for several records at once (simple ones: text, choices, yes/no, a link to another record)
   const bulkFields = (type) => Schema.fieldsFor(type, App.org()).filter((f) => !f.hidden && !f.readonly && !f.inherit && ['text', 'combo', 'select', 'bool', 'ref', 'number', 'date', 'multi'].includes(f.t) && !['name', 'surname', 'abbreviation', 'graphicName', 'fullGraphicName', 'graphicFirstName', 'graphicLastName'].includes(f.k));
-  const MULTI = new Set(['club', 'squad', 'player']);
   function setField(type, docs, after) {
     const fields = bulkFields(type);
     let f = fields[0], value;
     const slot = h('div', {});
-    const paintInput = () => { value = f.t === 'bool' ? false : f.t === 'multi' ? [] : ''; slot.replaceChildren(fieldInput(f, value, (v) => { value = v; })); };
+    let mode = 'set';
+    const modeSel = h('select', { onchange: (ev) => { mode = ev.target.value; } }, h('option', { value: 'set' }, 'Replace with'), h('option', { value: 'add' }, 'Add'), h('option', { value: 'remove' }, 'Remove'));
+    const modeBox = h('label', { class: 'f wide' }, h('span', {}, 'How'), modeSel);
+    const paintInput = () => { value = f.t === 'bool' ? false : f.t === 'multi' ? [] : ''; mode = 'set'; modeSel.value = 'set'; modeBox.style.display = f.t === 'multi' ? '' : 'none'; slot.replaceChildren(fieldInput(f, value, (v) => { value = v; })); };
     paintInput();
     UI.modal({ title: `Change a field for ${docs.length} ${E[type].plural.toLowerCase()}`, body: h('div', { class: 'form' },
       h('label', { class: 'f wide' }, h('span', {}, 'Field'), h('select', { onchange: (ev) => { f = fields.find((x) => x.k === ev.target.value); paintInput(); } }, fields.map((x) => h('option', { value: x.k }, x.l)))),
-      h('div', { class: 'f wide' }, h('span', { class: 'flabel' }, 'New value'), slot),
+      modeBox, h('div', { class: 'f wide' }, h('span', { class: 'flabel' }, 'New value'), slot),
       h('p', { class: 'help wide' }, 'Every selected record gets this value. Leave it empty to clear the field.')),
     actions: [{ label: 'Cancel' }, { label: 'Apply', primary: true, onClick: async () => {
       if (f.req && (value === '' || value === undefined || (Array.isArray(value) && !value.length))) { toast(`${f.l} cannot be empty`, 'error'); return false; }
-      const r = await each(docs.map((d) => d.id), (id) => { const d = App.docs.get(id); return App.save(type, id, { ...d.data, [f.k]: value }); }, 'Changed');
+      const next = (cur) => (f.t !== 'multi' || mode === 'set' ? value : mode === 'add' ? [...new Set([...(cur || []), ...value])] : (cur || []).filter((x) => !value.includes(x)));
+      const r = await each(docs.map((d) => d.id), (id) => { const d = App.docs.get(id); return App.save(type, id, { ...d.data, [f.k]: next(d.data[f.k]) }); }, 'Changed');
       toast(`${f.l} changed on ${r.done}${r.failed ? `, ${r.failed} not` : ''}`); after();
     } }] });
   }
@@ -135,62 +138,133 @@
     } }] });
   }
 
-  App.pages.list = (type) => {
-    const e = E[type];
-    if (!e) return App.pages.notfound();
-    let q = '';
-    const multi = MULTI.has(type) && App.canEdit(type);
-    const picked = new Set();
-    let shown = [];
+  // ---- bulk: the bar over a list once records are ticked (generic lists, fixtures, images)
+  //   delete, archive, change a field (add/remove for lists), export the ticked ones as CSV; players → add to a team
+  const csvCell = (v) => { const t = String(v == null ? '' : v); return /[",\n;]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  function exportCsv(type, docs) {
+    const fields = Schema.fieldsFor(type, App.org()).filter((f) => !f.hidden && !['image', 'list', 'html', 'json'].includes(f.t) && f.t);
+    const val = (f, v) => (v === undefined || v === null ? '' : f.t === 'ref' ? App.title(f.ref, v) : f.t === 'multi' ? (v || []).join(', ') : f.t === 'bool' ? (v ? 'Yes' : 'No') : typeof v === 'object' ? JSON.stringify(v) : v);
+    const rows = [['id', ...fields.map((f) => f.l)], ...docs.map((d) => [d.id, ...fields.map((f) => val(f, d.data[f.k]))])];
+    const blob = new Blob(['﻿' + rows.map((r) => r.map(csvCell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = h('a', { href: URL.createObjectURL(blob), download: `${E[type].plural.replace(/[^\w]+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv` });
+    document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  function makeBulkBar(type, { picked, shown, after, simple = false }) {
     const bar = h('div', { class: 'bulk-bar', style: { display: 'none' } });
-    const fields = Schema.fieldsFor(type, App.org());
-    const cols = e.cols.map((k) => fields.find((f) => f.k === k)).filter(Boolean);
-    const body = h('div', {});
-    const paint = () => {
-      const needle = q.toLowerCase();
-      const docs = App.sorted(type).filter((d) => !needle || JSON.stringify(d.data).toLowerCase().includes(needle) || App.title(type, d.id).toLowerCase().includes(needle));
-      if (type === 'production') docs.sort((a, b) => String(b.data.date || '').localeCompare(String(a.data.date || '')));
-      docs.sort((a, b) => (a.data.archived ? 1 : 0) - (b.data.archived ? 1 : 0));                     // archived last, greyed out
-      shown = docs;
+    bar.paint = () => {
       for (const id of [...picked]) if (!App.docs.get(id)) picked.delete(id);
-      const all = multi && docs.length && docs.every((d) => picked.has(d.id));
-      const tick = (d) => h('td', { class: 'pick', onclick: (ev) => ev.stopPropagation() }, h('input', { type: 'checkbox', checked: picked.has(d.id), 'aria-label': 'Select', onchange: (ev) => { if (ev.target.checked) picked.add(d.id); else picked.delete(d.id); paint(); } }));
-      body.replaceChildren(docs.length
-        ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, multi ? h('th', { class: 'pick' }, h('input', { type: 'checkbox', checked: all, title: 'Select all shown', 'aria-label': 'Select all', onchange: (ev) => { for (const d of docs) { if (ev.target.checked) picked.add(d.id); else picked.delete(d.id); } paint(); } })) : null, cols.map((f) => h('th', { class: f.t === 'money' || f.t === 'number' ? 'r' : '' }, f.t === 'image' ? '' : f.l)))),
-          h('tbody', {}, docs.map((d) => h('tr', { class: 'click' + (picked.has(d.id) ? ' picked' : ''), tabindex: '0', style: d.data.archived ? { opacity: '.45' } : {}, onclick: () => { location.hash = `#/edit/${type}/${d.id}`; }, onkeydown: (ev) => { if (ev.key === 'Enter') location.hash = `#/edit/${type}/${d.id}`; } },
-            multi ? tick(d) : null, cols.map((f) => h('td', { class: f.t === 'money' || f.t === 'number' ? 'r num' : '' }, cell(type, f, d.data[f.k], d.data))))))))
-        : h('div', { class: 'card empty' }, q ? 'Nothing matches that search.' : `No ${e.plural.toLowerCase()} yet.`, ' ', App.canCreate(type) && !q ? h('a', { href: `#/edit/${type}/new` }, 'Add the first one') : null),
-      type === 'advert' ? adReport() : null);
-      paintBar();
-    };
-    // the bar for the selected ones: delete, archive, set a field, and for players: add to a team
-    function paintBar() {
-      if (!multi || !picked.size) { bar.style.display = 'none'; return; }
-      const ids = [...picked], n = ids.length;
+      if (!picked.size) { bar.style.display = 'none'; return; }
+      const ids = [...picked], n = ids.length, list = shown();
       const docsOf = () => ids.map((id) => App.docs.get(id)).filter(Boolean);
-      const run = async (label, fn) => { const r = await each(ids, fn, label); picked.clear(); paint(); toast(`${label}: ${r.done} done${r.failed ? `, ${r.failed} not (no permission or in use)` : ''}`); };
+      const done = () => { picked.clear(); after(); };
+      const run = async (label, fn) => { const r = await each(ids, fn, label); done(); toast(`${label}: ${r.done} done${r.failed ? `, ${r.failed} not (no permission or in use)` : ''}`); };
+      const archivedAll = docsOf().every((d) => d.data.archived);
       bar.style.display = '';
       bar.replaceChildren(h('b', {}, `${n} selected`),
-        h('button', { class: 'sm ghost', onclick: () => { picked.clear(); paint(); } }, 'Clear'),
-        h('button', { class: 'sm', onclick: () => { for (const d of shown) picked.add(d.id); paint(); } }, `Select all ${shown.length}`),
+        h('button', { class: 'sm ghost', onclick: () => { picked.clear(); after(); } }, 'Clear'),
+        n < list.length ? h('button', { class: 'sm', onclick: () => { for (const d of list) picked.add(d.id); after(); } }, `Select all ${list.length}`) : null,
         h('span', { class: 'grow' }),
-        type === 'player' ? h('button', { class: 'sm', onclick: () => addToTeam(ids, () => { picked.clear(); paint(); }) }, 'Add to team…') : null,
-        bulkFields(type).length ? h('button', { class: 'sm', onclick: () => setField(type, docsOf(), () => { picked.clear(); paint(); }) }, 'Change a field…') : null,
-        h('button', { class: 'sm', onclick: async () => { const off = docsOf().every((d) => d.data.archived); await run(off ? 'Unarchived' : 'Archived', (id) => { const d = App.docs.get(id); return App.save(type, id, { ...d.data, archived: !off }); }); } }, docsOf().every((d) => d.data.archived) ? 'Unarchive' : 'Archive'),
+        type === 'player' ? h('button', { class: 'sm', onclick: () => addToTeam(ids, done) }, 'Add to team…') : null,
+        !simple && bulkFields(type).length ? h('button', { class: 'sm', onclick: () => setField(type, docsOf(), done) }, 'Change a field…') : null,
+        !simple ? h('button', { class: 'sm', title: 'A spreadsheet of the selected records', onclick: () => exportCsv(type, docsOf()) }, 'Export CSV') : null,
+        !simple ? h('button', { class: 'sm', onclick: () => run(archivedAll ? 'Unarchived' : 'Archived', (id) => { const d = App.docs.get(id); return App.save(type, id, { ...d.data, archived: !archivedAll }); }) }, archivedAll ? 'Unarchive' : 'Archive') : null,
         h('button', { class: 'sm danger', onclick: async () => {
           if (!(await confirmBox(deleteText(type, ids)))) return;
           let teams = 0;
           await run('Deleted', async (id) => { const r = await App.remove(type, id); teams += ((r && r.removed) || []).length; });
           if (teams) toast(`Also deleted ${teams} team${teams === 1 ? '' : 's'}`);
         } }, 'Delete'));
+    };
+    return bar;
+  }
+  App.makeBulkBar = makeBulkBar;
+
+  // ---- filters for a list: the choice fields that tell records apart (sport, status, type, category, club …),
+  // a date range, archived; kept per list while the app is open
+  const FILTER_T = ['select', 'combo', 'ref', 'bool', 'multi'];
+  const fval = (f, v) => (f.t === 'bool' ? (v ? 'yes' : 'no') : f.t === 'multi' ? (Array.isArray(v) ? v : []) : v === undefined || v === null ? '' : String(v));
+  function filterFieldsOf(type, docs) {
+    const fields = Schema.fieldsFor(type, App.org()).filter((f) => !f.hidden && FILTER_T.includes(f.t) && !['archived', 'theme'].includes(f.k));
+    const cols = E[type].cols || [];
+    const out = [];
+    for (const f of fields) {
+      const vals = new Set();
+      for (const d of docs) { const v = fval(f, d.data[f.k]); for (const x of [v].flat()) if (x !== '') vals.add(x); }
+      if (f.t === 'bool' ? vals.has('yes') && vals.has('no') : vals.size >= 2 && vals.size <= 80) out.push({ f, vals: [...vals], col: cols.includes(f.k) });
     }
+    const rank = (x) => (x.col ? 0 : 1) + (/status|type|sport|category|kind|club|competition|venue|channel|role|owner|condition|active|series|visibility|source|production/i.test(x.f.k) ? 0 : 2);
+    return out.sort((a, b) => rank(a) - rank(b)).slice(0, 6);
+  }
+  const optLabel = (f, v) => (f.t === 'ref' ? App.title(f.ref, v) || v : f.t === 'bool' ? (v === 'yes' ? 'Yes' : 'No') : v);
+  const sortKey = (f, v) => (v === undefined || v === null || v === '' ? null : f.t === 'ref' ? String(App.title(f.ref, v)).toLowerCase() : ['number', 'money'].includes(f.t) ? Number(v) : f.t === 'multi' ? (v || []).join(', ').toLowerCase() : f.t === 'bool' ? (v ? 1 : 0) : String(v).toLowerCase());
+
+  App.pages.list = (type) => {
+    const e = E[type];
+    if (!e) return App.pages.notfound();
+    const LF = App.listFilters || (App.listFilters = {});
+    const st = LF[type] || (LF[type] = { q: '', f: {}, archived: '', from: '', to: '', sort: '', dir: 1 });
+    const multi = App.canEdit(type) && App.editable(type);
+    const picked = new Set();
+    let shown = [];
+    const fields = Schema.fieldsFor(type, App.org());
+    const cols = e.cols.map((k) => fields.find((f) => f.k === k)).filter(Boolean);
+    const dateF = cols.find((f) => f.t === 'date') || fields.find((f) => f.t === 'date' && !f.hidden);
+    const body = h('div', {}), filterRow = h('div', { class: 'row list-filters' });
+    const bar = makeBulkBar(type, { picked, shown: () => shown, after: () => paint() });
+    const paintFilters = (all, fl) => {
+      const anyArchived = all.some((d) => d.data.archived);
+      const active = Object.values(st.f).some(Boolean) || st.archived || st.from || st.to;
+      const sel = (val, opts, on, label) => h('select', { class: val ? 'on' : '', 'aria-label': label, onchange: (ev) => on(ev.target.value) }, opts.map(([v, t]) => h('option', { value: v, selected: v === val }, t)));
+      filterRow.replaceChildren(
+        fl.map(({ f, vals }) => sel(st.f[f.k] || '', [['', 'Any ' + f.l.toLowerCase()], ...vals.map((v) => [v, optLabel(f, v)]).sort((a, b) => String(a[1]).localeCompare(String(b[1]), undefined, { numeric: true }))], (v) => { st.f[f.k] = v; paint(); }, f.l)),
+        dateF && all.length > 8 ? h('span', { class: 'row dates', title: dateF.l }, h('span', { class: 'dim small' }, dateF.l), h('input', { type: 'date', value: st.from, 'aria-label': 'From', onchange: (ev) => { st.from = ev.target.value; paint(); } }), h('span', { class: 'dim' }, '–'), h('input', { type: 'date', value: st.to, 'aria-label': 'To', onchange: (ev) => { st.to = ev.target.value; paint(); } })) : null,
+        anyArchived || st.archived ? sel(st.archived, [['', 'Archived last'], ['active', 'Hide archived'], ['only', 'Archived only']], (v) => { st.archived = v; paint(); }, 'Archived') : null,
+        active ? h('button', { class: 'sm ghost', onclick: () => { st.f = {}; st.archived = ''; st.from = ''; st.to = ''; paint(); } }, '✕ Clear filters') : null);
+      filterRow.style.display = filterRow.childElementCount ? '' : 'none';
+    };
+    const paint = () => {
+      const all = App.sorted(type);
+      const fl = filterFieldsOf(type, all);
+      const words = st.q.toLowerCase().split(/\s+/).filter(Boolean);
+      const docs = all.filter((d) => {
+        if (st.archived === 'active' && d.data.archived) return false;
+        if (st.archived === 'only' && !d.data.archived) return false;
+        for (const { f } of fl) { const want = st.f[f.k]; if (!want) continue; const v = fval(f, d.data[f.k]); if (Array.isArray(v) ? !v.includes(want) : v !== want) return false; }
+        if (dateF && (st.from || st.to)) { const v = String(d.data[dateF.k] || ''); if (!v || (st.from && v < st.from) || (st.to && v > st.to)) return false; }
+        if (words.length) { const text = (App.title(type, d.id) + ' ' + JSON.stringify(d.data) + ' ' + cols.filter((f) => f.t === 'ref').map((f) => App.title(f.ref, d.data[f.k])).join(' ')).toLowerCase(); if (!words.every((w) => text.includes(w))) return false; }
+        return true;
+      });
+      const sf = st.sort && fields.find((f) => f.k === st.sort);
+      if (sf) docs.sort((a, b) => { const x = sortKey(sf, a.data[sf.k]), y = sortKey(sf, b.data[sf.k]); if (x === y) return 0; if (x === null) return 1; if (y === null) return -1; return (x < y ? -1 : 1) * st.dir; });
+      else {
+        if (type === 'production') docs.sort((a, b) => String(b.data.date || '').localeCompare(String(a.data.date || '')));
+        docs.sort((a, b) => (a.data.archived ? 1 : 0) - (b.data.archived ? 1 : 0));                   // archived last, greyed out
+      }
+      shown = docs;
+      paintFilters(all, fl);
+      for (const id of [...picked]) if (!App.docs.get(id)) picked.delete(id);
+      const allOn = multi && docs.length && docs.every((d) => picked.has(d.id));
+      const tick = (d) => h('td', { class: 'pick', onclick: (ev) => ev.stopPropagation() }, h('input', { type: 'checkbox', checked: picked.has(d.id), 'aria-label': 'Select', onchange: (ev) => { if (ev.target.checked) picked.add(d.id); else picked.delete(d.id); ev.target.closest('tr').classList.toggle('picked', ev.target.checked); bar.paint(); } }));
+      const th = (f) => h('th', { class: 'sortable' + (f.t === 'money' || f.t === 'number' ? ' r' : '') + (st.sort === f.k ? ' sorted' : ''), title: 'Sort', onclick: () => { if (st.sort === f.k) { if (st.dir === 1) st.dir = -1; else { st.sort = ''; st.dir = 1; } } else { st.sort = f.k; st.dir = 1; } paint(); } },
+        f.l, st.sort === f.k ? (st.dir === 1 ? ' ▲' : ' ▼') : '');
+      const filtered = words.length || Object.values(st.f).some(Boolean) || st.archived || st.from || st.to;
+      body.replaceChildren(
+        filtered && all.length ? h('p', { class: 'dim small', style: { margin: '0 0 8px' } }, `${docs.length} of ${all.length}`) : null,
+        docs.length
+          ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, multi ? h('th', { class: 'pick' }, h('input', { type: 'checkbox', checked: allOn, title: 'Select all shown', 'aria-label': 'Select all', onchange: (ev) => { for (const d of docs) { if (ev.target.checked) picked.add(d.id); else picked.delete(d.id); } paint(); } })) : null, cols.map(th))),
+            h('tbody', {}, docs.map((d) => h('tr', { class: 'click' + (picked.has(d.id) ? ' picked' : ''), tabindex: '0', style: d.data.archived ? { opacity: '.45' } : {}, onclick: () => { location.hash = `#/edit/${type}/${d.id}`; }, onkeydown: (ev) => { if (ev.key === 'Enter') location.hash = `#/edit/${type}/${d.id}`; } },
+              multi ? tick(d) : null, cols.map((f) => h('td', { class: f.t === 'money' || f.t === 'number' ? 'r num' : '' }, cell(type, f, d.data[f.k], d.data))))))))
+          : h('div', { class: 'card empty' }, filtered ? 'Nothing matches the search and filters.' : `No ${e.plural.toLowerCase()} yet.`, ' ', App.canCreate(type) && !filtered ? h('a', { href: `#/edit/${type}/new` }, 'Add the first one') : null),
+        type === 'advert' ? adReport() : null);
+      bar.paint();
+    };
     paint();
     const el = h('div', {}, pageHead(e.plural,
-      h('input', { type: 'search', placeholder: 'Search…', 'aria-label': 'Search', style: { width: '220px' }, oninput: (ev) => { q = ev.target.value; paint(); } }),
+      h('input', { type: 'search', placeholder: 'Search…', value: st.q, 'aria-label': 'Search', style: { width: '220px' }, oninput: UI.debounce((ev) => { st.q = ev.target.value; paint(); }, 150) }),
       type === 'song' && App.canEdit('song') ? h('button', { title: 'SongSelect lyrics (.txt), SongSelect .usr and ChordPro files', onclick: () => App.importSongs() }, 'Import song files…') : null,
       (type === 'song' || type === 'service') && (App.gfx || App.machine.outputKey) && App.can('score') ? h('a', { class: 'btn', href: '/live/worship.html' }, 'Worship control ↗') : null,
       !App.editable(type) && App.can('edit') ? h('a', { class: 'btn', href: App.onlineUrl(`#/list/${type}`), target: '_blank', rel: 'noopener', title: 'Records are managed on the website' }, 'Manage on the website ↗') : null,
-      App.canCreate(type) ? h('a', { class: 'btn primary', href: `#/edit/${type}/new` }, '+ New ' + e.label.toLowerCase()) : null), bar, body);
+      App.canCreate(type) ? h('a', { class: 'btn primary', href: `#/edit/${type}/new` }, '+ New ' + e.label.toLowerCase()) : null), filterRow, bar, body);
     return { el, keepScroll: true, onMessage: UI.debounce((m) => { if (m.type === 'doc') paint(); }, 200) };
   };
 
@@ -453,31 +527,72 @@
 
   // ---- fixtures -------------------------------------------------------------------------------
   let fxTab = 'Upcoming';
+  const fxF = { q: '', sport: '', competition: '', venue: '' };
+  let fxSelect = false;
   App.pages.fixtures = () => {
-    const body = h('div', {}), tabs = h('div', { class: 'tabs' });
+    const body = h('div', {}), tabs = h('div', { class: 'tabs' }), filterRow = h('div', { class: 'row list-filters' });
+    const can = App.canEdit('fixture') && App.editable('fixture');
+    const picked = new Set();
+    let shown = [];
+    const bar = makeBulkBar('fixture', { picked, shown: () => shown, after: () => paint() });
+    const selBtn = can ? h('button', { onclick: () => { fxSelect = !fxSelect; if (!fxSelect) picked.clear(); selBtn.textContent = fxSelect ? 'Done' : 'Select'; paint(); } }, fxSelect ? 'Done' : 'Select') : null;
     const paint = () => {
-      const all = App.list('fixture');
+      const every = App.list('fixture');
+      const words = fxF.q.toLowerCase().split(/\s+/).filter(Boolean);
+      const all = every.filter((d) => {
+        const f = d.data;
+        if (fxF.sport && f.sport !== fxF.sport) return false;
+        if (fxF.competition && f.competition !== fxF.competition) return false;
+        if (fxF.venue && f.venue !== fxF.venue) return false;
+        if (words.length) { const t = [App.fixtureName(f), f.sport, App.title('competition', f.competition), App.title('venue', f.venue), App.title('squad', f.team1), App.title('squad', f.team2), f.startDate, f.status].join(' ').toLowerCase(); if (!words.every((w) => t.includes(w))) return false; }
+        return true;
+      });
       const groups = { Upcoming: all.filter((d) => !['Live', 'Completed'].includes(d.data.status)), Live: all.filter((d) => d.data.status === 'Live'), Results: all.filter((d) => d.data.status === 'Completed'), All: all };
       tabs.replaceChildren(...Object.keys(groups).map((t) => h('button', { class: t === fxTab ? 'on' : '', onclick: () => { fxTab = t; paint(); } }, `${t} (${groups[t].length})`)));
+      const opts = (ids, type) => [...new Set(ids.filter(Boolean))].map((id) => [id, App.title(type, id)]).sort((x, y) => String(x[1]).localeCompare(String(y[1])));
+      const sel = (key, label, list) => (list.length > 1 || fxF[key] ? h('select', { class: fxF[key] ? 'on' : '', onchange: (ev) => { fxF[key] = ev.target.value; paint(); } }, h('option', { value: '' }, label), list.map(([v, t]) => h('option', { value: v, selected: fxF[key] === v }, t))) : null);
+      filterRow.replaceChildren(
+        sel('sport', 'Any sport', [...new Set(every.map((d) => d.data.sport).filter(Boolean))].sort().map((x) => [x, x])),
+        sel('competition', 'Any competition', opts(every.map((d) => d.data.competition), 'competition')),
+        sel('venue', 'Any venue', opts(every.map((d) => d.data.venue), 'venue')),
+        fxF.sport || fxF.competition || fxF.venue || fxF.q ? h('span', { class: 'dim small' }, `${all.length} of ${every.length}`) : null,
+        fxF.sport || fxF.competition || fxF.venue ? h('button', { class: 'sm ghost', onclick: () => { fxF.sport = fxF.competition = fxF.venue = ''; paint(); } }, '✕ Clear filters') : null);
+      filterRow.style.display = filterRow.childElementCount ? '' : 'none';
       const desc = fxTab === 'Results';
       const list = groups[fxTab].sort((a, b) => String(a.data.startDate + a.data.startTime).localeCompare(String(b.data.startDate + b.data.startTime)) * (desc ? -1 : 1));
+      shown = list;
       const days = [...new Set(list.map((d) => d.data.startDate || ''))];
-      body.replaceChildren(list.length ? h('div', { class: 'card' }, days.map((day) => [h('div', { class: 'day' }, day ? UI.fmtDate(day, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'No date'), list.filter((d) => (d.data.startDate || '') === day).map((d) => fixtureRow(d))]))
-        : h('div', { class: 'card empty' }, fxTab === 'Results' ? 'Completed matches show up here.' : fxTab === 'Live' ? 'Nothing is live right now.' : 'No fixtures yet.'));
+      const row = (d) => (fxSelect ? h('div', { class: 'fx-pick' + (picked.has(d.id) ? ' picked' : '') }, h('input', { type: 'checkbox', checked: picked.has(d.id), 'aria-label': 'Select', onchange: (ev) => { if (ev.target.checked) picked.add(d.id); else picked.delete(d.id); ev.target.parentNode.classList.toggle('picked', ev.target.checked); bar.paint(); } }), fixtureRow(d)) : fixtureRow(d));
+      const dayHead = (day) => { const ids = list.filter((d) => (d.data.startDate || '') === day).map((d) => d.id);
+        return h('div', { class: 'day' }, fxSelect ? h('input', { type: 'checkbox', title: 'Select the whole day', checked: ids.every((id) => picked.has(id)), onchange: (ev) => { for (const id of ids) { if (ev.target.checked) picked.add(id); else picked.delete(id); } paint(); }, style: { marginRight: '8px' } }) : null,
+          day ? UI.fmtDate(day, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'No date'); };
+      body.replaceChildren(list.length ? h('div', { class: 'card' }, days.map((day) => [dayHead(day), list.filter((d) => (d.data.startDate || '') === day).map(row)]))
+        : h('div', { class: 'card empty' }, all.length < every.length ? 'Nothing matches the search and filters.' : fxTab === 'Results' ? 'Completed matches show up here.' : fxTab === 'Live' ? 'Nothing is live right now.' : 'No fixtures yet.'));
+      bar.paint();
     };
     paint();
-    return { el: h('div', {}, pageHead('Fixtures & Results', App.canEdit('fixture') ? h('a', { class: 'btn primary', href: '#/edit/fixture/new' }, '+ New match') : null), tabs, body), keepScroll: true, onMessage: UI.debounce((m) => { if (m.type === 'doc') paint(); }, 200) };
+    return { el: h('div', {}, pageHead('Fixtures & Results', h('input', { type: 'search', placeholder: 'Search teams, competition, venue…', value: fxF.q, 'aria-label': 'Search', style: { width: '240px' }, oninput: UI.debounce((ev) => { fxF.q = ev.target.value; paint(); }, 150) }),
+      selBtn, App.canEdit('fixture') ? h('a', { class: 'btn primary', href: '#/edit/fixture/new' }, '+ New match') : null), tabs, filterRow, bar, body), keepScroll: true, onMessage: UI.debounce((m) => { if (m.type === 'doc') paint(); }, 200) };
   };
 
   // ---- images ---------------------------------------------------------------------------------
   App.pages.images = () => {
     const grid = h('div', {});
     const used = (id) => [...App.docs.values()].some((d) => d.type !== 'image' && JSON.stringify(d.data).includes(id));
+    let q = '', shown = [];
+    const picked = new Set();
+    const bar = makeBulkBar('image', { picked, shown: () => shown, after: () => paint(), simple: true });
     const paint = () => {
-      const imgs = App.list('image').sort((a, b) => b.updatedAt - a.updatedAt);
-      grid.replaceChildren(imgs.length ? h('div', { class: 'gallery' }, imgs.map((d) => h('div', { class: 'g', style: { cursor: 'default' } }, h('img', { src: '/media/' + d.id, alt: d.data.name, loading: 'lazy' }), h('div', { title: d.data.name }, h('b', {}, d.data.name)), h('div', { class: 'dim', title: d.data.file }, d.data.file), h('div', { class: 'dim' }, Math.max(1, Math.round(d.data.size / 1024)) + ' KB'),
+      const every = App.list('image').sort((a, b) => b.updatedAt - a.updatedAt);
+      const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+      const imgs = every.filter((d) => words.every((w) => (String(d.data.name || '') + ' ' + String(d.data.file || '')).toLowerCase().includes(w)));
+      shown = imgs;
+      const can = App.canEdit('image');
+      const tick = (d) => (can ? h('input', { type: 'checkbox', class: 'g-pick', checked: picked.has(d.id), 'aria-label': 'Select', onchange: (ev) => { if (ev.target.checked) picked.add(d.id); else picked.delete(d.id); ev.target.closest('.g').classList.toggle('picked', ev.target.checked); bar.paint(); } }) : null);
+      bar.paint();
+      grid.replaceChildren(imgs.length ? h('div', { class: 'gallery' }, imgs.map((d) => h('div', { class: 'g' + (picked.has(d.id) ? ' picked' : ''), style: { cursor: 'default', position: 'relative' } }, tick(d), h('img', { src: '/media/' + d.id, alt: d.data.name, loading: 'lazy' }), h('div', { title: d.data.name }, h('b', {}, d.data.name)), h('div', { class: 'dim', title: d.data.file }, d.data.file), h('div', { class: 'dim' }, Math.max(1, Math.round(d.data.size / 1024)) + ' KB'),
         App.canEdit('image') ? h('button', { class: 'sm ghost danger', onclick: async () => { if (await confirmBox(used(d.id) ? 'This image is in use. Delete it anyway?' : 'Delete this image?')) { try { await App.remove('image', d.id); paint(); } catch (e) { oops(e); } } } }, 'Delete') : null)))
-        : h('div', { class: 'card empty' }, 'No images yet. Upload logos, player photos and sponsor boards here, or from any record that has an image field.'));
+        : h('div', { class: 'card empty' }, every.length ? 'No image matches.' : 'No images yet. Upload logos, player photos and sponsor boards here, or from any record that has an image field.'));
     };
     const file = h('input', { type: 'file', multiple: true, accept: 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml', class: 'hide', onchange: async () => {
       let n = 0;
@@ -486,9 +601,9 @@
     } });
     paint();
     const local = App.cfg.mode === 'local';
-    return { el: h('div', {}, pageHead('Images', file, App.canEdit('image') ? h('button', { class: 'primary', onclick: () => file.click() }, 'Upload images') : null),
+    return { el: h('div', {}, pageHead('Images', h('input', { type: 'search', placeholder: 'Search names…', 'aria-label': 'Search', style: { width: '200px' }, oninput: UI.debounce((ev) => { q = ev.target.value; paint(); }, 150) }), file, App.canEdit('image') ? h('button', { class: 'primary', onclick: () => file.click() }, 'Upload images') : null),
       h('p', { class: 'dim', style: { marginTop: '-8px' } }, local ? 'Every image is saved as a file in this machine\'s image folder, so CasparCG can load it from disk. Images added on other machines or the website are downloaded here automatically. Change the folder in Settings → This machine.'
-        : 'Images uploaded here are downloaded to every linked production PC, into the image folder chosen on that machine.'), grid),
+        : 'Images uploaded here are downloaded to every linked production PC, into the image folder chosen on that machine.'), bar, grid),
     keepScroll: true, onMessage: UI.debounce((m) => { if (m.type === 'doc' && m.doc.type === 'image') paint(); }, 300) };
   };
 })();

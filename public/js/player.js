@@ -65,7 +65,7 @@
   .pb-menu small { color: #8e8e93; margin-left: auto; }
   .pb-btn.lit { color: var(--pb-accent, #00ff82); }
   .pb-subs { position: absolute; left: 4%; right: 4%; bottom: 7%; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; text-align: center; font: 600 clamp(14px, 3.4cqw, 34px)/1.3 'Segoe UI', system-ui, sans-serif; container-type: normal; }
-  .stage { container-type: inline-size; }
+  .stage { container-type: inline-size; touch-action: manipulation; }
   .pb-subs span { padding: 2px 10px; border-radius: 4px; background: rgba(0,0,0,.6); color: #fff; }
   .pb-subs[data-size=s] { font-size: clamp(12px, 2.6cqw, 26px); } .pb-subs[data-size=l] { font-size: clamp(17px, 4.3cqw, 44px); } .pb-subs[data-size=xl] { font-size: clamp(20px, 5.4cqw, 56px); }
   .pb-subs[data-color=yellow] span { color: #ffe600; } .pb-subs[data-color=green] span { color: #00ff82; } .pb-subs[data-color=cyan] span { color: #5ff3ff; }
@@ -77,6 +77,11 @@
   .player:fullscreen .pbar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; border-radius: 0; background: rgba(22,22,24,.92); opacity: 0; transition: opacity .2s; }
   .player:fullscreen .pbar:hover, .player:fullscreen .pbar.menu, .player:fullscreen .pbar.touch { opacity: 1; }
   .player:fullscreen .pb-menu { bottom: 58px; }
+  .pb-fx { position: absolute; top: 0; bottom: 0; width: 38%; z-index: 3; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transition: opacity .25s; }
+  .pb-fx.l { left: 0; border-radius: 0 50% 50% 0 / 0 100% 100% 0; } .pb-fx.r { right: 0; border-radius: 50% 0 0 50% / 100% 0 0 100%; }
+  .pb-fx.on { opacity: 1; background: rgba(255,255,255,.12); }
+  .pb-fx span { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #fff; font: 700 14px system-ui, sans-serif; text-shadow: 0 1px 3px #000; }
+  .pb-fx b { font-size: 22px; letter-spacing: -2px; }
   @media (max-width: 600px) { .pbar { gap: 2px; padding: 6px; border-radius: 0; } .pb-vol, .pb-hide-s { display: none; } .pb-play { width: 44px; } .pb-time { padding: 0 3px; font-size: 12px; } }`;
   document.head.append(css);
 
@@ -191,12 +196,18 @@
     const list = btn('list', opts.listLabel || 'Videos', () => opts.onList && opts.onList());
     list.disabled = !opts.onList;
     const fullBtn = btn('full', 'Full screen', () => toggleFull());
+    // full screen turns a phone sideways for a wide picture (16:9, YouTube too); upright videos stay upright.
+    // The Android app turns the screen itself (RFPNative.videoPortrait); browsers through screen.orientation.
+    const wide = () => { const w = Number(video.videoWidth), hh = Number(video.videoHeight); return !(w > 0 && hh > 0) || w >= hh; };
+    const native = window.RFPNative;
     const toggleFull = () => {
       const t = player || video;
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-      else if (t.requestFullscreen) t.requestFullscreen().catch(() => {});
+      if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
+      if (native && native.videoPortrait) { try { native.videoPortrait(!wide()); } catch (e) { /* older app */ } }
+      if (t.requestFullscreen) t.requestFullscreen().then(() => { if (wide() && screen.orientation && screen.orientation.lock && !(native && native.videoPortrait)) screen.orientation.lock('landscape').catch(() => {}); }).catch(() => {});
       else if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
     };
+    document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && screen.orientation && screen.orientation.unlock) { try { screen.orientation.unlock(); } catch (e) { /* not locked */ } } });
     bar.append(prev, play, next, cur, seek, len, volBtn, vol, trackBtn, ccBtn, gear, list, fullBtn);
 
     function paint() {
@@ -228,8 +239,46 @@
     let touchT = null;
     (player || video).addEventListener('touchstart', () => { if (!document.fullscreenElement) return; bar.classList.add('touch'); clearTimeout(touchT); touchT = setTimeout(() => bar.classList.remove('touch'), 3500); }, { passive: true });
     const tick = setInterval(() => { if (!bar.isConnected) { clearInterval(tick); return; } paint(); }, 1000);
-    video.addEventListener('click', () => { if (video.paused) video.play().catch(() => {}); else video.pause(); });
-    video.addEventListener('dblclick', toggleFull);
+    // mouse: click plays / pauses, double-click is full screen. Touch: a tap plays / pauses (in full screen the first tap
+    // shows the bar), a double tap on the left or right half goes 10 seconds back or forward, and each tap more
+    // straight after adds 10 seconds (as on YouTube)
+    let touchAt = 0;
+    video.addEventListener('click', () => { if (Date.now() - touchAt < 800) return; if (video.paused) video.play().catch(() => {}); else video.pause(); });
+    video.addEventListener('dblclick', () => { if (Date.now() - touchAt < 800) return; toggleFull(); });
+    const tapEl = stageEl || video.parentNode || player;
+    const fx = { l: el('div', 'pb-fx l', el('span', '', el('b', '', '\u25C0\u25C0'), el('i', '', ''))), r: el('div', 'pb-fx r', el('span', '', el('b', '', '\u25B6\u25B6'), el('i', '', ''))) };
+    if (tapEl && tapEl.append) tapEl.append(fx.l, fx.r);
+    let lastTap = null, single = null, streak = null;
+    const seekBy = (sec) => {
+      const d = video.duration, end = opts.live ? edge() : d;
+      let t = (video.currentTime || 0) + sec;
+      if (Number.isFinite(end) && end > 0) t = Math.min(end - (opts.live ? 2 : 0.2), t);
+      video.currentTime = Math.max(0, t);
+      paint();
+    };
+    const showFx = (side, total) => {
+      const f = fx[side];
+      f.querySelector('i').textContent = Math.abs(total) + ' seconds';
+      f.classList.add('on'); clearTimeout(f._t); f._t = setTimeout(() => f.classList.remove('on'), 650);
+    };
+    if (tapEl && tapEl.addEventListener) tapEl.addEventListener('pointerup', (e) => {
+      if (e.pointerType !== 'touch' || e.target.closest('.pbar, .pb-menu, button, a, input')) return;
+      touchAt = Date.now();
+      const r = tapEl.getBoundingClientRect(), side = e.clientX - r.left < r.width / 2 ? 'l' : 'r', now = Date.now();
+      if (streak && streak.side === side && now - streak.at < 700) {            // more taps straight after: 10 s more each
+        streak.at = now; streak.total += 10; seekBy(side === 'l' ? -10 : 10); showFx(side, streak.total); return;
+      }
+      if (lastTap && now - lastTap.at < 300 && Math.abs(e.clientX - lastTap.x) < 90) {
+        clearTimeout(single); single = null; lastTap = null;
+        if (side === 'r' && opts.live && !behind()) return;                         // nothing ahead of live
+        streak = { side, at: now, total: 10 }; seekBy(side === 'l' ? -10 : 10); showFx(side, 10); return;
+      }
+      streak = null;
+      lastTap = { at: now, x: e.clientX };
+      const barShown = bar.classList.contains('touch');
+      clearTimeout(single);
+      single = setTimeout(() => { single = null; lastTap = null; if (document.fullscreenElement && !barShown) return; if (video.paused) video.play().catch(() => {}); else video.pause(); }, 300);
+    });
     const onKey = (e) => {
       if (!bar.isConnected) { document.removeEventListener('keydown', onKey); return; }
       if (/INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || '')) return;

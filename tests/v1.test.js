@@ -70,6 +70,7 @@ test('superuser page: emailed link sets the password, own sign-in, health and co
   assert.match(await page.text(), /super\.js/);
   const viaHost = (h) => new Promise((resolve, reject) => { const u = new URL(app.url); require('node:http').get({ host: u.hostname, port: u.port, path: '/', headers: { host: h } }, (res) => { let d = ''; res.on('data', (c) => { d += c; }); res.on('end', () => resolve(d)); }).on('error', reject); });
   assert.match(await viaHost('analytics.site.example'), /super\.js/);
+  assert.match(await viaHost('universe.site.example'), /super\.js/);
   assert.doesNotMatch(await viaHost('site.example'), /super\.js/, 'the website itself stays the website');
 
   const su = client(app.url);
