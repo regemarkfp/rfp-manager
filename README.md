@@ -18,10 +18,19 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.20
+
+- **Watch pages**: the player is as large as fits the screen and never taller, with the chat (live streams) or comments (videos) on the right and the title and description underneath. On a phone everything stacks.
+- **Comments on videos** (/v): anyone who may watch reads them, signed in to write; the writer and the team can remove them.
+- **YouTube videos show their length** instead of 0:00: read from YouTube when added (with or without the YouTube API key), and filled in for videos added before.
+- **Account menu on phones**: client portal links are listed one under the other, so the menu fits the screen (it ran off the left edge).
+- **YouTube captions stay off** when Subtitles is Off (YouTube switched them on by itself from the viewer's YouTube settings or the video's owner).
+- **Test PayFast** (Settings → Server → PayFast): the server sends PayFast a signed R5.00 test form (nobody pays, nothing is saved) and shows what PayFast answers: its payment page, or its error page with the reason (signature, merchant…) and what to change. **Remove passphrase** button for when the PayFast (or sandbox) account has none.
+- **Quote and invoice PDFs**: the terms and conditions always start at the top of a new page, after the page with the totals. A long line (a description with many rows) starts on the first page and carries on on the next, instead of leaving the first page empty. Terms and notes from Invoice Ninja print as plain text (no HTML), without their copy of the bank details and old terms and conditions (the billing details print those once). Wider Unit Cost column, so R110,500.00 stays on one line. Invisible characters and emoji pasted from websites are left out of PDFs instead of printing as "?", and a copy of the terms and conditions pasted into Small print is not printed a second time. The banking details print once, next to the totals (no longer again after the terms).
+
 ### 1.0.19
 
 - **Manage many quotes and invoices at once**: tick them in **Quotes & invoices** (or tick the top box for everything shown) and a bar offers: **Email** (each to its client, with their CC accounts), **Mark as…** a status, **Mark paid** (adds a payment of what is still owed, with the date and how), **To invoices** (quotes), **Copy** (new drafts with new numbers), **PDFs (ZIP)** (all their PDFs in one file), **Spreadsheet** (CSV for Excel or your bookkeeper) and **Delete**. What cannot be done to one (an invoice with payments cannot be deleted, a draft cannot be marked paid) is listed; the rest goes ahead.
-- **Quote and invoice PDFs**: the terms and conditions always start at the top of a new page, after the page with the totals. A long line (a description with many rows) starts on the first page and carries on on the next, instead of leaving the first page empty. Terms and notes from Invoice Ninja print as plain text (no HTML), without their copy of the bank details and old terms and conditions (the billing details print those once). Wider Unit Cost column, so R110,500.00 stays on one line. Invisible characters and emoji pasted from websites are left out of PDFs instead of printing as "?", and a copy of the terms and conditions pasted into Small print is not printed a second time.
 
 ### 1.0.18
 

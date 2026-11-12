@@ -169,8 +169,25 @@ test('VOD: chunked upload, series and seasons, who may watch, tickets for a vide
   assert.deepEqual((await admin.del(`/api/vod/${ep2}/subtitles/${sid}?team=${team}`)).data.list.map((x) => x.label), ['Afrikaans']);
   assert.equal((await admin.get(`/api/vod?team=${team}`)).data.list.find((x) => x.id === ep2).subtitles, 1);
   // a YouTube item gets our own file (the team's own video): same item, it plays the file once ready
+  // (a stand-in for YouTube's watch page, for the video's length)
+  const ytPage = http.createServer((req, res) => res.end('<html><script>var x = {"videoDetails":{"videoId":"abcdefghijk","lengthSeconds":"26519"}};</script></html>'));
+  await new Promise((r) => ytPage.listen(0, '127.0.0.1', r));
+  app.config.youtubeWatch = `http://127.0.0.1:${ytPage.address().port}/watch`;
   await admin.put(`/api/docs/vodvideo/vod_ytown12345?team=${team}`, { data: { title: 'Our final on YouTube', channel: 'chan_tv', source: 'YouTube', youtube: 'abcdefghijk', visibility: 'Public' } });
+  // its length, found from YouTube's page (no API key), so the cards do not say 0:00
+  await guest.get('/api/public/v/vod_ytown12345');
+  await until(async () => (await app.store.get('vod_ytown12345')).data.duration === 26519, 3000, 'YouTube length filled in');
+  assert.equal((await guest.get('/api/public/v/vod_ytown12345')).data.duration, 26519);
+  ytPage.close();
   assert.equal((await guest.get('/api/public/v/vod_ytown12345')).data.youtube, 'abcdefghijk');
+  // comments beside a video: anyone who may watch reads them, signed in to write
+  assert.deepEqual((await guest.get('/api/public/v/vod_ytown12345/comments')).data.comments, []);
+  assert.equal((await guest.post('/api/public/v/vod_ytown12345/comments', { text: 'Hi' })).status, 401);
+  assert.equal((await admin.post('/api/public/v/vod_ytown12345/comments', { text: 'What a final!' })).status, 200);
+  const cms = (await guest.get('/api/public/v/vod_ytown12345/comments')).data;
+  assert.deepEqual([cms.comments.length, cms.comments[0].text, cms.canModerate], [1, 'What a final!', false]);
+  assert.equal((await admin.get('/api/public/v/vod_ytown12345/comments')).data.canModerate, true);
+  assert.equal((await guest.get('/api/public/v/nope_nope/comments')).status, 404);
   const own = await upload(admin, team, crypto.randomBytes(900), { name: 'final.mp4', replace: 'vod_ytown12345', quality: 'small' });
   assert.equal(own, 'vod_ytown12345');
   assert.equal((await guest.get('/api/public/v/vod_ytown12345')).data.youtube, 'abcdefghijk', 'YouTube until the file is ready');

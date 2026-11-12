@@ -215,6 +215,25 @@
       const f = { merchantId: inp(c.merchantId, { placeholder: 'e.g. 10000100', inputmode: 'numeric' }), merchantKey: inp('', { type: 'password', autocomplete: 'off', placeholder: c.hasKey ? '•••••• saved (type a new one to replace it)' : 'Merchant key' }),
         passphrase: inp('', { type: 'password', autocomplete: 'off', placeholder: c.hasPassphrase ? '•••••• saved' : 'The passphrase you set on PayFast (Security)' }), sandbox: h('input', { type: 'checkbox', checked: c.sandbox }) };
       const field = (label, el, help) => h('label', { class: 'fld', style: { display: 'block', marginBottom: '10px' } }, h('div', { class: 'dim small' }, label), el, help ? h('div', { class: 'dim small' }, help) : null);
+      const result = h('div', { style: { marginTop: '10px' } });
+      // the server sends PayFast a test payment form and shows what PayFast said, with what to change
+      async function testPay(btn) {
+        btn.disabled = true; result.replaceChildren(h('p', { class: 'dim' }, 'Asking PayFast…'));
+        try {
+          const r = await api('POST', '/api/pay/test', {});
+          const hint = (r.reasons || []).concat(r.message).join(' ');
+          const tips = [];
+          if (/signature/i.test(hint)) tips.push(c.hasPassphrase ? 'The passphrase saved here does not match the one on PayFast (Settings → Developer settings → Security). Type it again exactly, or press Remove passphrase if PayFast has none.' : 'PayFast has a passphrase set: type the same passphrase here and save.');
+          if (/merchant/i.test(hint)) tips.push(r.sandbox ? 'Sandbox is ticked, so the ID and key must be your SANDBOX ones (sandbox.payfast.co.za → Settings → Developer settings), not your real account\'s.' : 'Check the merchant ID and key on PayFast → Settings → Developer settings. If they are sandbox details, tick Sandbox.');
+          if (/email/i.test(hint)) tips.push('PayFast may refuse a buyer with the same email as the merchant account: pay with another email address.');
+          result.replaceChildren(h('div', { class: 'card ' + (r.ok ? '' : 'warn') },
+            h('b', {}, r.ok ? '✓ PayFast is happy' : `✗ PayFast refused the payment form (${r.status || 'no answer'})`), h('p', {}, r.message),
+            (r.reasons || []).filter((x) => x !== r.message).length ? h('ul', {}, r.reasons.filter((x) => x !== r.message).map((x) => h('li', { class: 'small' }, x))) : null,
+            tips.length ? h('ul', {}, tips.map((x) => h('li', {}, x))) : null,
+            h('p', { class: 'dim small' }, (r.sandbox ? 'Sandbox' : 'Live') + ': ' + r.url)));
+        } catch (e) { result.replaceChildren(h('p', { class: 'dim' }, e.message)); }
+        btn.disabled = false;
+      }
       box.replaceChildren(h('h2', {}, 'PayFast (payments)'),
         h('p', {}, h('span', { class: 'led ' + (c.on ? 'ok' : 'bad') }), ' ', c.on ? `On${c.sandbox ? ' – SANDBOX (test payments, no real money)' : ''}. Tickets and passes, invoices (Pay now), booking deposits and paid software are paid through PayFast.` : 'Not set up: nothing can be paid online yet.'),
         h('details', { open: !c.on ? '' : null }, h('summary', {}, 'How to set it up'),
@@ -228,7 +247,9 @@
         h('p', { class: 'dim small' }, 'PayFast confirms each payment to ', h('code', {}, c.notifyUrl), '; nothing to set for that on PayFast.'),
         h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } },
           h('button', { class: 'primary', onclick: async () => { try { const r = await api('POST', '/api/pay/config', { merchantId: f.merchantId.value, merchantKey: f.merchantKey.value, passphrase: f.passphrase.value, sandbox: f.sandbox.checked }); App.cfg.payments = r.on; toast('Saved'); paint(); } catch (e) { oops(e); } } }, 'Save'),
-          c.on ? h('button', { class: 'danger sm', onclick: async () => { if (!confirm('Switch payments off? The merchant details are removed from this website.')) return; try { await api('POST', '/api/pay/config', { off: true }); App.cfg.payments = false; paint(); } catch (e) { oops(e); } } }, 'Switch off') : null));
+          c.on ? h('button', { onclick: (e) => testPay(e.target) }, 'Test PayFast') : null,
+          c.hasPassphrase ? h('button', { class: 'sm ghost', onclick: async () => { if (!confirm('Remove the saved passphrase? Do this when your PayFast account (or sandbox account) has no passphrase set.')) return; try { await api('POST', '/api/pay/config', { clearPassphrase: true }); toast('Passphrase removed'); paint(); } catch (e) { oops(e); } } }, 'Remove passphrase') : null,
+          c.on ? h('button', { class: 'danger sm', onclick: async () => { if (!confirm('Switch payments off? The merchant details are removed from this website.')) return; try { await api('POST', '/api/pay/config', { off: true }); App.cfg.payments = false; paint(); } catch (e) { oops(e); } } }, 'Switch off') : null), result);
     };
     paint();
     return box;

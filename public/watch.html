@@ -9,7 +9,14 @@
     :root { --bg: #111; --panel: #1b1b1b; --line: #333; --text: #f2f2f2; --dim: #a3a3a3; --live: #ff3b3b; --accent: #00ff82; }
     * { box-sizing: border-box; }
     html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif; }
-    main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    main { max-width: 1800px; margin: 0 auto; padding: 16px; }
+    /* the player as large as fits the screen (never taller), the chat on the right, the rest underneath */
+    .wgrid { display: grid; grid-template-columns: minmax(0, calc((100vh - 170px) * 16 / 9)) minmax(300px, 380px); gap: 22px; justify-content: center; align-items: start; }
+    .wmain { min-width: 0; }
+    .wside { position: sticky; top: 12px; background: var(--panel); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; max-height: calc(100vh - 90px); min-height: 280px; }
+    .wside #chat { margin-top: 0; display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 8px; } .wside .clist { max-height: none; flex: 1; min-height: 120px; }
+    .wside:has(#chat:empty) { display: none; }
+    @media (max-width: 1000px) { .wgrid { grid-template-columns: minmax(0, 1fr); } .wside { position: static; max-height: none; } .wside .clist { max-height: 420px; } }
     .stage { position: relative; background: #000; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; display: grid; place-items: center; }
     .stage video { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; }
     .stage .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .45; }
@@ -95,7 +102,7 @@
     .msg a { color: var(--accent); }
     .msg .col { display: grid; gap: 8px; margin: 14px 0 4px; } .msg .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; } .msg .small { font-size: 12px; }
     .msg .col input { margin: 0; box-sizing: border-box; }
-    .bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; max-width: 1100px; margin: 0 auto; }
+    .bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; max-width: 1800px; margin: 0 auto; }
     .bar img { height: 28px; } .bar a { color: var(--text); text-decoration: none; font-weight: 700; display: flex; align-items: center; gap: 10px; }
     .chrow { display: flex; align-items: center; gap: 12px; margin: 10px 0; flex-wrap: wrap; }
     .chrow a { color: var(--text); text-decoration: none; display: flex; align-items: center; gap: 10px; }
@@ -117,15 +124,16 @@
 <body>
   <div class="bar"><a href="/"><img src="/brand/rfp-logo-sm.png" alt="RFP"><span id="site">RegemarkFP</span></a></div>
   <main>
+    <div class="wgrid"><div class="wmain">
     <div class="player" id="player"><div class="stage" id="stage"><div class="msg"><b>Loading…</b></div></div><div id="ctrl"></div></div>
     <div class="info">
       <div class="head"><h1 id="title"></h1><span class="badge" id="badge">OFFLINE</span><span class="dim small" id="viewers"></span></div>
       <div class="chrow" id="chrow"></div>
       <div class="desc" id="desc"></div>
       <div id="mstats"></div>
-      <div id="chat"></div>
       <div id="vids"></div>
     </div>
+    </div><aside class="wside"><div id="chat"></div></aside></div>
   </main>
   <script src="/js/vendor/hls.min.js"></script>
   <script src="/js/player.js"></script>

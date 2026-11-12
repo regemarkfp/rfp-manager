@@ -36,6 +36,19 @@ test('paid streams: tickets and channel passes through PayFast, ticket links, wh
     payfast: { merchantId: '10000100', merchantKey: '46f0cd694581a', passphrase: PASS, sandbox: true, checkIp: false, validateUrl: `http://127.0.0.1:${pf.address().port}/eng/query/validate` } }, { mongoDriver: fakeMongo });
   t.after(() => cloud.stop());
   const admin = client(cloud.url);
+  // Test PayFast (Settings → Server): the form goes to PayFast, and PayFast's error page is read back
+  let pfPage = { status: 404, body: '<html><body><h3>404 Bad Request</h3><p>Unable to process transaction</p><ul><li>signature: Generated signature does not match submitted signature</li></ul></body></html>' }, posted = '';
+  const proc = http.createServer((req, res) => { let b = ''; req.on('data', (c) => { b += c; }); req.on('end', () => { posted = b; res.writeHead(pfPage.status, { 'content-type': 'text/html' }); res.end(pfPage.body); }); });
+  await new Promise((r) => proc.listen(0, '127.0.0.1', r));
+  t.after(() => proc.close());
+  cloud.config.payfast.processUrl = `http://127.0.0.1:${proc.address().port}/eng/process`;
+  let pt = await cloud.pay.test({ base: 'https://tv.example.com' });
+  assert.equal(pt.ok, false); assert.equal(pt.status, 404);
+  assert.match(pt.message, /signature/); assert.match(posted, /merchant_id=10000100&merchant_key=46f0cd694581a&return_url=/); assert.match(posted, /&signature=[0-9a-f]{32}$/);
+  pfPage = { status: 200, body: '<html><body><h1>Pay R 5.00</h1><button>Pay Now</button></body></html>' };
+  pt = await cloud.pay.test({ base: 'https://tv.example.com' });
+  assert.equal(pt.ok, true);
+  delete cloud.config.payfast.processUrl;
   assert.equal((await admin.post('/api/auth/signup', { name: 'Ruan', email: 'ruan@example.com', password: 'correct horse' })).status, 200);
   const team = (await admin.post('/api/orgs', { name: 'RegemarkFP' })).data.id;
   assert.equal((await admin.get('/api/config')).data.payments, true);

@@ -35,7 +35,7 @@
     sheet.addEventListener('dblclick', () => fire('dblclick'));
     box.append(slot, sheet);
     host.append(box);
-    let p = null, state = -1, tick = null, vol = 1, mute = false, rate = 1, wantPlay = false, ready = false, lastDur = 0, err = '';
+    let p = null, state = -1, tick = null, vol = 1, mute = false, rate = 1, wantPlay = false, ready = false, lastDur = 0, err = '', cc = false;
     const waiters = [];
     // YouTube's player did not come (a blocked network or an ad blocker, or the owner forbids it): say so, with a way out
     const failed = (msg) => {
@@ -61,10 +61,13 @@
             lastDur = p.getDuration() || 0;
             fire('loadedmetadata'); fire('durationchange'); fire('volumechange'); startTick();
             if (wantPlay) p.playVideo();
+            applyCc(); setTimeout(applyCc, 1500);
           },
+          // YouTube loads its captions module by itself (the viewer's YouTube setting, or the owner's): keep our choice
+          onApiChange: () => applyCc(),
           onStateChange: (e) => {
             state = e.data;
-            if (state === ST.PLAYING) { fire('play'); fire('playing'); waiters.splice(0).forEach((w) => w.ok()); }
+            if (state === ST.PLAYING) { fire('play'); fire('playing'); waiters.splice(0).forEach((w) => w.ok()); if (!ccApplied) { ccApplied = true; applyCc(); setTimeout(applyCc, 1200); } }
             else if (state === ST.PAUSED) fire('pause');
             else if (state === ST.BUFFERING) fire('waiting');
             else if (state === ST.ENDED) { fire('pause'); fire('ended'); }
@@ -97,7 +100,16 @@
       setTimeout(() => { const i = waiters.indexOf(w); if (i >= 0 && !(state === ST.PLAYING || state === ST.BUFFERING)) { waiters.splice(i, 1); const e = new Error('Autoplay with sound was refused'); e.name = mute ? 'AbortError' : 'NotAllowedError'; no(e); } }, ready ? 2500 : 6000);
     });
     // YouTube's own captions (the video's, or YouTube's automatic ones) on or off
-    media.captions = (on) => { if (!p || !ready) return; try { if (on) { p.loadModule('captions'); p.setOption('captions', 'track', { languageCode: (navigator.language || 'en').slice(0, 2) }); } else p.unloadModule('captions'); } catch (e) { /* not for this video */ } };
+    // off means off: the track is cleared and the module unloaded, again whenever YouTube brings it back
+    let ccApplied = false;
+    function applyCc() {
+      if (!p || !ready) return;
+      try {
+        if (cc) { p.loadModule('captions'); p.setOption('captions', 'track', { languageCode: (navigator.language || 'en').slice(0, 2) }); }
+        else { try { p.setOption('captions', 'track', {}); } catch (e) { /* no captions */ } try { p.unloadModule('captions'); } catch (e) { /* not loaded */ } try { p.unloadModule('cc'); } catch (e) { /* older name */ } }
+      } catch (e) { /* not for this video */ }
+    }
+    media.captions = (on) => { cc = !!on; applyCc(); };
     media.pause = () => { wantPlay = false; if (p && ready) p.pauseVideo(); };
     media.destroy = () => { destroy(); box.remove(); };
     media.el = box;

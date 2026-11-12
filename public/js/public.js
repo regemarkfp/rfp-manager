@@ -45,7 +45,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   }
   function streamCard(s, opts = {}) {
     const href = s.href || '/watch/' + s.slug + (s.match ? '?m=' + encodeURIComponent(s.match) : s.start ? '?v=' + encodeURIComponent(s.start) : '');
-    const badges = s.live ? el('span', { class: 'badge live' }, '● LIVE') : s.start ? el('span', { class: 'badge dur' }, dur(s.duration)) : el('span', { class: 'badge when' }, day(s.date, s.time));
+    const badges = s.live ? el('span', { class: 'badge live' }, '● LIVE') : s.start ? (s.duration > 0 ? el('span', { class: 'badge dur' }, dur(s.duration)) : s.youtube ? el('span', { class: 'badge dur' }, 'YouTube') : null) : el('span', { class: 'badge when' }, day(s.date, s.time));
     const sub = s.live ? `${s.viewers || 0} watching` : s.start ? (s.of ? s.of + ' · ' : '') + ago(s.start) : 'Upcoming · ' + day(s.date, s.time);
     const price = s.price && s.price.ticket ? el('span', { class: 'badge price' }, 'R ' + Number(s.price.ticket).toFixed(2).replace(/\.00$/, '')) : null;
     return el('a', { class: 'card', href }, thumb(s, [badges, price]),
@@ -829,6 +829,37 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     setTimeout(() => window.RFPPlayer.playWithSound(media, () => pb.stage.append(unmute)), 30);
     return b;
   }
+  // comments on a video (beside the player): read by anyone who may watch, written when signed in
+  function vodComments(v) {
+    const box = el('aside', { class: 'watch-side' }, el('h3', {}, 'Comments'), el('p', { class: 'sub small' }, 'Loading…'));
+    const ago2 = (t) => { const s = Math.round((Date.now() - t) / 1000); return s < 60 ? 'now' : s < 3600 ? Math.floor(s / 60) + ' min' : s < 86400 ? Math.floor(s / 3600) + ' h' : new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); };
+    const url = '/api/public/v/' + encodeURIComponent(v.id) + '/comments';
+    let form = null;
+    async function load() {
+      let r;
+      try { r = await vget(url); } catch (e) { box.replaceChildren(el('h3', {}, 'Comments'), el('p', { class: 'sub small' }, e.message)); return; }
+      const list = el('div', { class: 'clist' }, r.comments.length ? r.comments.slice().reverse().map((c) => el('div', { class: 'cm' },
+        c.image ? el('img', { class: 'av', src: c.image, alt: '', referrerpolicy: 'no-referrer' }) : el('span', { class: 'av' }, (c.name || '?').slice(0, 1).toUpperCase()),
+        el('div', {}, el('b', {}, c.name), el('span', { class: 'when' }, ago2(c.at)),
+          c.mine || r.canModerate ? el('button', { class: 'rm', title: 'Remove', onclick: async () => { await fetch('/api/comments/' + encodeURIComponent(c.id), { method: 'DELETE', credentials: 'same-origin', headers: { 'x-rfp': '1' } }); load(); } }, '✕') : null,
+          el('div', { class: 't' }, c.text)))) : el('p', { class: 'sub small' }, 'No comments yet. Be the first.'));
+      if (!form) {
+        if (r.signedIn) {
+          const input = el('textarea', { rows: 2, maxlength: 500, placeholder: 'Add a comment…' });
+          const err = el('p', { class: 'err small' });
+          const send = async () => {
+            const text = input.value.trim(); if (!text) return;
+            try { await vget(url, { method: 'POST', body: JSON.stringify({ text }) }); input.value = ''; err.textContent = ''; load(); } catch (e) { err.textContent = e.message; }
+          };
+          input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+          form = el('div', { class: 'cform' }, input, el('button', { class: 'primary', onclick: send }, 'Send'), err);
+        } else form = el('p', { class: 'sub small' }, el('a', { href: '/?signin=1&next=' + encodeURIComponent(location.pathname) }, 'Sign in'), ' to comment.');
+      }
+      box.replaceChildren(el('h3', {}, 'Comments' + (r.comments.length ? ` (${r.comments.length})` : '')), form, list);
+    }
+    load();
+    return box;
+  }
   async function videoPage(id, password) {
     let v;
     try { v = await vget('/api/public/v/' + encodeURIComponent(id), password !== undefined ? { method: 'POST', body: JSON.stringify({ password }) } : {}); } catch (e) { return el('div', { class: 'empty' }, e.message); }
@@ -884,10 +915,13 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
         onList: v.series ? () => { const t = document.querySelector('.eps'); if (t) t.scrollIntoView({ behavior: 'smooth' }); } : null, listLabel: 'Episodes' });
       stage = pb.box;
     }
-    return [paid, stage, head,
-      v.description ? el('div', { class: 'desc-box', style: { whiteSpace: 'pre-wrap' } }, v.description) : null,
-      v.next && !v.needs ? el('p', {}, el('a', { href: '/v/' + v.next.id, 'data-nav': '' }, el('button', {}, 'Next: ' + v.next.title + ' ›'))) : null,
-      v.series ? [el('h2', { class: 'sec' }, v.series.title), seasonsList(v.series, v.id)] : null];
+    // the player sized to fit the screen, comments on the right, everything else underneath
+    return [paid, el('div', { class: 'watch' },
+      el('div', { class: 'watch-main' }, stage, head,
+        v.description ? el('div', { class: 'desc-box', style: { whiteSpace: 'pre-wrap' } }, v.description) : null,
+        v.next && !v.needs ? el('p', {}, el('a', { href: '/v/' + v.next.id, 'data-nav': '' }, el('button', {}, 'Next: ' + v.next.title + ' ›'))) : null,
+        v.series ? [el('h2', { class: 'sec' }, v.series.title), seasonsList(v.series, v.id)] : null),
+      v.needs && v.needs !== 'processing' ? null : vodComments(v))];
   }
   async function seriesPage(id) {
     let s;
@@ -1207,7 +1241,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
         m.teams ? el('a', { href: '/app' }, 'Studio') : null, el('a', { href: '/subscriptions', 'data-nav': '' }, 'Subscriptions'), el('a', { href: '/notifications', 'data-nav': '' }, 'Notifications'), el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); signOut(); } }, 'Sign out'));
       // client portals of this email (a client of a production company): one link each
       const box = menu;
-      get('/api/public/my-portals').then((r) => { if (box.isConnected && r.portals.length) box.insertBefore(el('div', {}, r.portals.map((x) => el('a', { href: x.url }, `Client portal: ${x.client}`))), box.children[1] || null); }).catch(() => {});
+      get('/api/public/my-portals').then((r) => { if (box.isConnected && r.portals.length) box.insertBefore(el('div', { class: 'me-portals' }, el('div', { class: 'sub small' }, r.portals.length > 1 ? 'Client portals' : 'Client portal'), r.portals.map((x) => el('a', { href: x.url }, x.client))), box.children[1] || null); }).catch(() => {});
       $('me').append(menu); document.addEventListener('click', () => { if (menu) { menu.remove(); menu = null; } }, { once: true }); };
     $('me').replaceChildren(m && m.teams ? el('a', { href: '/app' }, el('button', { class: 'studio' }, 'Studio')) : null,
       m ? el('button', { class: 'icon avatar-btn', title: m.email, onclick: toggle }, avatar(m.image, m.name || m.email)) : signInButton());
