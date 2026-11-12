@@ -165,7 +165,7 @@ const pts = (team, n, how) => Array.from({ length: n }, () => ev('point', { team
 {
   const v = S.compute(setup('rugby'), []);
   eq(['teamA_name', 'scoreA', 'period', 'table_cols', 'col1', 'stat1_label'].every(k => k in v.flat), true, 'flat common keys');
-  eq(S.list().length, 11, 'eleven sports registered');
+  eq(S.list().length, 12, 'twelve sports registered (with Rocket League)');
 }
 
 // ---------------- federation rules added in RFP Manager

@@ -3,6 +3,8 @@
 'use strict';
 (() => {
   const P = {
+    code: 'M4 7v2c0 .55-.45 1-1 1H2v4h1c.55 0 1 .45 1 1v2c0 1.65 1.35 3 3 3h3v-2H7c-.55 0-1-.45-1-1v-2c0-1.3-.84-2.42-2-2.83v-.34C5.16 11.42 6 10.3 6 9V7c0-.55.45-1 1-1h3V4H7C5.35 4 4 5.35 4 7zm17 3c-.55 0-1-.45-1-1V7c0-1.65-1.35-3-3-3h-3v2h3c.55 0 1 .45 1 1v2c0 1.3.84 2.42 2 2.83v.34c-1.16.41-2 1.52-2 2.83v2c0 .55-.45 1-1 1h-3v2h3c1.65 0 3-1.35 3-3v-2c0-.55.45-1 1-1h1v-4h-1z',
+    game: 'M21.58 16.09l-1.09-7.66C20.21 6.46 18.52 5 16.53 5H7.47C5.48 5 3.79 6.46 3.51 8.43l-1.09 7.66C2.2 17.63 3.39 19 4.94 19c.68 0 1.32-.27 1.8-.75L9 16h6l2.25 2.25c.48.48 1.13.75 1.8.75 1.56 0 2.75-1.37 2.53-2.91zM11 11H9v2H8v-2H6v-1h2V8h1v2h2v1zm4-1c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm2 3c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z',
     home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
     dashboard: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z',
     trophy: 'M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z',
@@ -66,8 +68,8 @@
     '#/': 'dashboard', '#/notifications': 'bell', '#/list/booking': 'inbox', '#/list/client': 'work', '#/money': 'receipt', '#/list/service': 'tag', '#/ratings': 'star',
     '#/list/production': 'video', '#/calendar': 'calendar', '#/list/crewMember': 'people', '#/list/crewRole': 'badge', '#/list/equipment': 'camera', '#/list/releaseForm': 'doc', '#/list/expense': 'receipt', '#/availability': 'event',
     '#/fixtures': 'trophy', '#/list/competition': 'flag', '#/list/club': 'shield', '#/list/squad': 'people', '#/list/player': 'person', '#/list/venue': 'place',
-    '#/pcs': 'computer', '#/monitors': 'monitor', '#/templates': 'layers', '#/list/theme': 'palette', '#/adverts': 'play', '#/list/dashboard': 'tune', '#/list/timeline': 'timeline', '#/automation': 'bolt',
-    '#/list/channel': 'tv', '#/streams': 'live', '#/content': 'library', '#/vod': 'movie', '#/playlists': 'playlist', '#/analytics': 'chart', '#/sales': 'payments', '#/streamads': 'adframe',
+    '#/pcs': 'computer', '#/monitors': 'monitor', '#/templates': 'layers', '#/list/theme': 'palette', '#/adverts': 'play', '#/list/dashboard': 'tune', '#/list/timeline': 'timeline', '#/automation': 'bolt', '#/variables': 'code', '/rl/control': 'game',
+    '#/list/channel': 'tv', '#/streams': 'live', '#/content': 'library', '#/vod': 'movie', '#/playlists': 'playlist', '#/analytics': 'chart', '#/youtube': 'live', '#/sales': 'payments', '#/streamads': 'adframe',
     '#/list/advert': 'campaign', '#/list/adSlot': 'quilt', '#/list/playlist': 'numbered', '#/playlog': 'history', '#/sponsors': 'report',
     '#/images': 'image', '#/list/track': 'note', '#/music': 'queue', '#/musicrights': 'copyright',
     '#/list/song': 'songs', '#/ccli': 'report', '#/bibles': 'book', '#/settings': 'settings',

@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RFP Overlay</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+html,body{background:transparent;overflow:hidden;width:100%;height:100%}
+body.preview{background:#2b2b2b url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='20' height='20' fill='%23353535'/%3E%3Crect x='20' y='20' width='20' height='20' fill='%23353535'/%3E%3C/svg%3E")}
+#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0}
+#shake{position:absolute;inset:0}
+#shake.go{animation:shake .45s linear}
+@keyframes shake{10%{transform:translate(-6px,3px)}20%{transform:translate(5px,-4px)}30%{transform:translate(-4px,-2px)}40%{transform:translate(4px,3px)}55%{transform:translate(-2px,1px)}70%{transform:translate(2px,-1px)}100%{transform:none}}
+:root{--panelA:rgba(14,14,14,.92);--ease:cubic-bezier(.2,.9,.25,1.15);--ease2:cubic-bezier(.7,0,.2,1)}
+
+/* ================= SCOREBUG ================= */
+#bug{position:absolute;top:16px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center}
+#bug .row{position:relative;display:flex;align-items:stretch;height:66px;filter:drop-shadow(0 8px 16px rgba(0,0,0,.55))}
+#bug .film{position:absolute;left:30px;right:30px;top:-9px;height:5px;background:var(--perf);background-size:12px 5px;animation:film 1.6s linear infinite;opacity:.85;transition:transform .5s var(--ease2) .5s;transform-origin:center}
+@keyframes film{to{background-position:12px 0}}
+.logo{width:66px;background:var(--slab);display:grid;place-items:center;overflow:hidden;transition:transform .45s var(--ease) .32s,opacity .3s .32s}
+.logo img{max-width:78%;max-height:78%;object-fit:contain}
+.logo b{font-size:20px;font-weight:900;color:var(--c);font-style:italic}
+#lg0{clip-path:polygon(14px 0,100% 0,100% 100%,0 100%)}
+#lg1{clip-path:polygon(0 0,calc(100% - 14px) 0,100% 100%,0 100%)}
+.tm{width:256px;display:flex;flex-direction:column;justify-content:center;padding:0 18px;background:linear-gradient(90deg,var(--slab),var(--slab2));position:relative;overflow:hidden;transition:transform .45s var(--ease) .22s,opacity .3s .22s}
+.tm.r{background:linear-gradient(270deg,var(--slab),var(--slab2));text-align:right;align-items:flex-end}
+.tm .name{font-size:26px;font-weight:900;text-transform:uppercase;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:224px;line-height:1;font-style:italic}
+.tm::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:var(--c);box-shadow:0 0 14px var(--c)}
+.tm::before{content:"";position:absolute;top:0;bottom:0;width:80px;left:-120px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.14),transparent);transform:skewX(var(--skew));animation:gleam 9s ease-in-out infinite}
+.tm.r::before{animation-delay:.25s}
+@keyframes gleam{0%,88%{left:-120px}100%{left:110%}}
+.pips{display:flex;gap:5px;margin-top:8px}
+.pip{width:26px;height:6px;background:rgba(255,255,255,.2);transform:skewX(var(--skew));transition:background .3s,box-shadow .3s}
+.pip.on{background:var(--c);box-shadow:0 0 10px var(--c)}
+.pip.new{animation:pipPop .9s var(--ease)}
+@keyframes pipPop{0%{transform:skewX(var(--skew)) scale(1)}30%{transform:skewX(var(--skew)) scale(1.8);background:#fff}100%{transform:skewX(var(--skew)) scale(1)}}
+.sc{width:80px;position:relative;overflow:hidden;background:var(--c);transition:transform .4s var(--ease) .12s;transform-origin:center}
+.sc .roll span{position:absolute;inset:0;display:grid;place-items:center;font-size:48px;font-weight:900;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.3)}
+.sc .roll span.in{animation:rollIn .55s var(--ease)}
+.sc .roll span.out{animation:rollOut .45s var(--ease2) forwards}
+@keyframes rollIn{from{transform:translateY(100%) scale(.6)}}
+@keyframes rollOut{to{transform:translateY(-100%) scale(.6);opacity:0}}
+.sc::after{content:"";position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+.sc.flash::after{animation:flash .8s ease-out}
+@keyframes flash{0%{opacity:.95}100%{opacity:0}}
+#clockbox{width:156px;background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;border-bottom:3px solid var(--accent);transition:transform .4s var(--ease)}
+#clock{font-size:42px;font-weight:800;line-height:1;transition:color .3s}
+#clockbox.low #clock{color:var(--live);animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(1.08)}}
+#clockbox.ot #clock{color:var(--accent)}
+#ottag{position:absolute;top:-2px;left:50%;transform:translateX(-50%) scaleX(0);background:var(--accent);color:#000;font-size:11px;font-weight:900;padding:1px 10px;letter-spacing:.16em;transition:transform .35s var(--ease)}
+#clockbox.ot #ottag{transform:translateX(-50%) scaleX(1)}
+#bug .info{display:flex;align-items:center;gap:10px;background:var(--slab3);padding:5px 22px 5px 14px;clip-path:polygon(0 0,100% 0,calc(100% - 12px) 100%,12px 100%);transition:transform .4s var(--ease) .42s,opacity .3s .42s;transform-origin:top}
+#bug .info img{height:20px;display:block}
+#game{font-size:14px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+#title{margin-top:6px;font-size:12px;font-weight:700;letter-spacing:.24em;color:#d6d6d6;text-transform:uppercase;background:var(--panelA);padding:4px 18px;clip-path:polygon(8px 0,calc(100% - 8px) 0,100% 100%,0 100%);transition:transform .4s var(--ease) .5s,opacity .3s .5s;transform-origin:top}
+/* out state (build-out) */
+#bug.out .film{transform:scaleX(0);transition-delay:0s}
+#bug.out #tm0{transform:translateX(120%);opacity:0;transition-delay:.1s}
+#bug.out #tm1{transform:translateX(-120%);opacity:0;transition-delay:.1s}
+#bug.out .logo{transform:scale(0);opacity:0;transition-delay:0s}
+#bug.out .sc{transform:scaleY(0);transition-delay:.2s}
+#bug.out #clockbox{transform:scaleY(0);transition-delay:.3s}
+#bug.out .info,#bug.out #title{transform:scaleY(0);opacity:0;transition-delay:0s}
+
+#replay{position:absolute;top:160px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;background:var(--panelA);padding:9px 24px;font-size:20px;font-weight:900;letter-spacing:.2em;font-style:italic;border-bottom:3px solid var(--live);transition:transform .45s var(--ease),opacity .3s;clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%)}
+#replay.out{transform:translate(-50%,-30px) scaleY(0);opacity:0}
+#replay i{width:12px;height:12px;border-radius:50%;background:var(--live);box-shadow:0 0 10px var(--live);animation:blink 1s infinite}
+#replay span{color:var(--muted);font-weight:700;letter-spacing:.06em;font-size:16px;font-style:normal}
+@keyframes blink{50%{opacity:.2}}
+
+/* ================= BOOST BOARDS ================= */
+.board{position:absolute;top:20px;width:340px;display:flex;flex-direction:column;gap:6px}
+#board0{left:26px} #board1{right:26px}
+.pb{position:relative;height:48px;background:var(--panelA,var(--panelA));overflow:hidden;transform:skewX(var(--skew));border-left:5px solid var(--c);transition:transform .5s var(--ease),opacity .4s,background .25s,color .25s;animation:pbIn .6s var(--ease) both}
+#board1 .pb{border-left:0;border-right:5px solid var(--c);animation-name:pbIn1}
+@keyframes pbIn{from{transform:skewX(var(--skew)) translateX(-120%);opacity:0}}
+@keyframes pbIn1{from{transform:skewX(var(--skew)) translateX(120%);opacity:0}}
+.board.out .pb{transform:skewX(var(--skew)) translateX(-125%);opacity:0}
+#board1.out .pb{transform:skewX(var(--skew)) translateX(125%)}
+.pb:nth-child(2){transition-delay:.06s;animation-delay:.08s}.pb:nth-child(3){transition-delay:.12s;animation-delay:.16s}.pb:nth-child(4){transition-delay:.18s;animation-delay:.24s}
+.pb .fill{position:absolute;left:0;bottom:0;height:6px;background:linear-gradient(90deg,var(--c),#fff);transition:width .15s linear;box-shadow:0 0 10px var(--c)}
+#board1 .pb .fill{left:auto;right:0;background:linear-gradient(270deg,var(--c),#fff)}
+.pb .in{position:absolute;inset:0 0 6px 0;display:flex;align-items:center;justify-content:space-between;padding:0 16px;transform:skewX(calc(var(--skew) * -1))}
+#board1 .pb .in{flex-direction:row-reverse}
+.pb .nm{font-size:20px;font-weight:800;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;font-style:italic}
+.pb .bv{font-size:26px;font-weight:900;transition:color .2s}
+.pb.t{background:rgba(241,241,241,.97);color:#0b0b0b;box-shadow:inset 0 0 0 2px var(--accent)}
+.pb.low .bv{color:var(--live);animation:pulse .7s ease-in-out infinite}
+.pb.full .bv{animation:fullPop .6s var(--ease)}
+@keyframes fullPop{40%{transform:scale(1.35);color:var(--accent)}}
+.pb.dead{opacity:.5;background:rgba(60,8,8,.9)}
+.pb.dead .bv{font-size:13px;letter-spacing:.14em;color:var(--live)}
+.pb.boom{animation:boom .5s linear}
+@keyframes boom{0%{background:var(--live)}20%{transform:skewX(var(--skew)) translateX(-8px)}40%{transform:skewX(var(--skew)) translateX(7px)}60%{transform:skewX(var(--skew)) translateX(-4px)}80%{transform:skewX(var(--skew)) translateX(2px)}}
+.pb .sonic{position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(0,255,130,.28),transparent);animation:sweep .7s linear infinite;display:none}
+.pb.ss .sonic{display:block}
+@keyframes sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+/* ================= SPECTATED PLAYER ================= */
+#pcard{position:absolute;left:40px;bottom:40px;display:flex;align-items:stretch;filter:drop-shadow(0 10px 20px rgba(0,0,0,.55));transition:transform .5s var(--ease),opacity .35s}
+#pcard.out{transform:translateY(160px);opacity:0}
+#pcard .bar{width:10px;background:var(--c);box-shadow:0 0 14px var(--c);transition:background .3s}
+#pcard .main{position:relative;background:linear-gradient(90deg,var(--panelA),var(--slab2));padding:12px 26px 12px 18px;min-width:540px;clip-path:polygon(0 0,100% 0,calc(100% - 22px) 100%,0 100%);overflow:hidden}
+#pcard .main::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:var(--perf);background-size:12px 4px;opacity:.25;animation:film 2s linear infinite}
+#pcard.swap .main{animation:wipe .55s var(--ease2)}
+#pcard.swap .pn{animation:slideName .6s var(--ease)}
+@keyframes wipe{from{clip-path:polygon(0 0,0 0,0 100%,0 100%)}to{clip-path:polygon(0 0,100% 0,calc(100% - 22px) 100%,0 100%)}}
+@keyframes slideName{from{transform:translateX(-40px);opacity:0}}
+#pcard .top{display:flex;align-items:baseline;gap:12px}
+#pcard .pn{font-size:34px;font-weight:900;text-transform:uppercase;line-height:1;font-style:italic}
+#pcard .pt{font-size:13px;letter-spacing:.18em;color:var(--c);font-weight:800;text-transform:uppercase}
+#pcard .stats{display:flex;gap:18px;margin-top:10px}
+#pcard .stats div{display:flex;flex-direction:column}
+#pcard .stats b{font-size:26px;font-weight:800;line-height:1;display:inline-block}
+#pcard .stats b.bump{animation:bump .5s var(--ease)}
+@keyframes bump{40%{transform:scale(1.45);color:var(--accent)}}
+#pcard .stats span{font-size:10px;letter-spacing:.18em;color:var(--muted);font-weight:700}
+#pcard .spd{margin-left:auto;align-self:flex-end;text-align:right}
+#spdbar{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);box-shadow:0 0 8px var(--accent);transition:width .15s linear}
+
+#dial{position:absolute;right:46px;bottom:34px;width:206px;height:206px;transition:transform .55s var(--ease),opacity .35s}
+#dial.out{transform:scale(.2) rotate(-120deg);opacity:0}
+#dial svg{position:absolute;inset:0;transform:rotate(135deg);overflow:visible}
+#dial .v{position:absolute;inset:0;display:grid;place-items:center;font-size:68px;font-weight:900;font-style:italic}
+#dial .l{position:absolute;bottom:34px;width:100%;text-align:center;font-size:12px;font-weight:800;letter-spacing:.32em;color:var(--muted)}
+#dial.full #dialArc{filter:drop-shadow(0 0 10px var(--c))}
+#dial.low .v{color:var(--live)}
+
+/* ================= MINIMAP ================= */
+#mini{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);width:420px;height:270px;background:var(--panelA);border-top:3px solid var(--accent);transition:transform .5s var(--ease),opacity .35s}
+#mini.out{transform:translate(-50%,320px);opacity:0}
+#mini canvas{width:100%;height:100%;display:block}
+
+/* ================= FEED ================= */
+#feed{position:absolute;right:26px;top:310px;width:360px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.fi{position:relative;display:flex;align-items:center;gap:10px;background:var(--panelA);padding:8px 16px 10px;font-size:17px;font-weight:800;text-transform:uppercase;font-style:italic;border-right:4px solid var(--c);clip-path:polygon(10px 0,100% 0,100% 100%,0 100%);animation:fin .45s var(--ease), fout .45s ease-in 4.6s forwards;overflow:hidden}
+.fi em{font-style:normal;font-size:11px;letter-spacing:.18em;color:var(--accent);font-weight:800}
+.fi::after{content:"";position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--c);transform-origin:left;animation:timer 4.6s linear forwards}
+@keyframes timer{to{transform:scaleX(0)}}
+@keyframes fin{from{transform:translateX(60px) skewX(var(--skew));opacity:0}}
+@keyframes fout{to{transform:translateX(60px);opacity:0}}
+
+/* ================= GOAL STINGER ================= */
+#goal{position:absolute;left:0;right:0;top:360px;height:340px;display:none;overflow:hidden;pointer-events:none}
+#goal.on{display:block}
+#goal .film{position:absolute;left:-100px;right:-100px;height:10px;background:var(--perf);background-size:14px 10px;transform:skewY(-4deg) scaleX(0);animation:filmIn calc(3.4s * var(--stingerScale,1)) var(--ease2) forwards, film .6s linear infinite}
+#goal .f1{top:46px;transform-origin:left} #goal .f2{bottom:46px;transform-origin:right}
+@keyframes filmIn{0%{transform:skewY(-4deg) scaleX(0)}6%,86%{transform:skewY(-4deg) scaleX(1)}100%{transform:skewY(-4deg) scaleX(0)}}
+#goal .band{position:absolute;inset:62px -100px;background:var(--c);transform:skewY(-4deg) scaleX(0);transform-origin:left;animation:band calc(3.4s * var(--stingerScale,1)) var(--ease2) forwards}
+#goal .band2{position:absolute;inset:84px -100px;background:var(--ink);transform:skewY(-4deg) scaleX(0);transform-origin:right;animation:band2 calc(3.4s * var(--stingerScale,1)) var(--ease2) forwards;opacity:.92}
+#goal .edge{position:absolute;left:-100px;right:-100px;height:4px;background:var(--accent);box-shadow:0 0 18px var(--accent);transform:skewY(-4deg) scaleX(0);animation:filmIn calc(3.4s * var(--stingerScale,1)) var(--ease2) forwards}
+#goal .e1{top:80px;transform-origin:right}#goal .e2{bottom:80px;transform-origin:left}
+#goal .chev{position:absolute;top:84px;bottom:84px;width:140px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18));transform:skewX(-25deg);animation:chev 1s var(--ease2) .1s 3}
+@keyframes chev{from{left:-200px}to{left:2100px}}
+#goal .txt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;animation:fadeio calc(3.4s * var(--stingerScale,1)) forwards}
+#goal .big{display:flex;gap:4px;font-size:156px;font-weight:900;line-height:.9;font-style:italic;letter-spacing:.02em;text-shadow:0 6px 0 rgba(0,0,0,.3)}
+#goal .big span{display:inline-block;animation:letter .5s var(--ease) both}
+#goal .big span:nth-child(1){animation-delay:.04s}#goal .big span:nth-child(2){animation-delay:.08s}#goal .big span:nth-child(3){animation-delay:.12s}#goal .big span:nth-child(4){animation-delay:.16s}#goal .big span:nth-child(5){animation-delay:.2s;color:var(--accent)}
+@keyframes letter{0%{transform:translateY(-140px) skewX(var(--skew)) scale(1.4);opacity:0}60%{transform:translateY(8px) skewX(0) scale(1);opacity:1}100%{transform:none}}
+#goal .who{font-size:36px;font-weight:900;text-transform:uppercase;font-style:italic;margin-top:8px;animation:upIn .45s var(--ease) .3s both}
+#goal .meta{font-size:18px;font-weight:700;letter-spacing:.22em;color:#e8e8e8;text-transform:uppercase;margin-top:4px;animation:upIn .45s var(--ease) .4s both}
+#goal .meta b{color:var(--accent);font-weight:900}
+@keyframes upIn{from{transform:translateY(24px);opacity:0}}
+@keyframes band{0%{transform:skewY(-4deg) scaleX(0)}6%{transform:skewY(-4deg) scaleX(1)}86%{transform:skewY(-4deg) scaleX(1);transform-origin:right}100%{transform:skewY(-4deg) scaleX(0);transform-origin:right}}
+@keyframes band2{0%,2%{transform:skewY(-4deg) scaleX(0)}10%{transform:skewY(-4deg) scaleX(1)}83%{transform:skewY(-4deg) scaleX(1);transform-origin:left}97%,100%{transform:skewY(-4deg) scaleX(0);transform-origin:left}}
+@keyframes fadeio{0%{opacity:0}4%,84%{opacity:1}94%,100%{opacity:0}}
+
+/* ================= BANNERS (GO / OT / WINNER) ================= */
+#go{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;pointer-events:none}
+#go.on{display:block}
+#go .t{font-size:220px;font-weight:900;font-style:italic;color:#fff;text-shadow:0 0 40px var(--accent),0 8px 0 rgba(0,0,0,.35);animation:goPop 1s var(--ease) forwards}
+#go .ring{position:absolute;left:50%;top:50%;width:200px;height:200px;margin:-100px 0 0 -100px;border:8px solid var(--accent);border-radius:50%;animation:ring .9s ease-out forwards}
+#go .ring.r2{animation-delay:.12s;border-color:#fff}
+@keyframes goPop{0%{transform:scale(2.4);opacity:0}25%{transform:scale(.95);opacity:1}70%{transform:scale(1.05);opacity:1}100%{transform:scale(1.3);opacity:0}}
+@keyframes ring{from{transform:scale(.2);opacity:1}to{transform:scale(5);opacity:0}}
+
+.banner{position:absolute;left:0;right:0;display:none;pointer-events:none}
+.banner.on{display:block}
+#otb{top:430px;height:200px}
+#otb .s{position:absolute;inset:40px -60px;background:var(--accent);transform:skewY(-3deg) scaleX(0);animation:band 2.8s var(--ease2) forwards}
+#otb .s2{position:absolute;inset:56px -60px;background:var(--ink);transform:skewY(-3deg) scaleX(0);transform-origin:right;animation:band2 2.8s var(--ease2) forwards}
+#otb .t{position:absolute;inset:0;display:grid;place-items:center;font-size:96px;font-weight:900;font-style:italic;letter-spacing:.06em;animation:fadeio 2.8s forwards}
+#otb .t small{display:block;font-size:20px;letter-spacing:.4em;color:var(--accent);text-align:center;font-style:normal}
+
+#win{inset:0}
+#win .bg{position:absolute;inset:0;background:radial-gradient(ellipse at center,color-mix(in srgb,var(--c) 45%,transparent),rgba(0,0,0,.75) 70%);animation:fadeio2 7s forwards}
+#win .s{position:absolute;left:-80px;right:-80px;top:380px;height:320px;background:var(--c);transform:skewY(-4deg) scaleX(0);transform-origin:left;animation:winBand 7s var(--ease2) forwards}
+#win .s2{position:absolute;left:-80px;right:-80px;top:410px;height:260px;background:var(--ink);transform:skewY(-4deg) scaleX(0);transform-origin:right;animation:winBand 7s var(--ease2) .08s forwards}
+#win .film{position:absolute;left:-80px;right:-80px;height:10px;background:var(--perf);background-size:14px 10px;transform:skewY(-4deg);animation:film .6s linear infinite, fadeio2 7s forwards}
+#win .content{position:absolute;left:0;right:0;top:400px;height:280px;display:flex;align-items:center;justify-content:center;gap:40px;animation:fadeio2 7s forwards}
+#win .wl{width:190px;height:190px;display:grid;place-items:center;background:var(--slab);border-bottom:8px solid var(--c);animation:upIn .6s var(--ease) .5s both}
+#win .wl img{max-width:80%;max-height:80%} #win .wl b{font-size:56px;font-weight:900;color:var(--c);font-style:italic}
+#win .wn{font-size:110px;font-weight:900;font-style:italic;text-transform:uppercase;line-height:.95;animation:upIn .6s var(--ease) .65s both}
+#win .wk{font-size:24px;font-weight:800;letter-spacing:.4em;color:var(--accent);animation:upIn .6s var(--ease) .8s both}
+#win .ws{font-size:22px;font-weight:700;letter-spacing:.24em;color:#ddd;margin-top:8px;animation:upIn .6s var(--ease) .95s both}
+@keyframes winBand{0%{transform:skewY(-4deg) scaleX(0)}8%,90%{transform:skewY(-4deg) scaleX(1)}100%{transform:skewY(-4deg) scaleX(0)}}
+@keyframes fadeio2{0%{opacity:0}8%,90%{opacity:1}100%{opacity:0}}
+
+/* ================= TRANSITION WIPE ================= */
+#wipe{position:absolute;inset:0;display:none;pointer-events:none;overflow:hidden}
+#wipe.on{display:block}
+#wipe .p{position:absolute;top:-200px;bottom:-200px;transform:skewX(-18deg) translateX(-260%);animation:wipeP 1.5s var(--ease2) forwards}
+#wipe .p1{left:-10%;width:40%;background:var(--blue)}
+#wipe .p2{left:20%;width:62%;background:var(--ink);animation-delay:.06s}
+#wipe .p3{left:78%;width:10px;background:var(--accent);box-shadow:0 0 30px var(--accent);animation-delay:.1s}
+#wipe .p4{left:80%;width:40%;background:var(--orange);animation-delay:.12s}
+#wipe .p5{left:16%;width:10px;background:var(--accent);box-shadow:0 0 30px var(--accent);animation-delay:.03s}
+@keyframes wipeP{0%{transform:skewX(-18deg) translateX(-260%)}38%,58%{transform:skewX(-18deg) translateX(0)}100%{transform:skewX(-18deg) translateX(260%)}}
+#wipe .plate{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:14px;animation:plate 1.5s var(--ease2) forwards}
+#wipe .plate img{height:150px;filter:drop-shadow(0 0 24px rgba(0,255,130,.45))}
+#wipe .plate div{font-size:20px;font-weight:800;letter-spacing:.4em;color:#ddd;text-transform:uppercase}
+#wipe .fl{position:absolute;left:0;right:0;height:12px;background:var(--perf);background-size:16px 12px;animation:film .5s linear infinite,plate 1.5s forwards}
+@keyframes plate{0%,28%{opacity:0;transform:translate(-50%,-50%) scale(.85)}40%,58%{opacity:1;transform:translate(-50%,-50%) scale(1)}70%,100%{opacity:0;transform:translate(-50%,-50%) scale(1.1)}}
+#wipe .fl{transform:none!important}
+
+/* ================= FX + POSTGAME ================= */
+#fx{position:absolute;inset:0;width:1920px;height:1080px;pointer-events:none}
+#post{position:absolute;inset:0;border:0;width:1920px;height:1080px;background:transparent;transition:opacity .5s, transform .6s var(--ease)}
+#post.out{opacity:0;transform:scale(1.04);pointer-events:none}
+
+/* ===== MORE SLANTS ===== */
+
+#bug .row{gap:0}
+#bug .row>.logo,#bug .row>.tm,#bug .row>.sc,#bug .row>#clockbox{clip-path:polygon(var(--sl) 0,100% 0,calc(100% - var(--sl)) 100%,0 100%);margin-left:-8px}
+#bug .row>#lg0{margin-left:0}
+#bug .row>.tm{padding:0 30px}
+#bug .row>.sc{width:96px}
+#bug .row>#clockbox{width:178px;border-bottom:0;background:linear-gradient(180deg,var(--ink) 0 calc(100% - 4px),var(--accent) calc(100% - 4px))}
+#bug .row>.logo{width:82px}
+#bug .film{transform:skewX(var(--skew))}
+#bug.out .film{transform:skewX(var(--skew)) scaleX(0)}
+#bug .info,#title{clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%)}
+#bug .info{margin-top:4px;padding:5px 26px}
+#replay{clip-path:polygon(14px 0,100% 0,calc(100% - 14px) 100%,0 100%);padding:9px 30px}
+.pip{transform:skewX(-25deg);width:28px}
+.pip.new{animation:none}
+/* player card: slanted plate + slanted team bar */
+#pcard{gap:6px}
+#pcard .bar{width:16px;transform:skewX(-14deg)}
+#pcard .main{clip-path:polygon(24px 0,100% 0,calc(100% - 24px) 100%,0 100%);padding-left:34px;padding-right:40px}
+#pcard .stats div{transform:skewX(-8deg)}
+#pcard .stats b,#pcard .stats span{transform:skewX(8deg);display:inline-block}
+/* boost meter sits on a slanted plate */
+#dial::before{content:"";position:absolute;left:-36px;right:-36px;top:58px;bottom:58px;background:var(--panelA);transform:skewX(-14deg);border-left:6px solid var(--c);border-right:6px solid var(--accent)}
+/* feed + boards */
+.fi{clip-path:polygon(14px 0,100% 0,calc(100% - 14px) 100%,0 100%);padding-left:24px;padding-right:22px;border-right:0;background:linear-gradient(270deg,var(--c) 0 18px,var(--panelA) 18px)}
+.pb{transform:skewX(var(--skew))} .pb .in{transform:skewX(calc(var(--skew) * -1))}
+@keyframes pbIn{from{transform:skewX(var(--skew)) translateX(-120%);opacity:0}}
+@keyframes pbIn1{from{transform:skewX(var(--skew)) translateX(120%);opacity:0}}
+.board.out .pb{transform:skewX(var(--skew)) translateX(-125%)}
+#board1.out .pb{transform:skewX(var(--skew)) translateX(125%)}
+.pb.boom{animation:boom2 .5s linear}
+@keyframes boom2{0%{background:var(--live)}20%{transform:skewX(var(--skew)) translateX(-8px)}40%{transform:skewX(var(--skew)) translateX(7px)}60%{transform:skewX(var(--skew)) translateX(-4px)}80%{transform:skewX(var(--skew)) translateX(2px)}}
+/* stingers lean harder */
+#goal .band,#goal .band2,#goal .edge,#goal .film{--k:-7deg}
+#goal .big{transform:skewX(-10deg)}
+#win .wl{clip-path:polygon(24px 0,100% 0,calc(100% - 24px) 100%,0 100%);width:230px}
+#win .wk{display:inline-block;background:var(--accent);color:#000;padding:2px 18px;clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%)}
+#otb .t>div{transform:skewX(-10deg)}
+
+/* ===== PLAYER EVENT ICONS (RLCS style) ===== */
+.pb .nm{flex:0 1 auto;min-width:0}
+.ibox{display:flex;align-items:center;gap:4px;margin:0 10px 0 auto;flex:none}
+#board1 .ibox{margin:0 auto 0 10px;flex-direction:row-reverse}
+.ico{position:relative;width:42px;height:32px;flex:none;display:grid;place-items:center;background:var(--panelA);
+  clip-path:polygon(var(--sl) 0,100% 0,calc(100% - var(--sl)) 100%,0 100%);
+  box-shadow:inset 0 -3px 0 var(--ic,var(--accent));background:color-mix(in srgb,var(--ink) 92%,transparent);animation:icoIn .5s var(--ease) both, icoOut .35s ease-in forwards;animation-delay:0s,var(--life,4.2s)}
+.ico svg{width:20px;height:20px;fill:#fff;filter:drop-shadow(0 0 6px var(--ic,var(--accent)))}
+.ico::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.55) 50%,transparent 70%);transform:translateX(-120%);animation:icoGlint .7s ease-out .25s}
+.ico.gold{--ic:var(--gold)} .ico.gold svg{fill:var(--gold)}
+.ico.bad{--ic:var(--live)}
+.ico .x{position:absolute;right:calc(var(--sl) * .4 + 1px);top:0;font-size:10px;font-weight:900;color:var(--ic,var(--accent))}
+@keyframes icoIn{0%{transform:scale(0) rotate(-25deg);opacity:0}60%{transform:scale(1.18) rotate(4deg);opacity:1}100%{transform:none}}
+@keyframes icoOut{to{transform:scale(.4) translateY(-10px);opacity:0}}
+@keyframes icoGlint{to{transform:translateX(120%)}}
+.pb.hit{animation:hit .6s ease-out}
+@keyframes hit{0%{box-shadow:inset 0 0 0 3px var(--ic,var(--accent))}100%{box-shadow:inset 0 0 0 0 transparent}}
+
+/* ===== PER-GRAPHIC COLOURS (set in control panel; unset = theme default) ===== */
+html #bug .row>.tm{background:var(--c-bug,linear-gradient(90deg,var(--slab),var(--slab2)))}
+html #bug .row>.tm.r{background:var(--c-bug,linear-gradient(270deg,var(--slab),var(--slab2)))}
+html #bug .row>.tm .name{color:var(--c-bugtext,var(--text))}
+html #bug .row>.logo{background:var(--c-bug,var(--slab))}
+html #bug .row>#clockbox{background:linear-gradient(180deg,var(--c-clockbg,var(--ink)) 0 calc(100% - 4px),var(--c-clockline,var(--accent)) calc(100% - 4px))}
+html #clock{color:var(--c-clock,var(--text))}
+html .sc .roll span{color:var(--c-score,#fff)}
+html #bug .info{background:var(--c-info,var(--slab3))} html #game{color:var(--c-infotext,var(--text))}
+html #title{background:var(--c-title,var(--panelA));color:var(--c-titletext,#d6d6d6)}
+html .pb{background:var(--c-board,var(--panelA))} html .pb .nm,html .pb .bv{color:var(--c-boardtext,var(--text))}
+html .pb .fill{background:linear-gradient(90deg,var(--c-fill,var(--c)),var(--c-fill2,#fff))}
+html #board1 .pb .fill{background:linear-gradient(270deg,var(--c-fill,var(--c)),var(--c-fill2,#fff))}
+html .pb.t{background:var(--c-target,rgba(241,241,241,.97));box-shadow:inset 0 0 0 2px var(--c-targetline,var(--accent))}
+html .pb.t .nm,html .pb.t .bv{color:var(--c-targettext,#0b0b0b)}
+html .pb.low .bv{color:var(--live)}
+html #pcard .main{background:var(--c-card,linear-gradient(90deg,var(--panelA),var(--slab2)))}
+html #pcard .pn,html #pcard .stats b{color:var(--c-cardtext,var(--text))}
+html #spdbar{background:var(--c-speed,var(--accent))}
+html #dial svg circle:first-child{fill:var(--c-dial,rgba(11,11,11,.88))}
+html #dial::before{background:var(--c-dial,var(--panelA))}
+html #dial .v{color:var(--c-dialtext,var(--text))}
+html #goal .band{background:var(--c-stinger,var(--c))}
+html #goal .band2{background:var(--c-stinger2,var(--ink))}
+html #goal .big,html #goal .who{color:var(--c-stingertext,#fff)}
+html #goal .edge{background:var(--c-stingerline,var(--accent))}
+html #wipe .p2{background:var(--c-wipe,var(--ink))}
+html #wipe .p3,html #wipe .p5{background:var(--c-wipeline,var(--accent))}
+html #replay{background:var(--c-replay,var(--panelA))}
+html .ico{background:var(--c-icon,color-mix(in srgb,var(--ink) 92%,transparent))}
+html .ico svg{fill:var(--c-icontext,#fff)}
+</style>
+</head>
+<body>
+<div id="stage"><div id="shake">
+
+  <div id="bug" class="out">
+    <div class="row">
+      <div class="film"></div>
+      <div class="logo" id="lg0"></div>
+      <div class="tm" id="tm0"><div class="name" id="nm0">BLUE</div><div class="pips" id="pp0"></div></div>
+      <div class="sc" id="sc0"><div class="roll"><span>0</span></div></div>
+      <div id="clockbox"><div id="ottag">OVERTIME</div><div id="clock" class="num">5:00</div></div>
+      <div class="sc" id="sc1"><div class="roll"><span>0</span></div></div>
+      <div class="tm r" id="tm1"><div class="name" id="nm1">ORANGE</div><div class="pips" id="pp1"></div></div>
+      <div class="logo" id="lg1"></div>
+    </div>
+    <div class="info"><img class="brand-logo" data-logo="scorebug" src="rfp-logo.png" alt=""><div id="game">GAME 1 · BEST OF 5</div></div>
+    <div id="title">EVENT</div>
+  </div>
+  <div id="replay" class="out"><i></i>REPLAY<span id="replayInfo"></span></div>
+
+  <div class="board out" id="board0"></div>
+  <div class="board out" id="board1"></div>
+  <div id="feed"></div>
+
+  <div id="pcard" class="out">
+    <div class="bar"></div>
+    <div class="main">
+      <div class="top"><div class="pn" id="pn">PLAYER</div><div class="pt" id="pt">TEAM</div></div>
+      <div class="stats">
+        <div><b class="num" id="s_score">0</b><span>SCORE</span></div>
+        <div><b class="num" id="s_g">0</b><span>GOALS</span></div>
+        <div><b class="num" id="s_a">0</b><span>ASSISTS</span></div>
+        <div><b class="num" id="s_sv">0</b><span>SAVES</span></div>
+        <div><b class="num" id="s_sh">0</b><span>SHOTS</span></div>
+        <div><b class="num" id="s_d">0</b><span>DEMOS</span></div>
+        <div class="spd"><b class="num" id="s_spd">0</b><span>KM/H</span></div>
+      </div>
+      <div id="spdbar"></div>
+    </div>
+  </div>
+  <div id="dial" class="out">
+    <svg viewBox="0 0 200 200">
+      <circle cx="100" cy="100" r="86" fill="var(--panelA)" />
+      <circle cx="100" cy="100" r="98" fill="none" stroke="rgba(0,255,130,.35)" stroke-width="2" stroke-dasharray="4 8" />
+      <circle cx="100" cy="100" r="84" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="14" stroke-dasharray="395.8 527.8" />
+      <circle id="dialArc" cx="100" cy="100" r="84" fill="none" stroke="#fff" stroke-width="14" stroke-dasharray="0 527.8" style="transition:stroke-dasharray .15s linear" />
+    </svg>
+    <div class="v num" id="dialV">0</div><div class="l">BOOST</div>
+  </div>
+
+  <div id="mini" class="out"><canvas id="miniC"></canvas></div>
+
+  <div id="goal"><div class="film f1"></div><div class="band"></div><div class="band2"></div><div class="edge e1"></div><div class="edge e2"></div><div class="chev"></div><div class="film f2"></div>
+    <div class="txt"><div class="big"><span>G</span><span>O</span><span>A</span><span>L</span><span>!</span></div><div class="who" id="gWho"></div><div class="meta" id="gMeta"></div></div>
+  </div>
+  <div id="go"><div class="ring"></div><div class="ring r2"></div><div class="t">GO!</div></div>
+  <div class="banner" id="otb"><div class="s"></div><div class="s2"></div><div class="t"><div>OVERTIME<small>NEXT GOAL WINS</small></div></div></div>
+  <div class="banner" id="win"><div class="bg"></div><div class="s"></div><div class="s2"></div>
+    <div class="film" style="top:372px"></div><div class="film" style="top:700px"></div>
+    <div class="content"><div class="wl" id="wl"></div><div><div class="wk">VICTORY</div><div class="wn" id="wn">TEAM</div><div class="ws" id="ws"></div></div></div>
+  </div>
+  <iframe id="post" class="out" src="about:blank" allowtransparency="true"></iframe>
+  <div id="wipe"><div class="p p1"></div><div class="p p5"></div><div class="p p2"></div><div class="p p3"></div><div class="p p4"></div>
+    <div class="fl" style="top:330px"></div><div class="fl" style="top:738px"></div>
+    <div class="plate"><img class="brand-logo" data-logo="transition" src="rfp-logo.png" alt=""><div id="wipeT"></div></div></div>
+  <canvas id="fx" width="1920" height="1080"></canvas>
+</div></div>
+
+<script src="lib.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const qp = new URLSearchParams(location.search);
+if (qp.has('preview')) document.body.classList.add('preview');
+function fit(){ const s = Math.min(innerWidth/1920, innerHeight/1080); $('stage').style.transform = `scale(${s})`; }
+addEventListener('resize', fit); fit();
+const restart = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+const vis = (el, on) => el.classList.toggle('out', !on);
+const show = () => RL.control?.show || {};
+/* CasparCG: one layer per part — update({ part, ws }) when loaded, then play() / stop() take it in and out.
+   A browser (OBS) shows every part, or the ones in ?part=scorebug,boost … */
+const PART_EL = { scorebug: ['bug', 'replay'], boost: ['board0', 'board1', 'feed'], player: ['pcard', 'dial'], minimap: ['mini'], moments: ['goal', 'go', 'otb', 'win', 'fx'], transition: ['wipe'], postgame: ['post'] };
+let layerParts = (qp.get('part') || '').split(',').filter(p => PART_EL[p]);
+if (!layerParts.length) layerParts = Object.keys(PART_EL);
+let playing = true;
+const has = (p) => playing && layerParts.includes(p);
+function applyParts(){ for (const [p, ids] of Object.entries(PART_EL)) ids.forEach(id => { const el = $(id); if (el) el.style.display = layerParts.includes(p) ? '' : 'none'; }); }
+applyParts();
+
+/* ---------------- particles ---------------- */
+const fx = $('fx').getContext('2d'); let parts = [];
+function burst(x, y, colors, n = 140, spread = 1){
+  for (let i = 0; i < n; i++){
+    const a = Math.random() * Math.PI * 2, v = (6 + Math.random() * 16) * spread;
+    parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 6, g: .45, life: 1, d: .008 + Math.random() * .012,
+      w: 6 + Math.random() * 10, h: 3 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - .5) * .4, c: colors[i % colors.length] });
+  }
+}
+function rain(colors, n = 220){
+  for (let i = 0; i < n; i++) parts.push({ x: Math.random() * 1920, y: -20 - Math.random() * 600, vx: (Math.random() - .5) * 3, vy: 3 + Math.random() * 5, g: .05,
+    life: 1, d: .003 + Math.random() * .003, w: 8 + Math.random() * 10, h: 4 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - .5) * .3, c: colors[i % colors.length] });
+}
+(function tick(){
+  fx.clearRect(0, 0, 1920, 1080);
+  parts = parts.filter(p => p.life > 0 && p.y < 1150);
+  for (const p of parts){
+    p.vx *= .985; p.vy += p.g; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life -= p.d;
+    fx.save(); fx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.5)); fx.translate(p.x, p.y); fx.rotate(p.r);
+    fx.fillStyle = p.c; fx.fillRect(-p.w / 2, -p.h / 2, p.w, Math.abs(Math.cos(p.r * 2)) * p.h + 1); fx.restore();
+  }
+  requestAnimationFrame(tick);
+})();
+
+/* ---------------- scorebug ---------------- */
+const scoreVal = [null, null];
+function setScore(i, v){
+  if (scoreVal[i] === v) return;
+  const box = $('sc'+i), roll = box.querySelector('.roll');
+  if (scoreVal[i] === null){ roll.innerHTML = `<span>${v}</span>`; scoreVal[i] = v; return; }
+  const up = v > scoreVal[i]; scoreVal[i] = v;
+  roll.querySelectorAll('span').forEach(s => { s.className = 'out'; setTimeout(() => s.remove(), 460); });
+  const n = document.createElement('span'); n.className = 'in'; n.textContent = v; roll.appendChild(n);
+  if (up) restart(box, 'flash');
+}
+let prevSeries = [0, 0];
+function applyControl(c){
+  const root = document.documentElement.style;
+  root.setProperty('--blue', RL.teamColor(0)); root.setProperty('--orange', RL.teamColor(1));
+  [0,1].forEach(i => {
+    ['tm','sc','pp','lg'].forEach(k => $(k+i).style.setProperty('--c', RL.teamColor(i)));
+    $('nm'+i).textContent = RL.teamName(i);
+    const logo = RL.teamLogo(i);
+    $('lg'+i).innerHTML = logo ? `<img src="${RL.esc(logo)}">` : `<b>${RL.esc(RL.teamTag(i))}</b>`;
+    const need = Math.ceil((c.bestOf||1)/2), won = c.series?.[i] || 0;
+    $('pp'+i).innerHTML = c.bestOf > 1 ? Array.from({length:need},(_,k)=>`<div class="pip ${k < won ? 'on':''} ${k === won-1 && won > prevSeries[i] ? 'new':''}"></div>`).join('') : '';
+  });
+  prevSeries = [...(c.series || [0,0])];
+  const gameNo = Math.min(c.bestOf, (c.series?.[0]||0) + (c.series?.[1]||0) + 1);
+  $('game').textContent = c.bestOf > 1 ? `GAME ${gameNo} · BEST OF ${c.bestOf}` : 'SINGLE GAME';
+  $('title').textContent = [c.title, c.subtitle].filter(Boolean).join('  ·  ');
+  $('title').style.display = (c.title || c.subtitle) ? '' : 'none';
+  $('wipeT').textContent = c.title || '';
+  const sh = c.show || {};
+  if (sh.minimap && layerParts.includes('minimap') && !mini) mini = new RL.MiniMap($('miniC'), { compact: true, trails: false, names: true });
+  const post = $('post');
+  if (sh.postgame && has('postgame')){ $('goal').classList.remove('on'); if (post.src.indexOf('postgame') < 0) post.src = 'postgame.html?embed=1' + (RL.wsUrl ? '&ws=' + encodeURIComponent(RL.wsUrl) : ''); else post.contentWindow?.postMessage('replay', '*'); }
+  vis(post, has('postgame') && !!sh.postgame);
+  layout();
+}
+let mini = null;
+
+/* visibility of the main layers, depending on replay / post-game */
+let inReplay = false, hasData = false, cardShown = false;
+function layout(){
+  const sh = show(), pg = !!sh.postgame, tp = RL.targetPlayer(RL.update);
+  vis($('bug'), has('scorebug') && sh.scorebug && !pg && hasData);
+  vis($('board0'), has('boost') && sh.boost && !pg && !inReplay && hasData);
+  vis($('board1'), has('boost') && sh.boost && !pg && !inReplay && hasData);
+  const showCard = !!(has('player') && sh.player && !pg && !inReplay && tp);
+  if (showCard && !cardShown) restart($('pcard'), 'swap');   // only animate when the card comes on
+  cardShown = showCard;
+  vis($('pcard'), showCard);
+  vis($('dial'), has('player') && sh.player && !pg && !inReplay && !!tp);
+  vis($('mini'), has('minimap') && sh.minimap && !pg && !inReplay && hasData);
+  vis($('replay'), has('scorebug') && inReplay && !pg);
+  $('feed').style.display = sh.stats === false || pg ? 'none' : '';
+}
+
+/* ---------------- boost boards (keyed rows) ---------------- */
+const rows = {};
+function syncBoards(d, tp){
+  const teams = RL.playersByTeam(d), seen = new Set();
+  [0,1].forEach(t => {
+    const board = $('board'+t);
+    teams[t].forEach((p, idx) => {
+      seen.add(p._id);
+      let r = rows[p._id];
+      if (!r){
+        const el = document.createElement('div'); el.className = 'pb';
+        el.innerHTML = `<div class="sonic"></div><div class="fill"></div><div class="in"><div class="nm"></div><div class="ibox"></div><div class="bv num"></div></div>`;
+        r = rows[p._id] = { el, fill: el.querySelector('.fill'), nm: el.querySelector('.nm'), bv: el.querySelector('.bv'), ibox: el.querySelector('.ibox'), boost: -1, dead: false };
+      }
+      if (r.el.parentElement !== board || board.children[idx] !== r.el) board.insertBefore(r.el, board.children[idx] || null);
+      const b = Math.round(Math.max(0, Math.min(100, p.boost ?? 0)));
+      r.el.style.setProperty('--c', RL.teamColor(t));
+      r.nm.textContent = p.name;
+      r.fill.style.width = (p.isDead ? 0 : b) + '%';
+      r.bv.textContent = p.isDead ? 'DEMOLISHED' : b;
+      r.el.classList.toggle('t', !!tp && tp._id === p._id);
+      r.el.classList.toggle('ss', !!p.isSonic);
+      r.el.classList.toggle('low', !p.isDead && b <= 10);
+      r.el.classList.toggle('dead', !!p.isDead);
+      if (p.isDead && !r.dead) restart(r.el, 'boom');
+      if (b === 100 && r.boost >= 0 && r.boost < 100) restart(r.el, 'full');
+      r.dead = !!p.isDead; r.boost = b; r.name = p.name; r.team = t;
+    });
+  });
+  for (const id of Object.keys(rows)) if (!seen.has(id)){ rows[id].el.remove(); delete rows[id]; }
+}
+
+/* ---------------- spectated player ---------------- */
+let lastTarget = null, dialShown = 0, dialTarget = 0, prevStats = {};
+(function dialLoop(){ dialShown += (dialTarget - dialShown) * .25; $('dialV').textContent = Math.round(dialShown); requestAnimationFrame(dialLoop); })();
+function syncPlayer(tp){
+  if (!tp) { lastTarget = null; return; }
+  const t = tp.team === 1 ? 1 : 0, col = RL.teamColor(t);
+  if (tp._id !== lastTarget){ prevStats = {}; lastTarget = tp._id; }   // switching players: update in place, no animation
+  $('pcard').style.setProperty('--c', col); $('dial').style.setProperty('--c', col);
+  $('pn').textContent = tp.name; $('pt').textContent = RL.teamName(t);
+  const map = { s_score: 'score', s_g: 'goals', s_a: 'assists', s_sv: 'saves', s_sh: 'shots', s_d: 'demos' };
+  for (const [id, k] of Object.entries(map)){
+    const v = tp[k] ?? 0, el = $(id);
+    if (prevStats[k] !== undefined && v > prevStats[k]) restart(el, 'bump');
+    prevStats[k] = v; el.textContent = v;
+  }
+  const spd = Math.round(tp.speed ?? 0);
+  $('s_spd').textContent = spd; $('spdbar').style.width = Math.min(100, spd / 83 * 100) + '%';
+  const b = Math.max(0, Math.min(100, tp.boost ?? 0));
+  dialTarget = b;
+  $('dialArc').setAttribute('stroke-dasharray', `${(395.8 * b / 100).toFixed(1)} 527.8`);
+  $('dialArc').setAttribute('stroke', col);
+  $('dial').classList.toggle('full', b >= 100); $('dial').classList.toggle('low', b <= 10);
+}
+
+/* ---------------- live updates ---------------- */
+let wasOT = false;
+RL.on('control', applyControl);
+RL.on('update', d => {
+  const g = d.game || {};
+  if (!hasData){ hasData = true; layout(); }
+  [0,1].forEach(i => setScore(i, g.teams?.[i]?.score ?? 0));
+  if (RL.control?.useGameNames){ $('nm0').textContent = RL.teamName(0); $('nm1').textContent = RL.teamName(1); }
+  $('clock').textContent = RL.fmtClock(g);
+  $('clockbox').classList.toggle('ot', !!g.isOT);
+  $('clockbox').classList.toggle('low', !g.isOT && (g.time_seconds ?? 300) <= 30 && (g.time_seconds ?? 300) > 0);
+  if (g.isOT && !wasOT && show().banners !== false && has('moments')) restart($('otb'), 'on');
+  wasOT = !!g.isOT;
+  if (!!g.isReplay !== inReplay){ inReplay = !!g.isReplay; }
+  const tp = RL.targetPlayer(d);
+  syncBoards(d, tp); syncPlayer(tp); layout();
+});
+
+
+/* ---------------- player event icons ---------------- */
+const ICONS = {
+  goal:   '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="#fff" stroke-width="2"/><path d="M12 6.5l3.2 2.3-1.2 3.8h-4l-1.2-3.8z"/><path d="M12 2v4.5M15.2 8.8l4.6-1.4M14 12.6l2.8 4M10 12.6l-2.8 4M8.8 8.8L4.2 7.4" stroke="#fff" stroke-width="1.6" fill="none"/></svg>',
+  assist: '<svg viewBox="0 0 24 24"><path d="M3 13h9l-3-3 1.4-1.4L16 14l-5.6 5.4L9 18l3-3H3z"/><path d="M13 5h8v2h-8z" opacity=".8"/><path d="M15 9h6v2h-6z" opacity=".6"/></svg>',
+  save:   '<svg viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.4 9.3-8 11-4.6-1.7-8-6-8-11V5z"/></svg>',
+  epic:   '<svg viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.4 9.3-8 11-4.6-1.7-8-6-8-11V5z"/><path d="M12 6.5l1.5 3.1 3.4.4-2.5 2.3.7 3.4-3.1-1.7-3.1 1.7.7-3.4-2.5-2.3 3.4-.4z" fill="#000" opacity=".55"/></svg>',
+  shot:   '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="1.6"/><path d="M12 0v5M12 19v5M0 12h5M19 12h5" stroke="#fff" stroke-width="2"/></svg>',
+  demo:   '<svg viewBox="0 0 24 24"><path d="M12 1l2.2 5.4 5.3-2.6-2.1 5.5 5.6 1.6-5.2 2.6 3.3 4.8-5.8-.9.3 5.8-3.6-4.6-3.6 4.6.3-5.8-5.8.9 3.3-4.8L1 11l5.6-1.6-2.1-5.5 5.3 2.6z"/></svg>',
+  clear:  '<svg viewBox="0 0 24 24"><path d="M4 12h12M12 6l6 6-6 6" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M2 5h3M2 19h3" stroke="#fff" stroke-width="2" opacity=".6"/></svg>',
+  aerial: '<svg viewBox="0 0 24 24"><path d="M2 16l20-8-6 10-3-3-3 3v-4z"/></svg>',
+  hat:    '<svg viewBox="0 0 24 24"><path d="M3 18h18v2H3zM5 16l1-8 4 3 2-6 2 6 4-3 1 8z"/></svg>',
+  star:   '<svg viewBox="0 0 24 24"><path d="M12 2l3 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.7 21.4l1.5-7.1L1.8 9.4 9 8.6z"/></svg>',
+};
+function iconFor(name){
+  const n = String(name || '').toLowerCase().replace(/[\s_]/g, '');
+  if (/epicsave/.test(n)) return ['epic', 'gold'];
+  if (/save/.test(n)) return ['save'];
+  if (/hattrick/.test(n)) return ['hat', 'gold'];
+  if (/aerial|bicycle|flip/.test(n)) return ['aerial', 'gold'];
+  if (/goal/.test(n)) return ['goal'];
+  if (/assist|playmaker/.test(n)) return ['assist'];
+  if (/shot/.test(n)) return ['shot'];
+  if (/demo/.test(n)) return ['demo', 'bad'];
+  if (/clear/.test(n)) return ['clear'];
+  if (/mvp|savior|extermination|centerball|firsttouch|turtle|pool|swish|backward|longgoal|overtime/.test(n)) return ['star', 'gold'];
+  return null;
+}
+const recentIcon = {};
+function findRow(target){
+  if (!target) return null;
+  const name = String(target.name || '').toLowerCase(), team = target.team_num ?? target.teamnum;
+  for (const r of Object.values(rows)) if (String(r.name).toLowerCase() === name && (team == null || r.team === team)) return r;
+  for (const r of Object.values(rows)) if (String(r.name).toLowerCase() === name) return r;
+  return null;
+}
+function playerIcon(target, eventName){
+  if (show().stats === false || !has('boost')) return;
+  const kind = iconFor(eventName); if (!kind) return;
+  const r = findRow(target); if (!r) return;
+  const key = r.name + '|' + kind[0];
+  if (recentIcon[key] && performance.now() - recentIcon[key] < 1500) return;   // de-dupe (goal_scored + statfeed)
+  recentIcon[key] = performance.now();
+  const grp = r.ibox;
+  // stack repeated icon of same type as x2, x3
+  const same = [...grp.children].find(c => c.dataset.k === kind[0] && !c.dataset.gone);
+  if (same){ const n = (+same.dataset.n || 1) + 1; same.dataset.n = n; same.querySelector('.x').textContent = '×' + n; same.style.animation = 'none'; void same.offsetWidth; same.style.animation = ''; restart(r.el, 'hit'); return; }
+  const ico = document.createElement('div');
+  ico.className = 'ico ' + (kind[1] || ''); ico.dataset.k = kind[0]; ico.dataset.n = 1;
+  ico.innerHTML = ICONS[kind[0]] + '<span class="x"></span>';
+  ico.title = eventName;
+  grp.appendChild(ico);
+  while (grp.children.length > 3) grp.firstChild.remove();
+  const max = 3; void max;
+  r.el.style.setProperty('--ic', kind[1] === 'gold' ? 'var(--gold)' : kind[1] === 'bad' ? 'var(--live)' : 'var(--accent)');
+  restart(r.el, 'hit');
+  setTimeout(() => { ico.dataset.gone = 1; }, 4200);
+  setTimeout(() => ico.remove(), 4700);
+}
+
+/* ---------------- events ---------------- */
+let lastGoal = null, goalTimer;
+function transition(){ if (show().transitions === false || !has('transition')) return; restart($('wipe'), 'on'); setTimeout(() => $('wipe').classList.remove('on'), 1600); }
+function goal(d){
+  lastGoal = d;
+  if (show().stinger === false || show().postgame || !has('moments')) return;
+  const team = d.scorer?.teamnum === 1 ? 1 : 0, col = RL.teamColor(team);
+  const g = $('goal'); g.style.setProperty('--c', col);
+  $('gWho').textContent = d.scorer?.name || RL.teamName(team);
+  const parts = [RL.esc(RL.teamName(team))];
+  if (d.assister?.name) parts.push('ASSIST ' + RL.esc(d.assister.name));
+  parts.push(`<b id="gSpd">0 KM/H</b>`);
+  $('gMeta').innerHTML = parts.join('  ·  ');
+  restart(g, 'on'); restart($('shake'), 'go');
+  const acc = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#00ff82';
+  setTimeout(() => burst(960, 520, [col, '#ffffff', acc], 180, 1.2), 120);
+  const target = Math.round(d.goalspeed || 0), t0 = performance.now();
+  (function count(){ const k = Math.min(1, (performance.now() - t0 - 350) / 600); const el = document.getElementById('gSpd'); if (el) el.textContent = Math.max(0, Math.round(target * Math.max(0, k))) + ' KM/H'; if (k < 1) requestAnimationFrame(count); })();
+  const sc = (RL.control?.theme?.stingerSpeed ?? 100); clearTimeout(goalTimer); goalTimer = setTimeout(() => g.classList.remove('on'), 3500 * 100 / Math.max(40, sc));
+}
+function winner(team){
+  if (show().banners === false || !has('moments')) return;
+  const t = team === 1 ? 1 : 0, col = RL.teamColor(t), c = RL.control;
+  const w = $('win'); w.style.setProperty('--c', col);
+  $('wl').innerHTML = RL.teamLogo(t) ? `<img src="${RL.esc(RL.teamLogo(t))}">` : `<b>${RL.esc(RL.teamTag(t))}</b>`;
+  $('wn').textContent = RL.teamName(t) + ' WIN';
+  $('ws').textContent = c.bestOf > 1 ? `SERIES ${c.series[0]} – ${c.series[1]} · BEST OF ${c.bestOf}` : (c.title || '');
+  restart(w, 'on'); setTimeout(() => w.classList.remove('on'), 7100);
+  setTimeout(() => { const acc = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#00ff82'; burst(560, 540, [col, '#fff', acc], 160); burst(1360, 540, [col, '#fff', acc], 160); rain([col, '#ffffff', acc], 260); }, 500);
+}
+RL.on('ev', (e, d) => {
+  switch (e){
+    case 'game:goal_scored': goal(d); playerIcon(d.scorer, 'Goal'); if (d.assister?.name) playerIcon(d.assister, 'Assist'); break;
+    case 'game:replay_start':
+      $('replayInfo').textContent = lastGoal ? ` ${lastGoal.scorer?.name || ''}${lastGoal.goalspeed ? ' · ' + Math.round(lastGoal.goalspeed) + ' KM/H' : ''}` : '';
+      transition(); setTimeout(() => { inReplay = true; layout(); }, 550); break;
+    case 'game:replay_will_end': case 'game:replay_end':
+      if (inReplay){ transition(); setTimeout(() => { inReplay = false; layout(); }, 550); } break;
+    case 'game:round_started_go':
+      if (show().banners !== false && !inReplay && has('moments')) restart($('go'), 'on'); break;
+    case 'game:match_ended': winner(d?.winner_team_num); break;
+    case 'game:match_created': case 'game:initialized':
+      scoreVal[0] = scoreVal[1] = null; wasOT = false; break;
+    case 'ui:transition': transition(); break;
+    case 'ui:ot': if (has('moments')) restart($('otb'), 'on'); break;
+    case 'ui:winner': winner(d?.team ?? 0); break;
+    case 'ui:go': if (has('moments')) restart($('go'), 'on'); break;
+    case 'game:statfeed_event': {
+      const name = d.event_name || d.type || '';
+      playerIcon(d.main_target, name);
+      if (/demo/i.test(name) && has('moments')) restart($('shake'), 'go');
+      break;
+    }  }
+});
+/* CasparCG template calls */
+window.update = (raw) => {
+  let d = raw; if (typeof raw === 'string') { try { d = JSON.parse(raw); } catch (e) { d = {}; } }
+  if (d && d.part && PART_EL[d.part]) { layerParts = [d.part]; if (!window.__played) playing = false; applyParts(); if (RL.control) applyControl(RL.control); layout(); }
+  if (d && d.ws) RL.connect(d.ws);
+};
+window.play = () => { window.__played = true; playing = true; if (RL.control) applyControl(RL.control); layout(); };
+window.stop = () => { playing = false; layout(); };
+window.next = () => {};
+RL.connect();
+</script>
+</body>
+</html>

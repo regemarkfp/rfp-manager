@@ -205,6 +205,101 @@
     paint();
     return box;
   }
+  // ---- YouTube Live (site admin): the Google OAuth client secret that lets teams connect their YouTube channel
+  function ytliveServerCard() {
+    const box = h('div', { class: 'card' }, h('h2', {}, 'YouTube Live'), h('div', { class: 'dim' }, 'Loading…'));
+    (async () => {
+      let c; try { c = await api('GET', '/api/ytlive/server'); } catch (e) { box.replaceChildren(h('h2', {}, 'YouTube Live'), h('p', { class: 'dim' }, e.message)); return; }
+      const inp = h('input', { type: 'password', autocomplete: 'off', placeholder: c.hasSecret ? '•••••• saved (type a new one to replace it)' : 'Client secret (GOCSPX-…)' });
+      box.replaceChildren(h('h2', {}, 'YouTube Live'),
+        h('p', {}, h('span', { class: 'led ' + (c.hasSecret && c.clientId ? 'ok' : 'bad') }), ' ', c.hasSecret && c.clientId ? 'Ready: teams connect their YouTube channel under Streaming → YouTube Live and schedule broadcasts there.' : 'Not set up: teams cannot schedule YouTube broadcasts yet.'),
+        h('details', { open: c.hasSecret ? null : '' }, h('summary', {}, 'How to set it up (once, about 10 minutes)'),
+          h('ol', { style: { margin: '8px 0 10px 18px', padding: 0, lineHeight: 1.7 } },
+            h('li', {}, 'console.cloud.google.com → the project of your Google sign-in → APIs & Services → Library → "YouTube Data API v3" → Enable.'),
+            h('li', {}, 'APIs & Services → OAuth consent screen (Google Auth Platform) → Data access → Add scope ".../auth/youtube". While the app is in Testing, add your own Google account under Audience → Test users.'),
+            h('li', {}, ['Credentials → the OAuth client used for sign-in → Authorised redirect URIs → add ', h('code', {}, c.redirectUri), ' → Save.']),
+            h('li', {}, 'On the same page copy the Client secret and paste it below. It stays on the server.'))),
+        h('label', { class: 'fld', style: { display: 'block', marginBottom: '10px' } }, h('div', { class: 'dim small' }, 'Client secret'), inp),
+        !c.clientId ? h('p', { class: 'dim small' }, 'Google sign-in (the client ID) is not set up on this website yet.') : null,
+        h('div', { class: 'row', style: { gap: '8px' } }, h('button', { class: 'primary', onclick: async () => { if (!inp.value.trim()) return toast('Paste the client secret first', 'error'); try { await api('PUT', '/api/ytlive/server', { secret: inp.value }); toast('Saved'); box.replaceWith(ytliveServerCard()); } catch (e) { oops(e); } } }, 'Save'),
+          c.hasSecret ? h('button', { class: 'sm ghost', onclick: async () => { if (!(await confirmBox('Remove the client secret? Teams can no longer schedule YouTube broadcasts until it is added again.', 'Remove'))) return; try { await api('PUT', '/api/ytlive/server', { secret: '' }); box.replaceWith(ytliveServerCard()); } catch (e) { oops(e); } } }, 'Remove') : null));
+    })();
+    return box;
+  }
+
+  // ---- YouTube Live (Streaming → YouTube Live): the team's channel, its scheduled broadcasts, scheduling a new one
+  App.pages.youtube = (word, msg) => {
+    const box = h('div', {}, h('div', { class: 'card dim' }, 'Loading…'));
+    const T = () => 'team=' + App.team;
+    const when = (iso) => (iso ? new Date(iso).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
+    const localInput = (iso) => { const d = iso ? new Date(iso) : new Date(Date.now() + 3600e3); d.setSeconds(0, 0); return new Date(d.getTime() - d.getTimezoneOffset() * 60e3).toISOString().slice(0, 16); };
+    if (word === 'connected') setTimeout(() => toast('YouTube channel connected'), 300);
+    if (word === 'error' && msg) setTimeout(() => toast(msg, 'error'), 300);
+    function keyBox(k) {
+      return h('div', {}, h('p', { class: 'dim small', style: { margin: '6px 0 0' } }, 'For vMix, OBS or a hardware encoder: Custom RTMP with'), field('Server', k.server), field('Stream key', k.key, true));
+    }
+    function editor(b, done) {
+      const f = { title: b ? b.title : '', description: b ? b.description : '', start: localInput(b && b.start), privacy: b ? b.privacy : 'public', production: '', kids: false };
+      const prods = App.sorted('production').filter((p) => !p.data.ytLive && (!p.data.date || p.data.date >= new Date(Date.now() - 86400e3).toISOString().slice(0, 10)));
+      const pick = h('select', { onchange: (e) => { f.production = e.target.value; const p = App.docs.get ? App.docs.get(f.production) : null; const pd = p && p.data; if (pd) { if (!t.value) { t.value = f.title = (pd.streamTitle || pd.name || '').slice(0, 100); } if (pd.date) { s.value = f.start = `${pd.date}T${(pd.txTime || pd.productionTime || pd.callTime || '12:00').slice(0, 5)}`; } } } },
+        h('option', { value: '' }, 'None: I stream to YouTube myself (vMix, OBS …)'), prods.map((p) => h('option', { value: p.id }, `${p.data.name}${p.data.date ? ' · ' + p.data.date : ''}`)));
+      const t = h('input', { value: f.title, maxlength: 100, oninput: (e) => { f.title = e.target.value; } });
+      const s = h('input', { type: 'datetime-local', value: f.start, oninput: (e) => { f.start = e.target.value; } });
+      const fld = (l, el, help) => h('label', { class: 'f wide' }, h('span', {}, l), el, help ? h('small', { class: 'dim' }, help) : null);
+      modal({ title: b ? 'Change the YouTube broadcast' : 'Schedule on YouTube', wide: true, body: h('div', { class: 'form' },
+        b ? null : fld('For production', pick, 'With a production that streams through this website, the website sends the stream to YouTube while it is live (a restream destination is added). YouTube starts and ends the broadcast by itself.'),
+        fld('Title (shown on YouTube)', t), fld('Starts', s, 'Your local time. Subscribers see it as Upcoming on your channel.'),
+        fld('Description', h('textarea', { rows: 4, oninput: (e) => { f.description = e.target.value; } }, f.description)),
+        fld('Who can watch', h('select', { onchange: (e) => { f.privacy = e.target.value; } }, [['public', 'Public'], ['unlisted', 'Unlisted (only with the link)'], ['private', 'Private']].map(([v, l]) => h('option', { value: v, selected: f.privacy === v ? '' : null }, l)))),
+        b ? null : h('label', { class: 'row wide', style: { gap: '8px' } }, h('input', { type: 'checkbox', onchange: (e) => { f.kids = e.target.checked; } }), 'Made for kids (YouTube\'s rule: switches comments and some features off)')),
+        actions: [{ label: 'Cancel' }, { label: b ? 'Save' : 'Schedule', primary: true, onClick: async () => {
+          const body = { ...f, start: f.start ? new Date(f.start).toISOString() : '' };
+          const r = b ? await api('PUT', `/api/ytlive/broadcasts/${encodeURIComponent(b.id)}?${T()}`, body) : await api('POST', `/api/ytlive/broadcasts?${T()}`, body);
+          toast(b ? 'Saved on YouTube' : 'Scheduled on YouTube'); done(b ? null : r);
+        } }] });
+    }
+    async function paint() {
+      let st;
+      try { st = await api('GET', `/api/ytlive?${T()}`); } catch (e) { box.replaceChildren(h('div', { class: 'card' }, e.message)); return; }
+      const admin = App.can('admin');
+      if (!st.server.hasSecret || !st.server.clientId) {
+        box.replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Not set up on this website yet'), h('p', {}, 'A site admin first adds the Google client secret: Settings → Server → YouTube Live. It takes about 10 minutes, once.')));
+        return;
+      }
+      if (!st.connected) {
+        box.replaceChildren(h('div', { class: 'card' }, h('h2', {}, 'Connect your YouTube channel'),
+          h('p', {}, 'Sign in with the Google account that owns (or manages) the YouTube channel and allow RegemarkFP to manage its live streams. You do this once; the website then schedules broadcasts and makes their stream keys.'),
+          h('p', { class: 'dim small' }, 'Live streaming must be switched on for the channel (YouTube Studio → Create → Go live; the first time takes up to 24 hours).'),
+          admin ? h('button', { class: 'primary', onclick: async () => { try { location.href = (await api('POST', `/api/ytlive/connect?${T()}`, { back: '#/youtube' })).url; } catch (e) { oops(e); } } }, 'Connect YouTube') : h('p', { class: 'dim' }, 'An Admin of your team connects it.')));
+        return;
+      }
+      const head = h('div', { class: 'card row', style: { gap: '12px', alignItems: 'center', flexWrap: 'wrap' } },
+        st.channel.image ? h('img', { src: st.channel.image, alt: '', referrerpolicy: 'no-referrer', style: { width: '40px', height: '40px', borderRadius: '50%' } }) : null,
+        h('div', { class: 'grow' }, h('b', {}, st.channel.title), h('div', { class: 'dim small' }, `Connected by ${st.by}`)),
+        h('button', { class: 'primary', onclick: () => editor(null, (r) => { paint(); if (r && !r.production) modal({ title: 'Scheduled: ' + r.title, body: h('div', {}, h('p', {}, h('a', { href: r.url, target: '_blank', rel: 'noopener' }, r.url)), keyBox(r)), actions: [{ label: 'Done', primary: true }] }); }) }, '+ Schedule on YouTube'),
+        admin ? h('button', { class: 'ghost sm', onclick: async () => { if (!(await confirmBox('Disconnect the YouTube channel? Broadcasts already scheduled stay on YouTube.', 'Disconnect'))) return; try { await api('DELETE', `/api/ytlive/connect?${T()}`); paint(); } catch (e) { oops(e); } } }, 'Disconnect') : null);
+      const list = h('div', {}, h('div', { class: 'card dim' }, 'Asking YouTube…'));
+      box.replaceChildren(head, h('h2', { class: 'sec' }, 'Scheduled and live'), list);
+      let r;
+      try { r = await api('GET', `/api/ytlive/broadcasts?${T()}`); } catch (e) { list.replaceChildren(h('div', { class: 'card' }, e.message)); return; }
+      const STATE = { created: 'Scheduled', ready: 'Scheduled', testing: 'Testing', live: '● LIVE', liveStarting: 'Starting', complete: 'Ended' };
+      list.replaceChildren(r.list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, ['', 'Broadcast', 'Starts', 'Production', 'Status', ''].map((x) => h('th', {}, x)))),
+        h('tbody', {}, r.list.map((b) => h('tr', {},
+          h('td', {}, b.thumb ? h('img', { src: b.thumb, alt: '', referrerpolicy: 'no-referrer', style: { width: '96px', borderRadius: '4px', display: 'block' } }) : null),
+          h('td', {}, h('a', { href: b.url, target: '_blank', rel: 'noopener' }, h('b', {}, b.title)), h('div', { class: 'dim small' }, b.privacy)),
+          h('td', { class: 'nowrap small' }, when(b.start)),
+          h('td', { class: 'small' }, b.production ? h('a', { href: '#/edit/production/' + b.production.id }, b.production.name) : h('span', { class: 'dim' }, '—')),
+          h('td', {}, h('span', { class: 'pill ' + (b.state === 'live' ? 'bad' : b.state === 'complete' ? '' : 'ok') }, STATE[b.state] || b.state)),
+          h('td', { class: 'r nowrap' },
+            h('button', { class: 'sm', onclick: async () => { try { const k = await api('GET', `/api/ytlive/broadcasts/${encodeURIComponent(b.id)}/key?${T()}`); modal({ title: 'Stream key: ' + b.title, body: keyBox(k), actions: [{ label: 'Done', primary: true }] }); } catch (e) { oops(e); } } }, 'Key'), ' ',
+            b.state !== 'live' ? h('button', { class: 'sm', onclick: () => editor(b, () => paint()) }, 'Change') : null, ' ',
+            b.state !== 'live' ? h('button', { class: 'sm ghost danger', onclick: async () => { if (!(await confirmBox(`Cancel "${b.title}"? It is deleted from YouTube${b.production ? ' and its restream destination is removed from the production' : ''}.`, 'Cancel broadcast'))) return; try { await api('DELETE', `/api/ytlive/broadcasts/${encodeURIComponent(b.id)}?${T()}`); toast('Cancelled'); paint(); } catch (e) { oops(e); } } }, '✕') : null))))))
+        : h('div', { class: 'card empty' }, 'Nothing scheduled on YouTube. Press + Schedule on YouTube.'));
+    }
+    paint();
+    return { el: h('div', {}, pageHead('YouTube Live'), h('p', { class: 'dim', style: { marginTop: '-8px' } }, 'Schedule live broadcasts on your YouTube channel. With a production, the website sends its stream to YouTube while it is live.'), box) };
+  };
+
   // ---- PayFast: one merchant account for the website (tickets and passes, invoices, booking deposits, software)
   function payfastCard() {
     const box = h('div', { class: 'card' }, h('h2', {}, 'PayFast (payments)'), h('div', { class: 'dim' }, 'Loading…'));
@@ -362,6 +457,7 @@
         pushCard(),
         whatsappCard(),
         payfastCard(),
+        ytliveServerCard(),
         h('div', { class: 'card' }, h('h2', {}, 'After it has run'),
           h('ol', { style: { margin: '0 0 0 18px', padding: 0, lineHeight: 1.8 } },
             h('li', {}, 'Open the server\'s firewall in the cloud console: TCP 80, 443, 1935, 8189 and UDP 443, 8189, 8890.'),

@@ -195,7 +195,7 @@ function navFor() {
   if (c.bridge) {
     return [
       ['', [['#/', 'Bridge']]],
-      ['Live', [['#/monitors', 'Monitors'], ['#/templates', 'Templates'], ['#/list/theme', 'Themes'], ['#/adverts', 'Advert playout'], ['#/music', 'Music playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'], ['#/playlog', 'Play log']]],
+      ['Live', [['#/monitors', 'Monitors'], ['#/templates', 'Templates'], ['#/list/theme', 'Themes'], ['#/adverts', 'Advert playout'], ['#/music', 'Music playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'], ['#/variables', 'Variables by sport'], ['/rl/control', 'Rocket League'], ['#/playlog', 'Play log']]],
       ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/bibles', 'Bibles'], ['#/ccli', 'CCLI report']]],
       ['From the website', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions'], ['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], ['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues'], ['#/list/crewMember', 'Crew'], ['#/list/advert', 'Adverts'], ['#/list/playlist', 'Ad playlists'], ['#/images', 'Images']]],
       ['', [['#/settings', 'Settings']]],
@@ -211,8 +211,8 @@ function navFor() {
     money ? ['Clients & sales', [['#/list/booking', 'Booking requests' + n(App.waitingBookings && App.waitingBookings().length)], ['#/list/client', 'Clients'], ['#/money', 'Quotes & invoices'], ['#/list/service', 'Products & services'], ['#/ratings', 'Ratings']]] : null,
     ['Productions', ifs(['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment'], money && ['#/list/releaseForm', 'Release forms'], ['#/list/expense', ed ? 'Expenses' : 'My expenses'], web && ['#/availability', 'My availability'])],
     ['Sport', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions'], ['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues']]],
-    ['Live & graphics', ifs(App.pcs && ['#/pcs', 'Production PCs'], pc && ['#/monitors', 'Monitors'], pc && ['#/templates', 'Templates'], ['#/list/theme', 'Themes'], pc && ['#/adverts', 'Advert playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'])],
-    web ? ['Streaming', ifs(['#/list/channel', 'Channels'], ed && ['#/content', 'Content'], ed && ['#/analytics', 'Analytics'], ed && ['#/sales', 'Ticket sales'], ['#/streamads', 'Stream adverts'])] : null,
+    ['Live & graphics', ifs(App.pcs && ['#/pcs', 'Production PCs'], pc && ['#/monitors', 'Monitors'], pc && ['#/templates', 'Templates'], ['#/list/theme', 'Themes'], pc && ['#/adverts', 'Advert playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'], pc && ['#/variables', 'Variables by sport'], pc && ['/rl/control', 'Rocket League'])],
+    web ? ['Streaming', ifs(['#/list/channel', 'Channels'], ed && ['#/content', 'Content'], ed && ['#/youtube', 'YouTube Live'], ed && ['#/analytics', 'Analytics'], ed && ['#/sales', 'Ticket sales'], ['#/streamads', 'Stream adverts'])] : null,
     ['Adverts & sponsors', ifs(['#/list/advert', 'Adverts'], money && ['#/list/adSlot', 'Ad spaces (clients)'], ['#/list/playlist', 'Ad playlists'], ['#/playlog', 'Play log'], money && ['#/sponsors', 'Sponsor reports'])],
     ['Media & music', ifs(['#/images', 'Images'], ['#/list/track', 'Music library'], pc && ['#/music', 'Music playout'], ed && ['#/musicrights', 'Music use report'])],
     ['Worship', [['#/list/service', 'Services'], ['#/list/song', 'Songs'], ['#/ccli', 'CCLI report']].concat(local ? [['#/bibles', 'Bibles']] : [])],

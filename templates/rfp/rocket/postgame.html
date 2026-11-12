@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RFP Post-game</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+html,body{background:transparent;overflow:hidden;width:100%;height:100%}
+:root{--ease:cubic-bezier(.2,.9,.25,1.15);--ease2:cubic-bezier(.7,0,.2,1)}
+#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;
+  background:radial-gradient(ellipse at 0% 0%,color-mix(in srgb,var(--blue) 32%,transparent),transparent 55%),
+             radial-gradient(ellipse at 100% 100%,color-mix(in srgb,var(--orange) 32%,transparent),transparent 55%),
+             color-mix(in srgb,var(--ink) 95%,transparent);
+  display:flex;flex-direction:column;align-items:center;padding:64px 110px 50px;animation:in .5s ease-out}
+#stage::before,#stage::after{content:"";position:absolute;left:0;right:0;height:10px;background:var(--perf);background-size:16px 10px;opacity:.5;animation:film 1.4s linear infinite}
+#stage::before{top:22px}#stage::after{bottom:22px;animation-direction:reverse}
+@keyframes film{to{background-position:16px 0}}
+@keyframes in{from{opacity:0}}
+.kicker{font-size:16px;font-weight:800;letter-spacing:.42em;color:var(--accent);text-transform:uppercase;animation:down .6s var(--ease) .1s both}
+.head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:40px;width:100%;margin-top:18px}
+.team{display:flex;align-items:center;gap:22px;animation:fromL .7s var(--ease) .2s both}
+.team.r{flex-direction:row-reverse;text-align:right;animation-name:fromR}
+.tlogo{width:116px;height:116px;background:var(--slab);display:grid;place-items:center;border-bottom:6px solid var(--c);box-shadow:0 6px 24px color-mix(in srgb,var(--c) 40%,transparent)}
+.tlogo img{max-width:80%;max-height:80%}
+.tlogo b{font-size:38px;color:var(--c);font-weight:900;font-style:italic}
+.tname{font-size:56px;font-weight:900;font-style:italic;text-transform:uppercase;line-height:1}
+.tres{font-size:16px;letter-spacing:.34em;margin-top:10px;color:var(--c);font-weight:900}
+.tres.v{display:inline-block;background:var(--accent);color:#000;padding:3px 12px;clip-path:polygon(6px 0,100% 0,calc(100% - 6px) 100%,0 100%)}
+.score{display:flex;align-items:center;gap:24px;font-size:150px;font-weight:900;font-style:italic;line-height:1;animation:pop .8s var(--ease) .35s both}
+.score .d{font-size:60px;color:var(--muted)}
+.score .w{color:#fff;text-shadow:0 0 30px rgba(0,255,130,.35)} .score .l{color:#5c5c5c}
+.series{margin-top:10px;font-size:18px;font-weight:800;letter-spacing:.26em;color:#e5e5e5;text-transform:uppercase;background:var(--slab3);padding:8px 26px;clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 100%,0 100%);animation:up .6s var(--ease) .55s both}
+.tables{display:grid;grid-template-columns:1fr 1fr;gap:40px;width:100%;margin-top:46px}
+table{width:100%;border-collapse:separate;border-spacing:0 7px}
+th{font-size:13px;letter-spacing:.22em;color:var(--muted);font-weight:800;text-align:center;padding:0 6px;animation:fadeIn .5s .6s both}
+th:first-child{text-align:left}
+tr.row{animation:rowIn .6s var(--ease) both}
+td{background:var(--slab2);font-size:30px;font-weight:800;text-align:center;padding:14px 8px}
+td:first-child{text-align:left;padding-left:20px;border-left:6px solid var(--c);text-transform:uppercase;font-style:italic;font-weight:900;max-width:270px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+tr.mvp td{background:rgba(0,255,130,.09)}
+tr.mvp td:first-child{background:linear-gradient(90deg,rgba(0,255,130,.28),rgba(0,255,130,.09));position:relative}
+tr.mvp td:first-child::after{content:"";position:absolute;top:0;bottom:0;width:60px;left:-80px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);transform:skewX(-20deg);animation:gleam 3.5s ease-in-out 2s infinite}
+@keyframes gleam{0%,70%{left:-80px}100%{left:110%}}
+.mvpt{display:inline-block;font-size:12px;font-style:normal;background:var(--accent);color:#000;padding:2px 9px;margin-left:10px;letter-spacing:.16em;vertical-align:middle;font-weight:900;animation:pop .6s var(--ease) 1.8s both}
+td.hi{color:var(--accent)}
+.foot{margin-top:auto;display:flex;align-items:center;gap:30px;font-size:14px;font-weight:700;letter-spacing:.26em;color:var(--muted);text-transform:uppercase;animation:up .6s var(--ease) 1.4s both}
+.foot img{height:44px}
+.empty{margin:auto;font-size:28px;color:var(--muted);letter-spacing:.2em}
+@keyframes down{from{transform:translateY(-30px);opacity:0}}
+@keyframes up{from{transform:translateY(30px);opacity:0}}
+@keyframes fromL{from{transform:translateX(-140px);opacity:0}}
+@keyframes fromR{from{transform:translateX(140px);opacity:0}}
+@keyframes pop{0%{transform:scale(1.8);opacity:0}100%{transform:none;opacity:1}}
+@keyframes rowIn{from{transform:translateX(-60px) skewX(-10deg);opacity:0}}
+@keyframes fadeIn{from{opacity:0}}
+
+/* ===== MORE SLANTS ===== */
+.tlogo{clip-path:polygon(22px 0,100% 0,calc(100% - 22px) 100%,0 100%);width:150px;border-bottom:0;background:linear-gradient(180deg,var(--slab) 0 calc(100% - 6px),var(--c) calc(100% - 6px))}
+table{border-spacing:0 8px}
+td{background:var(--slab2)}
+td:first-child{border-left:0;clip-path:polygon(16px 0,100% 0,100% 100%,0 100%);padding-left:34px;background:linear-gradient(100deg,var(--c) 0 30px,var(--slab2) 30px)}
+td:last-child{clip-path:polygon(0 0,100% 0,calc(100% - 16px) 100%,0 100%)}
+tr.mvp td:first-child{background:linear-gradient(100deg,var(--c) 0 30px,rgba(0,255,130,.28) 30px,rgba(0,255,130,.09))}
+.mvpt,.series{clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)}
+.series{clip-path:polygon(14px 0,100% 0,calc(100% - 14px) 100%,0 100%);padding:8px 34px}
+.score{transform:skewX(-6deg)}
+.tres.v{clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)}
+#stage::before,#stage::after{transform:skewY(-1.2deg)}
+</style>
+</head>
+<body>
+<div id="stage"><div class="empty">WAITING FOR MATCH TO END…</div></div>
+<script src="lib.js"></script>
+<script>
+const stage = document.getElementById('stage');
+function fit(){ const s = Math.min(innerWidth/1920, innerHeight/1080); stage.style.transform = `scale(${s})`; }
+addEventListener('resize', fit); fit();
+
+function render(){
+  const pg = RL.postgame, c = RL.control; if (!c) return;
+  document.documentElement.style.setProperty('--blue', RL.teamColor(0));
+  document.documentElement.style.setProperty('--orange', RL.teamColor(1));
+  if (!pg){ stage.innerHTML = '<div class="empty">WAITING FOR MATCH TO END…</div>'; return; }
+  const teams = RL.playersByTeam(pg);
+  const w = pg.winner;
+  const winners = Object.values(pg.players || {}).filter(p => w == null || p.team === w);
+  const mvp = RL.mvp(Object.fromEntries(winners.map(p => [p.name, p])));
+  const cols = [['score','SCORE'],['goals','GOALS'],['assists','AST'],['saves','SAVES'],['shots','SHOTS'],['demos','DEMOS']];
+  const maxOf = k => Math.max(0, ...Object.values(pg.players || {}).map(p => p[k] ?? 0));
+  const maxes = Object.fromEntries(cols.map(([k]) => [k, maxOf(k)]));
+  const logo = i => RL.teamLogo(i) ? `<img src="${RL.esc(RL.teamLogo(i))}">` : `<b>${RL.esc(RL.teamTag(i))}</b>`;
+  const team = i => `
+    <div class="team ${i?'r':''}" style="--c:${RL.teamColor(i)}">
+      <div class="tlogo">${logo(i)}</div>
+      <div><div class="tname">${RL.esc(RL.teamName(i))}</div><div class="tres ${w===i?'v':''}">${w===i?'VICTORY':(w==null?'':'DEFEAT')}</div></div>
+    </div>`;
+  const table = i => `
+    <table style="--c:${RL.teamColor(i)}">
+      <tr><th>PLAYER</th>${cols.map(([,h])=>`<th>${h}</th>`).join('')}</tr>
+      ${teams[i].map((p, ri) => `<tr class="row ${mvp && p.name===mvp.name?'mvp':''}" style="animation-delay:${.7 + ri*.12 + i*.06}s"><td>${RL.esc(p.name)}${mvp && p.name===mvp.name?'<span class="mvpt">MVP</span>':''}</td>
+        ${cols.map(([k]) => `<td class="num ${maxes[k] > 0 && (p[k]??0)===maxes[k] ? 'hi':''}" data-n="${p[k] ?? 0}">0</td>`).join('')}</tr>`).join('')}
+    </table>`;
+  const s = pg.score || [0,0];
+  const series = c.bestOf > 1 ? `SERIES ${c.series[0]} – ${c.series[1]} · BEST OF ${c.bestOf}` : 'FINAL';
+  stage.innerHTML = `
+    <div class="kicker">${RL.esc([c.title, c.subtitle].filter(Boolean).join('  ·  '))}</div>
+    <div class="head">${team(0)}
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <div class="score num"><span class="${w===0?'w':'l'}">${s[0]}</span><span class="d">–</span><span class="${w===1?'w':'l'}">${s[1]}</span></div>
+        <div class="series">${series}</div>
+      </div>${team(1)}</div>
+    <div class="tables">${table(0)}${table(1)}</div>
+    <div class="foot"><span>${RL.esc(RL.arenaName(pg.arena))}</span><img class="brand-logo" data-logo="postgame" src="${RL.esc(RL.logoUrl())}" alt=""><span>FINAL SCOREBOARD</span></div>`;
+  countUp(); RL.applyTheme();
+}
+function countUp(){
+  const t0 = performance.now() + 900;
+  const cells = [...stage.querySelectorAll('td[data-n]')];
+  (function step(){
+    const k = Math.max(0, Math.min(1, (performance.now() - t0) / 1100)), e = 1 - Math.pow(1 - k, 3);
+    cells.forEach(td => td.textContent = Math.round(+td.dataset.n * e));
+    if (k < 1) requestAnimationFrame(step);
+  })();
+}
+let sig = '';
+function maybeRender(){ const n = JSON.stringify([RL.postgame?.time, RL.control?.teams, RL.control?.series, RL.control?.title, RL.control?.subtitle, RL.control?.theme]); if (n !== sig){ sig = n; render(); } }
+addEventListener('message', e => { if (e.data === 'replay'){ sig = ''; maybeRender(); } });
+RL.on('control', maybeRender).on('postgame', maybeRender);
+RL.connect();
+</script>
+</body>
+</html>

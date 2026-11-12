@@ -18,11 +18,26 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.0.21
+
+- **E-Sports: Rocket League.** A sport of its own (category E-Sports; production type E-Sports): fixtures, competitions, teams and players, and a hand scorer (goals, shots, assists, saves, epic saves, demolitions; 5 minutes, then golden-goal overtime; 3v3, 2v2, 1v1) for when the game feed is not there.
+- **Rocket League graphics on CasparCG** (production PC, Live & graphics → Rocket League, or `/rl/control`). The RL Broadcast controller, now inside RFP Manager:
+  - Game data from the **SOS plugin** (BakkesMod, `ws://localhost:49122`), Psyonix's **official Stats API** (`TAStatsAPI.ini` / `DefaultStatsAPI.ini`: `PacketSendRate=30`, `WebPort=49125` – 49124 is taken by the RocketLink voice-chat plugin; or its TCP port `tcp://localhost:49123`), or a **relay** on another PC (any `ws://` address; SOS and official messages are both understood).
+  - The graphics are CasparCG templates (`templates/rfp/rocket/overlay.html`), **one layer per graphic** from layer 40: scorebug, boost bars and event icons, player card and boost meter, minimap, goal stinger / GO / overtime / winner, replay transitions, post-game scoreboard. The switches take them in and out (CG PLAY / STOP); each layer reads the fast data (boost, clock, car positions) from `/rl/ws` itself. Copy `templates/rfp` (with `rocket`) into CasparCG's template folder.
+  - The same pages still work in OBS: `/rl/overlay`, `/rl/postgame`, `/rl/stats` (add `?part=scorebug,boost` for some of them only).
+  - **From the match on air** fills the teams (names, tags, colours, logos) from the Rocket League fixture in Graphics control. Series wins count by themselves when a game ends.
+  - Live values `{rl_…}` (score, clock, seconds, overtime, replay, spectated player and their boost, last goal …) for graphics triggers, dashboards and templates.
+- **Game triggers for Rocket League and at set times**: goal, assist, shot, save, epic save, demolition, aerial goal, hat trick, kick-off, goal replay start / end, overtime, game start / end, series point; **Game clock reaches** (At `1:00`, `+1:00` in overtime) and **Time of day** (At `19:30`, any sport). New action **Rocket League graphic**: take one in or out, transition, GO, overtime, winner, post-game, series ±1.
+- **Variables by sport** (Live & graphics → Variables by sport): every value for every sport, grouped, with search and Copy as `{key}`, `key` or `data-f="key"`. New: every statistic **by name** (`stat_shots_on_target_a`, `stat_saves_b` …), leaders by name (`leader_top_scorer_name`), and **every player's statistics by shirt number** (`playerA9_goals`, `playerB4_save`, `playerA9_line`), next to the numbered ones (`stat1_label` …). A section for the Rocket League game's live values.
+
 ### 1.0.20
 
+- **YouTube Live** (Streaming → YouTube Live): connect the team's YouTube channel once (an Admin, with Google), then schedule broadcasts: title, start, description, who can watch. For a production that streams through this website a YouTube restream destination is added to it, so the stream goes to YouTube while it is live and YouTube starts and ends the broadcast by itself; without a production the server and stream key are shown for vMix / OBS. Change, see the key or cancel each one. Set up once by a site admin: Settings → Server → YouTube Live (the Google client secret).
+- Public site menus: headings (Subscriptions, Client portals) in the accent colour.
 - **Watch pages**: the player is as large as fits the screen and never taller, with the chat (live streams) or comments (videos) on the right and the title and description underneath. On a phone everything stacks.
 - **Comments on videos** (/v): anyone who may watch reads them, signed in to write; the writer and the team can remove them.
 - **YouTube videos show their length** instead of 0:00: read from YouTube when added (with or without the YouTube API key), and filled in for videos added before.
+- **Signing in keeps you where you were**: on the public website, signing in (also as a production team member) leaves you on the same page; only "Sign in as production team" / "Production teams: sign in" goes on to the Studio.
 - **Account menu on phones**: client portal links are listed one under the other, so the menu fits the screen (it ran off the left edge).
 - **YouTube captions stay off** when Subtitles is Off (YouTube switched them on by itself from the viewer's YouTube settings or the video's owner).
 - **Test PayFast** (Settings → Server → PayFast): the server sends PayFast a signed R5.00 test form (nobody pays, nothing is saved) and shows what PayFast answers: its payment page, or its error page with the reason (signature, merchant…) and what to change. **Remove passphrase** button for when the PayFast (or sandbox) account has none.

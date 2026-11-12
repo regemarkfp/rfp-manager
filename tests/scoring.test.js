@@ -12,7 +12,7 @@ const setup = (sport, variant) => { const s = S.newSetup(sport, variant); s.team
 const points = (team, k) => Array.from({ length: k }, () => ev('point', { team }));
 
 test('team sports do not say "X lead by Y" (only cricket does); the result still shows at the end', () => {
-  for (const [sport, key] of [['rugby', 'try'], ['football', 'goal'], ['hockey', 'goal'], ['netball', 'goal'], ['basketball', 'two']]) {
+  for (const [sport, key] of [['rugby', 'try'], ['football', 'goal'], ['hockey', 'goal'], ['netball', 'goal'], ['basketball', 'two'], ['rocketleague', 'goal']]) {
     const v = S.compute(setup(sport), [ev('score', { team: 'A', key })]);
     assert.equal(v.score.A > v.score.B, true, sport + ' scored');
     assert.doesNotMatch(v.status, /LEAD|LEVEL/, sport + ' live status');
@@ -84,4 +84,15 @@ test('match settings only show for the sports they apply to', () => {
   assert.deepEqual([f.sport.group, f.venue.group, f.scorer.group], ['Match', 'When & where', 'People']);
   const c = Object.fromEntries(Schema.ENTITIES.competition.fields.map((x) => [x.k, x]));
   assert.deepEqual([c.name.group, c.logo.group, c.fieldGoalPoints.sports], ['Competition', 'Branding', ['rugby']]);
+});
+
+test('Rocket League (E-Sports): goals, saves and demos; 5 minutes then overtime; 3v3 / 2v2 / 1v1', () => {
+  const su = setup('rocketleague');
+  assert.equal(su.variant, 'standard');
+  const v = S.compute(su, [ev('score', { team: 'A', key: 'goal' }), ev('score', { team: 'B', key: 'goal' }), ev('stat', { team: 'B', key: 'epic_save' }), ev('stat', { team: 'A', key: 'demo' }), ev('period', {})]);
+  assert.deepEqual([v.score.A, v.score.B, v.periodLabel], ['1', '1', 'OVERTIME']);
+  assert.equal(v.teamStats.find((x) => x.label === 'SAVES').b, '1', 'an epic save is also a save');
+  assert.equal(S.compute(su, []).clock.game.startMs, 5 * 60000);
+  assert.equal(S.list().find((x) => x.id === 'rocketleague').category, 'E-Sports');
+  assert.equal(S.compute(setup('rocketleague', 'doubles'), []).extra.lineupSize, 2);
 });

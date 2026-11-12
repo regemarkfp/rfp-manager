@@ -611,6 +611,41 @@
     return netView(st, setup);
   };
 
+  // ----------------------------------------------------------------- Rocket League (E-Sports)
+  // Scored by itself from the game (lib/rocket.js: the SOS plugin or Psyonix's Stats API); this is the hand scorer for when
+  // the game feed is not there, and what fixtures, competitions and results use. 5 minutes, then golden-goal overtime.
+  register(timedSport({
+    id: 'rocketleague', name: 'Rocket League', category: 'E-Sports', lineupSize: o => o.size || 3,
+    defaultVariant: 'standard',
+    variants: {
+      standard: { label: 'Standard 3v3 (5 min, golden-goal overtime)', options: { periods: 1, periodMin: 5, otMin: 5, size: 3 } },
+      doubles: { label: 'Doubles 2v2 (5 min, golden-goal overtime)', options: { periods: 1, periodMin: 5, otMin: 5, size: 2 } },
+      duel: { label: 'Duel 1v1 (5 min, golden-goal overtime)', options: { periods: 1, periodMin: 5, otMin: 5, size: 1 } },
+    },
+    options: { clockDir: 'down', stopAtLimit: true },
+    actions: [
+      { key: 'goal', label: 'Goal', pts: 1, player: true, wipe: 'GOAL', btn: 'big', stat: 'goals', attempt: 'shots' },
+      { key: 'shot', label: 'Shot on goal', type: 'stat', stat: 'shots', player: true },
+      { key: 'assist', label: 'Assist', abbr: 'AST', type: 'stat', player: true },
+      { key: 'save', label: 'Save', abbr: 'SV', type: 'stat', player: true },
+      { key: 'epic_save', label: 'Epic save', abbr: 'ES', type: 'stat', player: true, also: 'save' },
+      { key: 'demo', label: 'Demolition', abbr: 'DEM', type: 'stat', player: true },
+      { key: 'aerial', label: 'Aerial goal', abbr: 'AER', cat: 'Style', type: 'stat', group: 'stats', player: true },
+      { key: 'clear', label: 'Clear ball', abbr: 'CLR', cat: 'Defence', type: 'stat', group: 'stats', player: true },
+    ],
+    cards: [],
+    periodName: (p, o) => (p > o.periods ? 'OVERTIME' : 'REGULATION'),
+    periodShort: (p, o) => (p > o.periods ? 'OT' : 'REG'),
+    tableTitle: 'SCORE BY PERIOD',
+    teamStats: [
+      { label: 'GOALS', key: 'goals' }, { label: 'SHOTS', key: 'shots' }, { label: 'ASSISTS', key: 'assist' }, { label: 'SAVES', key: 'save' },
+      { label: 'EPIC SAVES', key: 'epic_save' }, { label: 'DEMOLITIONS', key: 'demo' }, { label: 'AERIAL GOALS', key: 'aerial' }, { label: 'CLEARS', key: 'clear' },
+    ],
+    leaders: [{ label: 'TOP SCORER', stat: 'goals' }, { label: 'MOST SAVES', stat: 'save' }, { label: 'MOST DEMOS', stat: 'demo' }],
+    playerLine: s => [s.goals ? `${s.goals} GOAL${s.goals > 1 ? 'S' : ''}` : '', s.assist ? `${s.assist} AST` : '', s.save ? `${s.save} SAVES` : '', s.demo ? `${s.demo} DEMOS` : ''].filter(Boolean).join(' · '),
+    runMin: 2,
+  }));
+
   // ----------------------------------------------------------------- basketball
   register(timedSport({
     id: 'basketball', name: 'Basketball', lineupSize: o => (o.threeByThree ? 3 : 5),
@@ -1372,6 +1407,22 @@
     // team stats
     set('stats_count', v.teamStats.length);
     v.teamStats.forEach((s, i) => { set(`stat${i + 1}_label`, s.label); set(`stat${i + 1}_a`, s.a); set(`stat${i + 1}_b`, s.b); });
+    // ... and every statistic by its own name, so a graphic can be linked to one (the numbered ones move between sports):
+    //   stat_<label>_a / _b (stat_shots_on_target_a), leader_<label>_name / _value / _team (leader_top_scorer_name),
+    //   per player by shirt number: playerA9_name, playerA9_<stat> for every statistic the scorer counts (0 when none)
+    const nameKey = (x) => String(x || '').toLowerCase().replace(/%/g, ' pct').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+    v.teamStats.forEach(s => { const k = nameKey(s.label); if (k) { set(`stat_${k}_a`, s.a); set(`stat_${k}_b`, s.b); } });
+    (SPORTS[v.sport] && Array.isArray(SPORTS[v.sport].leaders) ? SPORTS[v.sport].leaders : []).forEach(l => { const k = nameKey(l.label); if (k) { set(`leader_${k}_name`, ''); set(`leader_${k}_value`, ''); set(`leader_${k}_team`, ''); } });
+    v.leaders.forEach(l => { const k = nameKey(l.label); if (k) { set(`leader_${k}_name`, l.name); set(`leader_${k}_value`, l.value); set(`leader_${k}_team`, l.team ? U.up(v.teams[l.team].short) : ''); } });
+    const sdef = SPORTS[v.sport] || {}, acts = typeof sdef.actions === 'function' ? sdef.actions(v.options || {}) : (sdef.actions || []);
+    const pkeys = [...new Set(['points', ...acts.filter(a => a.player !== false).map(a => a.stat || a.key).filter(Boolean)])];
+    (v.players || []).forEach(p => {
+      if (!p.number || !/^[A-Z]$/.test(p.team || '')) return;
+      const b = `player${p.team}${String(p.number).replace(/[^\w]/g, '')}`;
+      set(b + '_name', p.tvName); set(b + '_line', p.statsText || '');
+      for (const k of pkeys) set(`${b}_${k}`, (p.stats || {})[k] || 0);
+      for (const [k, val] of Object.entries(p.stats || {})) if (!pkeys.includes(k)) set(`${b}_${k}`, val);
+    });
     // timeline (latest first)
     const tl = v.timeline.slice().reverse().slice(0, 16);
     set('events_count', tl.length);
@@ -1499,7 +1550,7 @@
 
   const Sports = {
     SPORTS, U, compute, newSetup, officialRoles, officialsOf, gameTime, parseMark,
-    list: () => Object.values(SPORTS).map(d => ({ id: d.id, name: d.name, kind: d.kind, variants: Object.entries(d.variants || {}).map(([k, x]) => ({ id: k, label: x.label })), defaultVariant: d.defaultVariant })),
+    list: () => Object.values(SPORTS).map(d => ({ id: d.id, name: d.name, kind: d.kind, category: d.category || 'Sport', variants: Object.entries(d.variants || {}).map(([k, x]) => ({ id: k, label: x.label })), defaultVariant: d.defaultVariant })),
     actions: (sportId, variant, options) => {
       const d = SPORTS[sportId];
       if (!d || d.kind !== 'timed') return [];

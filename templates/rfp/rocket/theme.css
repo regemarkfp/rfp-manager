@@ -1,0 +1,25 @@
+/* RegemarkFP (RFP) broadcast tokens — matches regemarkfp.com */
+:root{
+  --blue:#1f7cff; --orange:#ff7a1a;
+  --ink:#0b0b0b; --slab:#141414; --slab2:#1b1b1b; --slab3:#272727; --line:#303030;
+  --text:#f1f1f1; --muted:#aaaaaa;
+  --accent:#00ff82; --live:#ff3b3b; --gold:#ffc43d; --good:#00ff82; --bad:#ff3b3b;
+  --font:"Segoe UI","Segoe UI Variable Display",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --skew:-16deg; --sl:19px;
+  /* film-strip perforation strip (RFP motif) */
+  --perf:repeating-linear-gradient(90deg,#f1f1f1 0 7px,transparent 7px 12px);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--font);color:var(--text);-webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums}
+.upper{text-transform:uppercase;letter-spacing:.04em}
+.perf{height:5px;background:var(--perf);opacity:.9}
+
+/* theme switches set from the control panel */
+html.nofilm{--perf:none}
+html.nofilm .film,html.nofilm .fl{display:none!important}
+html.noglow *{box-shadow:none!important;text-shadow:none!important}
+html.noglow img{filter:none!important}
+html.noitalic *{font-style:normal!important}
+img.brand-logo{transform:scale(var(--logoScale,1));transform-origin:center}

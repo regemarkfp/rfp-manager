@@ -42,6 +42,7 @@ async function start(overrides = {}, { configPath = process.env.CONFIG || path.j
       })().catch(() => sock.destroy());
     }
     if (p === '/live/ws') return app.live.upgrade(req, sock).catch(() => sock.destroy());
+    if (p === '/rl/ws' && app.rocket && app.rocket.on) return app.rocket.upgrade(req, sock).catch(() => sock.destroy());
     if (p !== '/ws') return sock.destroy();
     hub.upgrade(req, sock).catch(() => sock.destroy());
   });
@@ -57,7 +58,7 @@ async function start(overrides = {}, { configPath = process.env.CONFIG || path.j
   config.port = server.address().port;
   app.server = server; app.hub = hub;
   if (app.relay) app.relay.start();
-  app.stop = async () => { if (app.relay) app.relay.close(); if (app.relayServer) app.relayServer.close(); hub.close(); app.live.close(); app.worship.close(); await new Promise((r) => { server.close(r); server.closeAllConnections(); }); await app.close(); };
+  app.stop = async () => { if (app.relay) app.relay.close(); if (app.relayServer) app.relayServer.close(); hub.close(); app.live.close(); app.worship.close(); if (app.rocket) app.rocket.stop(); await new Promise((r) => { server.close(r); server.closeAllConnections(); }); await app.close(); };
   if (!quiet) banner(app);
   return app;
 }

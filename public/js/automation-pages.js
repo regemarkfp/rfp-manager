@@ -7,6 +7,9 @@
 (() => {
   const EVENTS = {
     'Cricket': [['ball', 'Any ball'], ['four', 'Four'], ['six', 'Six'], ['boundary', 'Four or six'], ['wicket', 'Wicket'], ['dot', 'Dot ball'], ['wide', 'Wide'], ['noball', 'No ball'], ['extra', 'Any extra'], ['over', 'End of an over'], ['maiden', 'Maiden over'], ['fifty', 'Batter reaches 50'], ['hundred', 'Batter reaches 100'], ['innings', 'End of an innings']],
+    'Rocket League (E-Sports)': [['goal', 'Goal'], ['assist', 'Assist'], ['shot', 'Shot on goal'], ['save', 'Save'], ['epic_save', 'Epic save'], ['demo', 'Demolition'], ['aerial_goal', 'Aerial goal'], ['hat_trick', 'Hat trick'], ['clear', 'Clear ball'],
+      ['kickoff', 'Kick-off (GO)'], ['replay_start', 'Goal replay starts'], ['replay_end', 'Goal replay ends'], ['overtime', 'Overtime starts'], ['match_start', 'A game starts'], ['match_end', 'A game ends'], ['series_point', 'Series point']],
+    'At a time': [['clock', 'Game clock reaches… (At)'], ['time', 'Time of day (At)']],
     'Other sports': [['score', 'Any score'], ['try', 'Try'], ['conversion', 'Conversion'], ['penalty', 'Penalty goal'], ['dropgoal', 'Drop goal'], ['goal', 'Goal'], ['point', 'Point'], ['card', 'Any card'], ['yellow', 'Yellow card'], ['red', 'Red card'], ['sub', 'Substitution'], ['timeout', 'Time-out'], ['period', 'New period / half'], ['end', 'End of the match'], ['event', 'Anything the scorer adds']],
   };
   const SCOPES = [['all', 'One value'], ['sport', 'One per sport'], ['competition', 'One per competition'], ['match', 'One per match']];
@@ -84,6 +87,7 @@
         return h('div', { class: 'conn-dev' },
           h('div', { class: 'row', style: { alignItems: 'flex-end' } },
             lab('Name', inp('name', { placeholder: 'Try sponsor' }), 180), lab('When', whenSel, 170),
+            lab('At', inp('at', { placeholder: '1:00 · 19:30', title: 'Game clock (m:ss, e.g. 1:00 = one minute left; +1:00 in overtime) for "Game clock reaches", or the time of day (19:30) for "Time of day". Leave empty for other events.' }), 90),
             lab('By', h('select', { onchange: (e) => { d.team = e.target.value; } }, [['any', 'either team'], ['A', 'team A (home / first)'], ['B', 'team B (away / second)']].map(([v, l]) => h('option', { value: v, selected: d.team === v }, l))), 150),
             lab('Sport', h('span', {}, inp('sport', { list: 'gt-sports', placeholder: 'every sport' })), 130),
             lab('Competition', h('select', { onchange: (e) => { d.competition = e.target.value; } }, [['', 'every competition'], ...App.list('competition').map((c) => [c.id, App.title('competition', c.id)])].map(([v, l]) => h('option', { value: v, selected: d.competition === v }, l))), 170)),

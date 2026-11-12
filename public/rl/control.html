@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RFP Broadcast Control</title>
+<link rel="stylesheet" href="/rl/theme.css">
+<style>
+html,body{background:#0f0f0f;min-height:100%}
+body{font-size:14px}
+.top{display:flex;align-items:center;gap:14px;padding:12px 20px;background:var(--ink);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.brand{font-size:19px;font-weight:900;letter-spacing:.04em;font-style:italic}
+.brand span{color:var(--muted);font-weight:400;margin-left:8px;font-size:13px;letter-spacing:.2em}
+.pill{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--slab2);font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+.pill i{width:9px;height:9px;border-radius:50%;background:var(--bad)}
+.pill.connected i{background:var(--good);box-shadow:0 0 8px var(--good)}
+.pill.demo i{background:var(--gold)}
+.pill.connecting i{background:var(--gold);animation:bl 1s infinite}
+@keyframes bl{50%{opacity:.3}}
+.sp{flex:1}
+input,select{font-family:var(--font);font-size:15px;background:var(--slab);border:1px solid var(--line);color:var(--text);padding:8px 10px;width:100%;outline:none}
+input:focus,select:focus{border-color:#4a5a80}
+input[type=color]{padding:2px;height:38px;width:56px;cursor:pointer}
+input[type=checkbox]{width:auto}
+button{font-family:var(--font);font-size:13px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;background:var(--slab3);border:0;color:var(--text);padding:10px 18px;cursor:pointer;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%);transition:background .15s,transform .1s}
+button:active{transform:scale(.96)}
+button:hover{background:#3a3a3a}
+button.pri{background:var(--accent);color:#000}
+button.acc{background:var(--accent);color:#000}button.acc:hover{background:#4dffa6}
+.wrap{display:grid;grid-template-columns:minmax(420px,560px) 1fr;gap:18px;padding:18px 20px}
+.sec{background:var(--slab2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.sec h3{margin:0 0 12px;font-size:12px;letter-spacing:.28em;color:var(--accent);font-weight:800}
+.row{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.row label{font-size:11px;letter-spacing:.16em;color:var(--muted);min-width:80px;text-transform:uppercase}
+.teams{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.team{background:var(--slab3);padding:12px;border-top:4px solid var(--c);border-radius:8px}
+.team .row label{min-width:52px}
+.series{display:flex;align-items:center;gap:8px;margin-top:6px}
+.series b{font-size:34px;width:46px;text-align:center}
+.series button{width:40px;padding:6px 0;font-size:18px}
+.logoPrev{width:44px;height:44px;background:var(--ink);display:grid;place-items:center;flex:none}
+.logoPrev img{max-width:90%;max-height:90%}
+.toggles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tg{padding:14px 8px;text-align:center;background:var(--slab3);border:1px solid var(--line);cursor:pointer;user-select:none;font-weight:800;letter-spacing:.06em;text-transform:uppercase;font-size:12px;border-radius:8px;transition:all .15s}
+.tg.on{background:rgba(0,255,130,.12);border-color:var(--accent);color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent)}
+.tg.big{grid-column:1/-1;padding:18px;font-size:16px}
+.tg.big.on{background:rgba(255,59,59,.15);border-color:var(--live);color:#fff;box-shadow:inset 0 -3px 0 var(--live)}
+.preview{position:relative;width:100%;aspect-ratio:16/9;background:#000;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.preview iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.links{display:grid;grid-template-columns:auto 1fr auto;gap:8px 10px;align-items:center;margin-top:4px}
+.links code{background:var(--ink);padding:7px 10px;font-family:Consolas,monospace;font-size:13px;color:#cfd6e6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.links span{font-size:11px;letter-spacing:.16em;color:var(--muted)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:10px;letter-spacing:.16em;color:var(--muted);text-align:center;padding:4px;font-weight:600}
+th:first-child,td:first-child{text-align:left}
+td{padding:6px 4px;text-align:center;border-top:1px solid var(--line)}
+td:first-child{border-left:4px solid var(--c);padding-left:8px;font-weight:700;text-transform:uppercase}
+tr.t td{background:rgba(255,255,255,.06)}
+.hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
+@media (max-width:1100px){.wrap{grid-template-columns:1fr}}
+
+/* ===== MORE SLANTS ===== */
+.tg{border-radius:0;clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%);border:0;background:var(--slab3)}
+.tg.on{box-shadow:inset 0 -4px 0 var(--accent)}
+.tg.big.on{box-shadow:inset 0 -4px 0 var(--live)}
+.pill{clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%);padding:6px 18px}
+.team{border-radius:0;border-top:0;clip-path:polygon(14px 0,100% 0,calc(100% - 14px) 100%,0 100%);padding:12px 24px;background:linear-gradient(180deg,var(--c) 0 5px,var(--slab3) 5px)}
+.sec h3{display:inline-block;background:var(--accent);color:#000;padding:3px 16px;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)}
+input,select{clip-path:polygon(6px 0,100% 0,calc(100% - 6px) 100%,0 100%);border:0;background:var(--ink);padding-left:14px}
+input[type=checkbox],input[type=file]{clip-path:none}
+.preview{border-radius:0;clip-path:polygon(18px 0,100% 0,calc(100% - 18px) 100%,0 100%)}
+
+.logoPrev.wide{width:110px}
+.chips{display:flex;flex-wrap:wrap;gap:8px 16px}
+.chips label{min-width:0!important;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;letter-spacing:.06em;color:var(--text);text-transform:none}
+.swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:4px 0 12px}
+.swatches label{display:flex;flex-direction:column;gap:4px;font-size:10px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+.swatches input{width:100%}
+input[type=range]{clip-path:none;padding:0;background:transparent;accent-color:var(--accent);flex:1}
+.rv{min-width:44px;text-align:right;font-variant-numeric:tabular-nums;color:var(--accent);font-weight:800}
+
+.subh{font-size:11px;font-weight:800;letter-spacing:.24em;color:var(--accent);margin:14px 0 8px}
+.subh span{color:var(--muted);letter-spacing:.06em;font-weight:600;margin-left:8px;text-transform:none}
+.gc-grp{margin-bottom:10px}
+.gc-grp b{display:block;font-size:10px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.gc-items{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}
+.gc{display:flex;align-items:center;gap:8px;font-size:12px}
+.gc input[type=color]{width:34px;height:24px;flex:none}
+.gc.unset input[type=color]{opacity:.35}
+.gc span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gc button{padding:2px 8px;font-size:11px}
+</style>
+</head>
+<body>
+<div class="top">
+  <img class="brand-logo" src="/rl/rfp-logo.png" alt="Logo" style="height:34px;transform:none"><div class="brand">ROCKET LEAGUE<span>BROADCAST CONTROL</span></div>
+  <div class="pill" id="pill"><i></i><span id="pillT">Connecting</span></div>
+  <div class="sp"></div>
+  <div style="width:250px"><select id="srcSel" title="Where game data comes from"><option value="sos">SOS plugin (BakkesMod)</option><option value="official">Official Stats API (no mods)</option><option value="relay">Relay on another PC</option></select></div><div style="width:240px"><input id="srcUrl" title="Address of the game data"></div>
+  <a href="/app#/live" style="color:var(--muted);font-size:12px;letter-spacing:.12em;text-decoration:none">RFP MANAGER ›</a>
+</div>
+
+<div id="srcHint" style="display:none;margin:12px 20px 0;padding:10px 16px;background:rgba(0,255,130,.08);border-left:4px solid var(--accent);font-size:13px;line-height:1.5;color:#ddd">
+  <b style="color:var(--accent)">Official Stats API:</b> no BakkesMod needed. Scores, boost, stats, spectated player and goal events work. Rocket League does not stream car positions, so the minimap places each car where it last touched the ball or picked up boost (boost pickups need spectator mode) — less smooth than SOS.
+  Turn it on in <code>&lt;Rocket League folder&gt;\TAGame\Config\DefaultStatsAPI.ini</code> (or <code>TAStatsAPI.ini</code>) → <code>[TAGame.MatchStatsExporter_TA]</code>: <code>PacketSendRate=30</code> and <code>WebPort=49125</code> (49124, the default, is taken by the RocketLink voice-chat plugin), then restart the game. Spectate a match for full data.
+  Address: <code>ws://localhost:49125</code>, or the TCP port <code>tcp://localhost:49123</code>.
+</div>
+<div id="relayHint" style="display:none;margin:12px 20px 0;padding:10px 16px;background:rgba(0,255,130,.08);border-left:4px solid var(--accent);font-size:13px;line-height:1.5;color:#ddd">
+  <b style="color:var(--accent)">Relay:</b> the game runs on another PC. Type the address of the game data there, e.g. <code>ws://192.168.1.30:49122</code> (SOS) or <code>ws://192.168.1.30:49125</code> (official API).
+  SOS and the official API only listen on that PC itself; run RFP Manager there too and use its <code>ws://&lt;that PC&gt;:8080/rl/ws</code>, or any relay that passes the messages on. SOS and official messages are both understood.
+</div>
+<div id="signin" style="display:none;margin:12px 20px 0;padding:10px 16px;background:rgba(255,59,59,.12);border-left:4px solid var(--live);font-size:13px">You are not signed in: you can watch but not change anything. <a href="/app" style="color:var(--accent)">Sign in to RFP Manager</a>, then come back.</div>
+<div class="wrap">
+  <div>
+    <div class="sec">
+      <h3>MATCH</h3>
+      <div class="row"><label>Title</label><input data-k="title" placeholder="Event name"></div>
+      <div class="row"><label>Subtitle</label><input data-k="subtitle" placeholder="Stage / round"></div>
+      <div class="row"><label>Format</label>
+        <select data-k="bestOf" data-num="1"><option value="1">Single game</option><option value="3">Best of 3</option><option value="5">Best of 5</option><option value="7">Best of 7</option></select>
+      </div>
+      <div class="row"><label></label>
+        <label style="min-width:0;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" data-k="autoSeries"> Auto-add series win at match end</label>
+      </div>
+      <div class="row"><label></label>
+        <label style="min-width:0;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" data-k="useGameNames"> Use team names from the game</label>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h3>TEAMS</h3>
+      <div class="teams" id="teams"></div>
+      <div class="btns" style="margin-top:12px"><button id="swap">⇄ Swap sides</button><button id="reset">Reset series</button><button id="fromMatch" title="Names, short names, colours and logos of the Rocket League match on air in Graphics control">From the match on air</button></div>
+    </div>
+
+    <div class="sec">
+      <h3>GRAPHICS</h3>
+      <div class="toggles" id="toggles"></div>
+      <div class="btns" style="margin-top:12px">
+        <button id="tg0">Goal · Blue</button><button id="tg1">Goal · Orange</button><button id="tIc">Event icons</button><button id="tTr">Transition</button><button id="tGo">Kickoff GO</button><button id="tOt">Overtime</button><button id="tW0">Winner · Blue</button><button id="tW1">Winner · Orange</button><button id="snap" class="acc">Capture scoreboard now</button>
+      </div>
+      <div class="hint">The post-game scoreboard fills in automatically when a match ends. "Capture scoreboard now" builds it from the current live stats.</div>
+    </div>
+
+    <div class="sec" id="themeSec">
+      <h3>THEME &amp; BRANDING</h3>
+      <div class="row"><label>Main logo</label><div class="logoPrev wide"><img class="brand-logo" id="thLogoPrev" src="/rl/rfp-logo.png" alt="" style="transform:none"></div>
+        <input data-th="logo" placeholder="Image URL (blank = RFP logo)"></div>
+      <div class="row"><label></label><input type="file" accept="image/*" id="thLogoFile" style="font-size:12px;padding:4px"><button id="thLogoReset">Use RFP logo</button></div>
+      <div class="row"><label>Logo size</label><input type="range" min="50" max="200" data-th="logoSize" data-num="1"><span class="rv" data-rv="logoSize"></span></div>
+      <div class="row"><label>Show logo</label>
+        <div class="chips">
+          <label><input type="checkbox" data-th="logoScorebug"> Scorebug</label>
+          <label><input type="checkbox" data-th="logoTransition"> Transitions</label>
+          <label><input type="checkbox" data-th="logoPostgame"> Post-game</label>
+          <label><input type="checkbox" data-th="logoStats"> Stats page</label>
+        </div></div>
+      <div class="swatches">
+        <label>Accent<input type="color" data-th="accent"></label>
+        <label>Live / alert<input type="color" data-th="live"></label>
+        <label>Panels<input type="color" data-th="panel"></label>
+        <label>Text<input type="color" data-th="text"></label>
+        <label>Labels<input type="color" data-th="muted"></label>
+      </div>
+      <div class="subh">GRAPHIC COLOURS <span>blank = use theme / team colour</span></div>
+      <div id="gcols"></div>
+      <div class="row"><label>Panel opacity</label><input type="range" min="50" max="100" data-th="panelOpacity" data-num="1"><span class="rv" data-rv="panelOpacity"></span></div>
+      <div class="row"><label>Font</label><select data-th="font" id="thFont"></select></div>
+      <div class="row"><label>Slant</label><input type="range" min="0" max="30" data-th="angle" data-num="1"><span class="rv" data-rv="angle"></span></div>
+      <div class="row"><label>Stinger speed</label><input type="range" min="50" max="200" step="10" data-th="stingerSpeed" data-num="1"><span class="rv" data-rv="stingerSpeed"></span></div>
+      <div class="row"><label>Style</label>
+        <div class="chips">
+          <label><input type="checkbox" data-th="italic"> Italic names</label>
+          <label><input type="checkbox" data-th="film"> Film strips</label>
+          <label><input type="checkbox" data-th="glow"> Glow</label>
+        </div></div>
+      <div class="btns" style="margin-top:6px"><button id="thPreset1">RFP green</button><button id="thPreset2">Broadcast blue</button><button id="thPreset3">Clean white</button><button id="thReset" class="acc">Reset theme</button></div>
+    </div>
+
+  </div>
+
+  <div>
+    <div class="sec">
+      <h3>CASPARCG</h3>
+      <div class="row"><label></label><label style="min-width:0;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="cgOn"> Play the graphics on CasparCG (one layer each)</label></div>
+      <div class="row"><label>Channel</label><input id="cgCh" type="number" min="0" max="99" style="width:90px" title="0 = the program channel of Graphics control"><label style="min-width:0">First layer</label><input id="cgLayer" type="number" min="1" max="9900" style="width:110px"><button id="cgReload" title="Load the layers again (after restarting CasparCG or changing the templates)">Load again</button></div>
+      <table id="cgLayers"></table>
+      <div class="hint">Copy <code>templates/rfp</code> (with its <code>rocket</code> folder) into CasparCG's template folder. Each graphic is its own layer and goes in and out with the switches above; goal stingers, GO, overtime, winner and transitions play by themselves on game moments. Game triggers can take them too (action <b>Rocket League graphic</b>).</div>
+    </div>
+    <div class="sec">
+      <h3>PROGRAM PREVIEW</h3>
+      <div class="preview"><iframe src="/rl/overlay?preview=1"></iframe></div>
+    </div>
+    <div class="sec">
+      <h3>OBS BROWSER SOURCES (1920 × 1080)</h3>
+      <div class="links" id="links"></div>
+      <div class="hint">In Rocket League spectator mode, press <b>H</b> to hide the game's own HUD so only this overlay shows.</div>
+    </div>
+    <div class="sec">
+      <h3>LIVE PLAYERS</h3>
+      <table id="pl"></table>
+    </div>
+  </div>
+</div>
+
+<script>window.RL_THEME_LIMITED = true;</script>
+<script src="/rl/lib.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const TOGGLES = [['scorebug','Scorebug'],['boost','Boost bars'],['player','Player cam card'],['minimap','Minimap'],['stinger','Goal stinger'],['stats','Player event icons'],['transitions','Replay transitions'],['banners','GO / OT / Winner'],['postgame','Post-game scoreboard',true]];
+let built = false;
+
+function buildTeams(){
+  $('teams').innerHTML = [0,1].map(i => `
+    <div class="team" id="team${i}">
+      <div class="row"><label>Name</label><input data-team="${i}" data-f="name"></div>
+      <div class="row"><label>Tag</label><input data-team="${i}" data-f="tag" maxlength="5" style="width:90px"><input type="color" data-team="${i}" data-f="color"></div>
+      <div class="row"><label>Logo</label><div class="logoPrev" id="lp${i}"></div><input data-team="${i}" data-f="logo" placeholder="Image URL or upload"></div>
+      <div class="row"><label></label><input type="file" accept="image/*" data-upload="${i}" style="font-size:12px;padding:4px"></div>
+      <div class="series"><label style="font-size:11px;letter-spacing:.16em;color:var(--muted);flex:1">SERIES WINS</label>
+        <button data-s="${i}" data-d="-1">−</button><b class="num" id="sw${i}">0</b><button data-s="${i}" data-d="1">+</button></div>
+    </div>`).join('');
+  $('toggles').innerHTML = TOGGLES.map(([k,l,big]) => `<div class="tg ${big?'big':''}" data-t="${k}">${l}</div>`).join('');
+  const base = location.origin;
+  $('links').innerHTML = [['OVERLAY','/rl/overlay'],['POST-GAME','/rl/postgame'],['STATS + MAP','/rl/stats']].map(([n,p]) =>
+    `<span>${n}</span><code>${base}${p}</code><button data-copy="${base}${p}">Copy</button>`).join('');
+  wire();
+}
+
+function teamsPatch(i, f, v){ const teams = structuredClone(RL.control.teams); teams[i][f] = v; RL.patch({ teams }); }
+
+let deb = {};
+
+const TH_DEFAULT = { accent:'#00ff82', live:'#ff3b3b', panel:'#141414', text:'#f1f1f1', muted:'#aaaaaa', panelOpacity:92, font:'Segoe UI', italic:true, angle:16, film:true, glow:true, logo:'', logoSize:100, logoScorebug:true, logoTransition:true, logoPostgame:true, logoStats:true, stingerSpeed:100 };
+const TH_PRESETS = {
+  thPreset1: { accent:'#00ff82', live:'#ff3b3b', panel:'#141414', text:'#f1f1f1', muted:'#aaaaaa', film:true, glow:true, italic:true },
+  thPreset2: { accent:'#3fb6ff', live:'#ff3b5c', panel:'#0c1424', text:'#eef4ff', muted:'#8ea3c4', film:false, glow:true, italic:true },
+  thPreset3: { accent:'#111111', live:'#e0002a', panel:'#f2f2f2', text:'#111111', muted:'#666666', film:false, glow:false, italic:false },
+};
+
+const pendingGc = {};
+function buildColours(){
+  const groups = {};
+  RL.COLOR_KEYS.forEach(([k, g, label]) => (groups[g] = groups[g] || []).push([k, label]));
+  $('gcols').innerHTML = Object.entries(groups).map(([g, items]) => `<div class="gc-grp"><b>${g}</b><div class="gc-items">${
+    items.map(([k, l]) => `<label class="gc unset" data-gck="${k}"><input type="color" data-gc="${k}"><span>${l}</span><button type="button" data-gcr="${k}" title="Back to default">↺</button></label>`).join('')}</div></div>`).join('');
+  document.querySelectorAll('[data-gc]').forEach(el => el.addEventListener('input', () => {
+    const k = el.dataset.gc, v = el.value, colors = { ...(RL.control.theme.colors || {}), [k]: v };
+    pendingGc[k] = v;
+    RL.applyTheme({ ...RL.control.theme, colors });
+    clearTimeout(deb['gc' + k]); deb['gc' + k] = setTimeout(() => { RL.patch({ theme: { colors: { [k]: v } } }); setTimeout(() => delete pendingGc[k], 400); }, 120);
+  }));
+  document.querySelectorAll('[data-gcr]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); RL.patch({ theme: { colors: { [b.dataset.gcr]: '' } } }); }));
+}
+function syncColours(t){
+  const cols = (t && t.colors) || {};
+  document.querySelectorAll('[data-gck]').forEach(l => {
+    const k = l.dataset.gck; if (pendingGc[k]) return; const v = cols[k] || '';
+    l.classList.toggle('unset', !v);
+    const inp = l.querySelector('input'); if (document.activeElement !== inp) inp.value = v || '#000000';
+  });
+}
+function wireTheme(){
+  buildColours();
+  $('thFont').innerHTML = RL.FONTS.map(f => `<option value="${f}" style="font-family:'${f}'">${f}</option>`).join('');
+  const RV = { logoSize: v => v + '%', panelOpacity: v => v + '%', angle: v => v + '°', stingerSpeed: v => v + '%' };
+  document.querySelectorAll('[data-th]').forEach(el => {
+    const k = el.dataset.th, ev = (el.type === 'checkbox' || el.tagName === 'SELECT' || el.type === 'color') ? (el.type === 'color' ? 'input' : 'change') : 'input';
+    el.addEventListener(ev, () => {
+      const v = el.type === 'checkbox' ? el.checked : (el.dataset.num ? Number(el.value) : el.value);
+      const rv = document.querySelector(`[data-rv="${k}"]`); if (rv && RV[k]) rv.textContent = RV[k](v);
+      RL.applyTheme({ ...RL.control.theme, [k]: v });        // instant local preview
+      clearTimeout(deb['th'+k]); deb['th'+k] = setTimeout(() => RL.patch({ theme: { [k]: v } }), el.type === 'range' || el.type === 'color' ? 120 : 250);
+    });
+  });
+  $('thLogoFile').addEventListener('change', e => {
+    const f = e.target.files[0]; if (!f) return;
+    const img = new Image();
+    img.onload = () => {
+      const sc = Math.min(1, 600 / Math.max(img.width, img.height));
+      const cv = document.createElement('canvas'); cv.width = Math.round(img.width * sc); cv.height = Math.round(img.height * sc);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      RL.patch({ theme: { logo: cv.toDataURL('image/png') } }); URL.revokeObjectURL(img.src);
+    };
+    img.src = URL.createObjectURL(f);
+  });
+  $('thLogoReset').onclick = () => RL.patch({ theme: { logo: '' } });
+  $('thReset').onclick = () => RL.patch({ theme: { ...TH_DEFAULT, colors: Object.fromEntries(RL.COLOR_KEYS.map(([k]) => [k, ''])) } });
+  Object.keys(TH_PRESETS).forEach(id => $(id).onclick = () => RL.patch({ theme: TH_PRESETS[id] }));
+}
+function syncTheme(t){
+  t = t || {};
+  const RV = { logoSize: v => v + '%', panelOpacity: v => v + '%', angle: v => v + '°', stingerSpeed: v => v + '%' };
+  document.querySelectorAll('[data-th]').forEach(el => {
+    const k = el.dataset.th; let v = t[k];
+    if (k === 'logo' && String(v || '').startsWith('data:')) v = '(uploaded image)';
+    setVal(el, v);
+    const rv = document.querySelector(`[data-rv="${k}"]`); if (rv && RV[k] && v != null) rv.textContent = RV[k](v);
+  });
+}
+
+function wire(){
+  document.querySelectorAll('[data-k]').forEach(el => {
+    const ev = el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input';
+    el.addEventListener(ev, () => {
+      const k = el.dataset.k;
+      const v = el.type === 'checkbox' ? el.checked : (el.dataset.num ? Number(el.value) : el.value);
+      clearTimeout(deb[k]); deb[k] = setTimeout(() => RL.patch({ [k]: v }), ev === 'input' ? 250 : 0);
+    });
+  });
+  document.querySelectorAll('[data-team]').forEach(el => {
+    el.addEventListener('input', () => {
+      const key = el.dataset.team + el.dataset.f;
+      clearTimeout(deb[key]); deb[key] = setTimeout(() => teamsPatch(+el.dataset.team, el.dataset.f, el.value), 250);
+    });
+  });
+  document.querySelectorAll('[data-upload]').forEach(el => el.addEventListener('change', () => {
+    const f = el.files[0]; if (!f) return;
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, 320 / Math.max(img.width, img.height));
+      const cv = document.createElement('canvas'); cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      teamsPatch(+el.dataset.upload, 'logo', cv.toDataURL('image/png'));
+      URL.revokeObjectURL(img.src);
+    };
+    img.src = URL.createObjectURL(f);
+  }));
+  document.querySelectorAll('[data-s]').forEach(b => b.onclick = () => {
+    const s = [...RL.control.series]; s[+b.dataset.s] += +b.dataset.d; RL.patch({ series: s });
+  });
+  document.querySelectorAll('[data-t]').forEach(t => t.onclick = () => RL.patch({ show: { [t.dataset.t]: !RL.control.show[t.dataset.t] } }));
+  document.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => { navigator.clipboard?.writeText(b.dataset.copy); b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1200); });
+  $('swap').onclick = () => RL.action('swapTeams');
+  $('reset').onclick = () => RL.action('resetSeries');
+  $('tg0').onclick = () => RL.action('testGoal', { team: 0 });
+  $('tg1').onclick = () => RL.action('testGoal', { team: 1 });
+  $('snap').onclick = () => RL.action('snapshotPostgame');
+  $('tIc').onclick = () => RL.action('testIcons');
+  $('tTr').onclick = () => RL.action('testTransition');
+  $('tGo').onclick = () => RL.action('testGo');
+  $('tOt').onclick = () => RL.action('testOT');
+  $('tW0').onclick = () => RL.action('testWinner', { team: 0 });
+  $('tW1').onclick = () => RL.action('testWinner', { team: 1 });
+  $('srcSel').addEventListener('change', e => RL.patch({ source: e.target.value }));
+  $('srcUrl').addEventListener('change', e => RL.patch({ [urlKey()]: e.target.value.trim() }));
+  $('fromMatch').onclick = () => RL.action('fromMatch');
+  $('cgOn').onchange = e => RL.patch({ caspar: { on: e.target.checked } });
+  $('cgCh').onchange = e => RL.patch({ caspar: { channel: Number(e.target.value) || 0 } });
+  $('cgLayer').onchange = e => RL.patch({ caspar: { layer: Number(e.target.value) || 40 } });
+  $('cgReload').onclick = () => { RL.action('reload'); setTimeout(cgLayers, 1500); };
+}
+
+function setVal(el, v){ if (document.activeElement === el) return; if (el.type === 'checkbox') el.checked = !!v; else if (el.type !== 'file' && el.value !== String(v ?? '')) el.value = v ?? ''; }
+
+RL.on('control', c => {
+  if (!built){ buildTeams(); wireTheme(); built = true; }
+  syncTheme(c.theme); syncColours(c.theme);
+  document.querySelectorAll('[data-k]').forEach(el => setVal(el, c[el.dataset.k]));
+  document.querySelectorAll('[data-team]').forEach(el => {
+    const v = c.teams[+el.dataset.team][el.dataset.f];
+    setVal(el, el.dataset.f === 'logo' && String(v).startsWith('data:') ? '(uploaded image)' : v);
+  });
+  [0,1].forEach(i => {
+    $('team'+i).style.setProperty('--c', c.teams[i].color);
+    $('sw'+i).textContent = c.series[i];
+    $('lp'+i).innerHTML = c.teams[i].logo ? `<img src="${RL.esc(c.teams[i].logo)}">` : '';
+  });
+  document.querySelectorAll('[data-t]').forEach(t => t.classList.toggle('on', !!c.show[t.dataset.t]));
+  setVal($('srcSel'), c.source || 'sos');
+  setVal($('srcUrl'), c[urlKey()]);
+  $('srcUrl').placeholder = c.source === 'relay' ? 'ws://192.168.1.30:49122' : c.source === 'official' ? 'ws://localhost:49125' : 'ws://localhost:49122';
+  $('srcHint').style.display = c.source === 'official' ? '' : 'none';
+  $('relayHint').style.display = c.source === 'relay' ? '' : 'none';
+  const cg = c.caspar || {};
+  setVal($('cgOn'), !!cg.on); setVal($('cgCh'), cg.channel ?? 0); setVal($('cgLayer'), cg.layer ?? 40);
+  $('signin').style.display = RL.canControl ? 'none' : '';
+  clearTimeout(cgT); cgT = setTimeout(cgLayers, 800);
+});
+const urlKey = () => (RL.control.source === 'official' ? 'officialUrl' : RL.control.source === 'relay' ? 'relayUrl' : 'sosUrl');
+let cgT = null;
+async function cgLayers(){
+  try {
+    const r = await fetch('/api/rl', { credentials: 'same-origin' }); if (!r.ok) return; const v = await r.json();
+    const on = v.control.caspar.on;
+    $('cgLayers').innerHTML = `<tr><th>Layer</th><th>Graphic</th><th>${on ? 'On CasparCG' : 'CasparCG is off'}</th></tr>` + v.parts.map(p => `<tr><td style="--c:var(--accent)">${v.control.caspar.channel || 'PGM'}-${p.layer}</td><td>${RL.esc(p.label)}</td><td>${!on ? '—' : p.playing ? 'IN' : p.loaded ? 'loaded' : 'not loaded'}</td></tr>`).join('') + `<tr><td colspan="3" style="text-align:left;border-left:0;font-weight:400;color:var(--muted)">Template <code>${RL.esc(v.template)}</code> · data from <code>${RL.esc(v.wsUrl)}</code></td></tr>`;
+  } catch (e) { /* not signed in */ }
+}
+RL.on('error', e => { $('pillT').textContent = e; });
+RL.on('status', s => {
+  $('pill').className = 'pill ' + s;
+  $('pillT').textContent = ({connected:'Live data', connecting:'Connecting to game', disconnected:'Game not found', offline:'RFP Manager offline'})[s] || s;
+});
+RL.on('update', d => {
+  const tp = RL.targetPlayer(d), teams = RL.playersByTeam(d);
+  $('pl').innerHTML = `<tr><th>Player</th><th>Boost</th><th>Score</th><th>G</th><th>A</th><th>SV</th><th>SH</th><th>D</th></tr>` +
+    teams.flat().map(p => `<tr class="${tp && tp._id===p._id?'t':''}" style="--c:${RL.teamColor(p.team===1?1:0)}"><td>${RL.esc(p.name)}</td><td class="num">${Math.round(p.boost??0)}</td><td class="num">${p.score??0}</td><td>${p.goals??0}</td><td>${p.assists??0}</td><td>${p.saves??0}</td><td>${p.shots??0}</td><td>${p.demos??0}</td></tr>`).join('');
+});
+RL.connect();
+</script>
+</body>
+</html>

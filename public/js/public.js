@@ -1051,7 +1051,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     try { l = await landingData(); } catch (e) { return el('div', { class: 'empty' }, e.message); }
     document.title = l.site || 'RegemarkFP';
     const live = (D.live || [])[0];
-    const team = () => { if (D.me && D.me.teams) location.href = '/app'; else signIn('Production team members: sign in to open your Studio.'); };
+    const team = () => { if (D.me && D.me.teams) location.href = '/app'; else signIn('Production team members: sign in to open your Studio.', { studio: true }); };
     return [
       el('section', { class: 'land-hero', style: l.image ? { backgroundImage: `linear-gradient(90deg, rgba(10,10,10,.92) 35%, rgba(10,10,10,.55)), url("${img(l.image)}")` } : {} },
         el('img', { class: 'land-logo', src: '/brand/rfp-logo.png', alt: l.site || '' }),
@@ -1150,7 +1150,8 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   // team are taken to the Studio (/app); nobody is asked to make a production team.
   let gsi = null, backTo = '';
   const loadGsi = () => gsi || (gsi = new Promise((resolve, reject) => { const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.onload = resolve; s.onerror = () => reject(new Error('Google sign-in could not load')); document.head.append(s); }));
-  function signIn(why) {
+  // signing in keeps you on the page you were on; only "open your Studio" (studio) goes on to the Studio
+  function signIn(why, { studio = false } = {}) {
     const old = document.getElementById('signin-modal'); if (old) old.remove();
     const holder = el('div', { style: { display: 'flex', justifyContent: 'center', minHeight: '44px' } }, el('span', { class: 'sub' }, 'Loading…'));
     const err = el('p', { class: 'err', style: { display: 'none' } });
@@ -1159,7 +1160,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       el('div', { class: 'modal-box' }, el('button', { class: 'icon x', onclick: close, 'aria-label': 'Close' }, '✕'),
         el('img', { src: '/brand/rfp-logo-sm.png', alt: '', style: { height: '34px' } }), el('h2', {}, 'Sign in'),
         el('p', { class: 'sub' }, why || 'Subscribe to channels, keep your tickets and get an email when they go live.'), holder, err,
-        el('p', { class: 'sub small' }, 'Production team members go to their Studio after signing in.')));
+        studio ? el('p', { class: 'sub small' }, 'You go to your Studio after signing in.') : el('p', { class: 'sub small' }, 'You stay on this page. Production team members find their Studio at the top.')));
     document.body.append(wrap);
     if (!D.googleClientId) { holder.replaceChildren(el('span', { class: 'sub' }, 'Sign-in is not set up on this website yet.')); return; }
     if (window.RFPNative && window.RFPNative.signInWithGoogle) {
@@ -1174,7 +1175,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
               await post('/api/auth/google', { credential: token });
               D = await get('/api/public/home');
               if (backTo) { location.href = backTo; return; }
-              if (D.me && D.me.teams) { location.href = '/app'; return; }
+              if (studio && D.me && D.me.teams) { location.href = '/app'; return; }
               close(); render(); return;
             } catch (e) { err.textContent = e.message; err.style.display = ''; }
           } else if (why && why !== 'cancelled') { window.RFPNative.signInWithGoogle(nx); }
@@ -1192,7 +1193,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
           await post('/api/auth/google', { credential: resp.credential });
           D = await get('/api/public/home');
           if (backTo) { location.href = backTo; return; }
-          if (D.me && D.me.teams) { location.href = '/app'; return; }
+          if (studio && D.me && D.me.teams) { location.href = '/app'; return; }
           close(); render();
         } catch (e) { err.textContent = e.message; err.style.display = ''; holder.replaceChildren(); }
       } });
@@ -1231,7 +1232,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     $('side').replaceChildren(link('/', 'Home', '⌂'), link('/browse', 'Browse', '▦'), link('/book', 'Book services', '✉'), link('/matches', 'Matches', '◎'), link('/teams', 'Teams', '⚑'), link('/software', 'Software', '⬇'), D && D.me ? link('/following', 'Following' + ((D.me.follows || []).length ? ` (${D.me.follows.length})` : ''), '♥') : null, link('/videos', 'Videos', '▶'), link('/subscriptions', 'Subscriptions', '★'), link('/channels', 'Channels', '◉'),
       subs.length ? [el('hr'), el('h4', {}, 'Subscriptions'), subs.map((c) => el('a', { href: '/c/' + c.slug, 'data-nav': '', class: p === '/c/' + c.slug ? 'on' : '' }, c.logo ? el('img', { class: 'chip-logo', src: img(c.logo), alt: '' }) : el('span', { class: 'chip-logo' }), c.name))] : null,
       D && D.me && D.me.teams ? [el('hr'), el('a', { href: '/app', class: 'studio-link' }, ico('⚙'), 'Studio (your production team)')] : null,
-      D && !D.me ? [el('hr'), el('a', { href: '#', class: 'studio-link', onclick: (e) => { e.preventDefault(); signIn('Production team members: sign in to open your Studio.'); } }, ico('⚙'), 'Production teams: sign in')] : null);
+      D && !D.me ? [el('hr'), el('a', { href: '#', class: 'studio-link', onclick: (e) => { e.preventDefault(); signIn('Production team members: sign in to open your Studio.', { studio: true }); } }, ico('⚙'), 'Production teams: sign in')] : null);
   }
   function meBox() {
     const m = D && D.me;

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RFP Stats + Map</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+html,body{height:100%;background:var(--ink)}
+body{display:flex;flex-direction:column;background:radial-gradient(ellipse at 0 0,color-mix(in srgb,var(--blue) 18%,transparent),transparent 50%),radial-gradient(ellipse at 100% 100%,color-mix(in srgb,var(--orange) 18%,transparent),transparent 50%),var(--ink)}
+header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:16px 24px 6px;gap:16px}
+.ht{display:flex;align-items:center;gap:14px}
+.ht.r{flex-direction:row-reverse;text-align:right}
+.hl{width:54px;height:54px;background:var(--slab);display:grid;place-items:center;border-bottom:4px solid var(--c)}
+.hl img{max-width:80%;max-height:80%} .hl b{color:var(--c);font-size:18px}
+.hn{font-size:30px;font-weight:900;font-style:italic;text-transform:uppercase;line-height:1}
+#brand{position:fixed;left:24px;bottom:14px;height:34px;opacity:.9}
+header{animation:hdr .7s cubic-bezier(.2,.9,.25,1.15)}@keyframes hdr{from{transform:translateY(-40px);opacity:0}}
+.mid .c{border-bottom:3px solid var(--accent)}
+.map{border-top:3px solid var(--accent);border-radius:0 0 10px 10px}
+.panel{border-radius:10px}
+.h{color:var(--accent)!important;font-weight:800}
+.hp{display:flex;gap:4px;margin-top:6px}.ht.r .hp{justify-content:flex-end}
+.hp i{width:22px;height:5px;background:rgba(255,255,255,.15);transform:skewX(var(--skew))}.hp i.on{background:var(--c)}
+.mid{display:flex;align-items:stretch;height:58px}
+.mid .s{width:74px;display:grid;place-items:center;font-size:40px;font-weight:700;background:var(--c)}
+.mid .c{width:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--slab)}
+.mid .c b{font-size:36px;line-height:1}.mid .c.ot b{color:var(--gold)}
+.mid .c span{font-size:11px;letter-spacing:.2em;color:var(--muted)}
+#sub{text-align:center;font-size:12px;letter-spacing:.3em;color:var(--muted);text-transform:uppercase;height:18px}
+main{flex:1;display:grid;grid-template-columns:320px 1fr 320px;gap:16px;padding:8px 24px 20px;min-height:0}
+.col{display:flex;flex-direction:column;gap:10px;min-height:0;overflow:auto}
+.h{font-size:12px;letter-spacing:.3em;color:var(--muted);text-transform:uppercase}
+.card{background:linear-gradient(135deg,var(--slab2),var(--slab));padding:12px 14px;position:relative;border-left:5px solid var(--c);transition:box-shadow .2s}
+.col.r .card{border-left:0;border-right:5px solid var(--c)}
+.card.t{box-shadow:inset 0 0 0 2px var(--accent),0 0 18px rgba(0,255,130,.25)}
+.card.dead{opacity:.45}
+.ct{display:flex;align-items:baseline;gap:8px}
+.cn{font-size:22px;font-weight:900;font-style:italic;text-transform:uppercase;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cs{font-size:22px;font-weight:700}
+.tags{display:flex;gap:4px;min-height:18px;margin:4px 0}
+.tag{font-size:10px;font-weight:700;letter-spacing:.12em;padding:2px 6px;background:var(--slab3);color:var(--muted)}
+.tag.cam{background:var(--accent);color:#000}.tag.ss{background:var(--gold);color:#000}.tag.dd{background:var(--bad);color:#fff}.tag.air{background:#3b4f8a;color:#fff}.tag.wall{background:#6a3f8f;color:#fff}
+.bb{height:8px;background:rgba(255,255,255,.08);transform:skewX(var(--skew));overflow:hidden}
+.bb i{display:block;height:100%;background:linear-gradient(90deg,var(--c),#fff);transition:width .12s}
+.br{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px;letter-spacing:.06em}
+.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-top:8px;text-align:center}
+.grid div{background:rgba(0,0,0,.25);padding:4px 0}
+.grid b{display:block;font-size:18px;line-height:1.1}
+.grid span{font-size:9px;letter-spacing:.14em;color:var(--muted)}
+.center{display:flex;flex-direction:column;gap:12px;min-height:0}
+.map{flex:1;position:relative;background:rgba(20,20,20,.75);min-height:300px}
+.map canvas{position:absolute;inset:0;width:100%;height:100%}
+.map .lab{position:absolute;left:14px;top:10px;font-size:12px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase}
+.bottom{display:grid;grid-template-columns:1.1fr 1fr;gap:12px;height:250px}
+.panel{background:rgba(27,27,27,.9);padding:12px 14px;overflow:hidden;display:flex;flex-direction:column}
+.cmp{display:grid;grid-template-columns:52px 1fr 52px;align-items:center;gap:2px 8px;margin-top:4px;font-size:17px;font-weight:700}
+.cmp .k{font-size:10px;letter-spacing:.2em;color:var(--muted);text-align:center;grid-column:1/-1}
+.cmp .v0{text-align:left}.cmp .v1{text-align:right}
+.cmp .bar{display:flex;height:8px;background:rgba(255,255,255,.08)}
+.cmp .bar i{display:block;height:100%}
+#feed{flex:1;overflow:auto;font-size:14px;margin-top:6px}
+#feed div{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06);display:flex;gap:10px}
+#feed .tt{color:var(--muted);font-size:12px;min-width:44px}
+#feed .goal{color:var(--gold);font-weight:700}
+#conn{position:fixed;right:12px;bottom:8px;font-size:11px;letter-spacing:.14em;color:var(--muted)}
+@media (max-width:1100px){main{grid-template-columns:1fr}.bottom{grid-template-columns:1fr;height:auto}}
+
+/* ===== MORE SLANTS ===== */
+.card{border-left:0!important;border-right:0!important;clip-path:polygon(16px 0,100% 0,calc(100% - 16px) 100%,0 100%);padding-left:30px;padding-right:30px;background:linear-gradient(100deg,var(--c) 0 30px,var(--slab2) 30px,var(--slab))}
+.col.r .card{background:linear-gradient(280deg,var(--c) 0 30px,var(--slab2) 30px,var(--slab))}
+.card.t{box-shadow:none;background:linear-gradient(100deg,var(--accent) 0 30px,#1f2a22 30px,var(--slab))}
+.col.r .card.t{background:linear-gradient(280deg,var(--accent) 0 30px,#1f2a22 30px,var(--slab))}
+.grid div{transform:skewX(-10deg)} .grid div>*{transform:skewX(10deg)}
+.tag{clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%);padding:2px 9px}
+.mid .s,.mid .c,.hl{clip-path:polygon(14px 0,100% 0,calc(100% - 14px) 100%,0 100%)}
+.mid .s{width:90px}.mid .c{width:160px;margin:0 -6px;border-bottom:0;background:linear-gradient(180deg,var(--slab) 0 calc(100% - 3px),var(--accent) calc(100% - 3px))}
+.hl{width:70px;border-bottom:0;background:linear-gradient(180deg,var(--slab) 0 calc(100% - 4px),var(--c) calc(100% - 4px))}
+.panel,.map{clip-path:polygon(20px 0,100% 0,calc(100% - 20px) 100%,0 100%);border-radius:0}
+.panel{padding-left:30px;padding-right:30px}
+.cmp .bar{transform:skewX(-20deg)}
+</style>
+</head>
+<body>
+<header>
+  <div class="ht" id="h0"><div class="hl" id="hl0"></div><div><div class="hn" id="hn0">BLUE</div><div class="hp" id="hp0"></div></div></div>
+  <div class="mid"><div class="s num" id="hs0" style="--c:var(--blue)">0</div><div class="c" id="hc"><b class="num" id="clock">5:00</b><span id="gameNo">GAME 1</span></div><div class="s num" id="hs1" style="--c:var(--orange)">0</div></div>
+  <div class="ht r" id="h1"><div class="hl" id="hl1"></div><div><div class="hn" id="hn1">ORANGE</div><div class="hp" id="hp1"></div></div></div>
+</header>
+<div id="sub"></div><img class="brand-logo" data-logo="stats" src="rfp-logo.png" alt="" id="brand">
+<main>
+  <div class="col" id="c0"><div class="h">Players</div></div>
+  <div class="center">
+    <div class="map"><canvas id="map"></canvas><div class="lab" id="ballLab">Live positions</div></div>
+    <div class="bottom">
+      <div class="panel"><div class="h">Team comparison</div><div id="cmp"></div></div>
+      <div class="panel"><div class="h">Match events</div><div id="feed"></div></div>
+    </div>
+  </div>
+  <div class="col r" id="c1"><div class="h" style="text-align:right">Players</div></div>
+</main>
+<div id="conn">CONNECTING…</div>
+<script src="lib.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const map = new RL.MiniMap($('map'));
+const poss = [0, 0]; let lastT = 0;
+
+function header(){
+  const c = RL.control; if (!c) return;
+  document.documentElement.style.setProperty('--blue', RL.teamColor(0));
+  document.documentElement.style.setProperty('--orange', RL.teamColor(1));
+  [0,1].forEach(i => {
+    $('h'+i).style.setProperty('--c', RL.teamColor(i));
+    $('hn'+i).textContent = RL.teamName(i);
+    $('hl'+i).innerHTML = RL.teamLogo(i) ? `<img src="${RL.esc(RL.teamLogo(i))}">` : `<b>${RL.esc(RL.teamTag(i))}</b>`;
+    const need = Math.ceil(c.bestOf/2);
+    $('hp'+i).innerHTML = c.bestOf > 1 ? Array.from({length:need},(_,k)=>`<i class="${k<c.series[i]?'on':''}"></i>`).join('') : '';
+  });
+  $('gameNo').textContent = c.bestOf > 1 ? `GAME ${Math.min(c.bestOf, c.series[0]+c.series[1]+1)} · BO${c.bestOf}` : 'MATCH';
+}
+
+function card(p, isT){
+  const t = p.team === 1 ? 1 : 0, b = Math.round(Math.max(0, Math.min(100, p.boost ?? 0)));
+  const tags = [];
+  if (isT) tags.push('<span class="tag cam">ON CAM</span>');
+  if (p.isDead) tags.push('<span class="tag dd">DEMOLISHED</span>');
+  if (p.isSonic) tags.push('<span class="tag ss">SUPERSONIC</span>');
+  if (p.onWall) tags.push('<span class="tag wall">WALL</span>'); else if (p.onGround === false && !p.isDead) tags.push('<span class="tag air">AIR</span>');
+  if (p.isPowersliding) tags.push('<span class="tag">SLIDE</span>');
+  return `<div class="card ${isT?'t':''} ${p.isDead?'dead':''}" style="--c:${RL.teamColor(t)}">
+    <div class="ct"><div class="cn">${RL.esc(p.name)}</div><div class="cs num">${p.score ?? 0}</div></div>
+    <div class="tags">${tags.join('')}</div>
+    <div class="bb"><i style="width:${b}%"></i></div>
+    <div class="br"><span>BOOST <b class="num" style="color:#fff">${b}</b></span><span><b class="num" style="color:#fff">${Math.round(p.speed ?? 0)}</b> KM/H</span></div>
+    <div class="grid">
+      <div><b class="num">${p.goals??0}</b><span>GOALS</span></div><div><b class="num">${p.assists??0}</b><span>AST</span></div>
+      <div><b class="num">${p.saves??0}</b><span>SAVES</span></div><div><b class="num">${p.shots??0}</b><span>SHOTS</span></div>
+      <div><b class="num">${p.demos??0}</b><span>DEMOS</span></div><div><b class="num">${p.touches??0}</b><span>TOUCH</span></div>
+    </div></div>`;
+}
+
+function cmpRow(label, a, b, fmt = v => v){
+  const tot = (a + b) || 1;
+  return `<div class="cmp"><div class="k">${label}</div><div class="v0 num">${fmt(a)}</div>
+    <div class="bar"><i style="width:${a/tot*100}%;background:${RL.teamColor(0)}"></i><i style="width:${b/tot*100}%;background:${RL.teamColor(1)}"></i></div>
+    <div class="v1 num">${fmt(b)}</div></div>`;
+}
+
+RL.on('control', header);
+RL.on('status', s => $('conn').textContent = ({connected:'● LIVE — GAME CONNECTED', demo:'● DEMO MODE', connecting:'CONNECTING TO GAME…', disconnected:'GAME NOT CONNECTED — IS ROCKET LEAGUE RUNNING?', offline:'SERVER OFFLINE'})[s] || s);
+RL.on('update', d => {
+  const g = d.game || {};
+  [0,1].forEach(i => $('hs'+i).textContent = g.teams?.[i]?.score ?? 0);
+  if (RL.control?.useGameNames) header();
+  $('clock').textContent = RL.fmtClock(g); $('hc').classList.toggle('ot', !!g.isOT);
+  $('sub').textContent = g.isReplay ? 'REPLAY' : (g.isOT ? 'OVERTIME' : RL.arenaName(g.arena));
+  const tp = RL.targetPlayer(d);
+  const teams = RL.playersByTeam(d);
+  [0,1].forEach(i => {
+    const col = $('c'+i), h = col.firstElementChild;
+    col.innerHTML = ''; col.appendChild(h);
+    col.insertAdjacentHTML('beforeend', teams[i].map(p => card(p, tp && tp._id === p._id)).join(''));
+  });
+  // possession (time ball was last touched by each team)
+  const now = performance.now();
+  if (lastT && !g.isReplay && (g.ball?.team === 0 || g.ball?.team === 1)) poss[g.ball.team] += Math.min(200, now - lastT);
+  lastT = now;
+  const sum = k => teams.map(t => t.reduce((s, p) => s + (p[k] ?? 0), 0));
+  const avgBoost = teams.map(t => t.length ? Math.round(t.reduce((s,p)=>s+(p.boost??0),0)/t.length) : 0);
+  const [sh0, sh1] = sum('shots'), [sv0, sv1] = sum('saves'), [dm0, dm1] = sum('demos'), [tc0, tc1] = sum('touches');
+  const pt = (poss[0] + poss[1]) || 1;
+  $('cmp').innerHTML = cmpRow('POSSESSION', poss[0], poss[1], v => Math.round(v/pt*100) + '%') + cmpRow('SHOTS', sh0, sh1) + cmpRow('SAVES', sv0, sv1) + cmpRow('DEMOS', dm0, dm1) + cmpRow('AVG BOOST', avgBoost[0], avgBoost[1]);
+  $('ballLab').textContent = `Ball ${Math.round(g.ball?.speed ?? 0)} km/h${g.arena ? ' · ' + RL.arenaName(g.arena) : ''}`;
+  if (d.source === 'official') $('ballLab').textContent += ' · Positions from ball touches & boost pickups (native API)';
+});
+function log(html, cls){
+  const el = document.createElement('div'); if (cls) el.className = cls;
+  el.innerHTML = `<span class="tt num">${RL.fmtClock(RL.update?.game)}</span><span>${html}</span>`;
+  $('feed').prepend(el); while ($('feed').children.length > 60) $('feed').lastChild.remove();
+}
+RL.on('ev', (e, d) => {
+  if (e === 'game:goal_scored') log(`GOAL — ${RL.esc(d.scorer?.name)}${d.assister?.name ? ' (ast. ' + RL.esc(d.assister.name) + ')' : ''} · ${Math.round(d.goalspeed||0)} km/h`, 'goal');
+  else if (e === 'game:statfeed_event' && !/goal/i.test(d.event_name||'')) log(`${RL.esc(d.event_name || d.type)} — ${RL.esc(d.main_target?.name)}${d.secondary_target?.name ? ' ▸ ' + RL.esc(d.secondary_target.name) : ''}`);
+  else if (e === 'game:match_created') { poss[0] = poss[1] = 0; $('feed').innerHTML = ''; log('Match created'); }
+  else if (e === 'game:round_started_go') log('Kickoff');
+  else if (e === 'game:match_ended') log(`Match ended — ${RL.esc(RL.teamName(d.winner_team_num))} win`, 'goal');
+});
+RL.connect();
+</script>
+</body>
+</html>

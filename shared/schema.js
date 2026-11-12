@@ -17,7 +17,7 @@
   const BOOKING_STATUS = ['New', 'Assigned', 'Accepted', 'Declined by producer', 'Quoted', 'Booked', 'Not going ahead'];
   const BOOKING_STAGES = ['Received', 'Being reviewed', 'Quote sent', 'Confirmed', 'Crew booked', 'Event day', 'Completed', 'Declined', 'Cancelled'];   // what the client sees (lib/bookings.js)
   const EXPENSE_STATUS = ['Submitted', 'Approved', 'Rejected', 'Paid back'];
-  const PRODUCTION_TYPES = ['Sport', 'Corporate', 'Religion', 'Concert', 'Conference', 'Wedding', 'Awards', 'Esports', 'Other'];
+  const PRODUCTION_TYPES = ['Sport', 'Corporate', 'Religion', 'Concert', 'Conference', 'Wedding', 'Awards', 'E-Sports', 'Other'];
   const GENDERS = ['Male', 'Female', 'Mixed'];
   const AGE_GROUPS = ['Adults', 'Seniors', 'U21', 'U20', 'U19', 'U18', 'U17', 'U16', 'U15', 'U14', 'U13', 'U12', 'U11', 'U10', 'U9', 'U8', 'Veterans', 'Masters'];
   const DIVISIONS = ['First Grade', 'Second Grade', 'Third Grade', 'Reserves', '1st Team', '2nd Team', 'A', 'B', 'C', 'D', 'Premier', 'Division 1', 'Division 2'];

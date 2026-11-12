@@ -33,7 +33,7 @@
     opts = opts || {};
     const dirty = () => { if (opts.onChange) opts.onChange(); };
     const box = h('div', {});
-    const DO = [['macro', 'run macro'], ['advert', 'play an advert'], ['playlist', 'start an ad playlist'], ['adstop', 'stop the adverts'], ['show', 'take graphic'], ['hide', 'take off graphic'], ['hideall', 'take everything off'], ['setvar', 'set a variable'], ['timeline', 'timeline'], ['device', 'device command'], ['amcp', 'AMCP command']];
+    const DO = [['macro', 'run macro'], ['advert', 'play an advert'], ['playlist', 'start an ad playlist'], ['adstop', 'stop the adverts'], ['show', 'take graphic'], ['hide', 'take off graphic'], ['hideall', 'take everything off'], ['setvar', 'set a variable'], ['timeline', 'timeline'], ['device', 'device command'], ['rocket', 'Rocket League graphic'], ['amcp', 'AMCP command']];
     const sel = (a, k, list, none) => h('select', { onchange: (e) => { a[k] = e.target.value; dirty(); } }, [h('option', { value: '' }, none), ...list.map(([v, l]) => h('option', { value: v, selected: a[k] === v }, l))]);
     const paintA = () => box.replaceChildren(...acts.map((a, n) => h('div', { class: 'row', style: { marginTop: '6px' } },
       h('select', { style: { width: 'auto' }, onchange: (e) => { acts[n] = { do: e.target.value, target: '', method: e.target.value === 'timeline' ? 'go' : '', value: '', delay: a.delay || 0 }; dirty(); paintA(); } }, DO.map(([k, l]) => h('option', { value: k, selected: a.do === k }, l))),
@@ -45,6 +45,12 @@
       a.do === 'show' || a.do === 'hide' ? sel(a, 'target', ACT.graphics || [], 'choose a graphic…') : null,
       a.do === 'show' ? h('input', { value: Object.entries(a.values || {}).map(([k, v]) => k + '=' + v).join('; '), placeholder: 'values: line1=TRY {team}; line2={event_text}', style: { flex: '1 1 220px' }, oninput: (e) => { a.values = {}; e.target.value.split(';').forEach((p) => { const m = /^\s*([^=]+?)\s*=\s*(.*)$/.exec(p); if (m) a.values[m[1]] = m[2]; }); dirty(); } }) : null,
       a.do === 'setvar' ? [sel(a, 'target', (ACT.vars || []).map((v) => [v.key, v.name + ' {var_' + v.key + '}']), 'choose a variable…'), h('input', { value: a.value || '', placeholder: '12 · +1 · toggle · {value} · text', style: { width: '190px' }, oninput: (e) => { a.value = e.target.value; dirty(); } })] : null,
+      a.do === 'rocket' ? (() => { const M = [['show', 'take in'], ['hide', 'take out'], ['toggle', 'in / out'], ['transition', 'transition wipe'], ['go', 'kick-off GO'], ['overtime', 'overtime banner'], ['winner', 'winner banner'], ['goal', 'goal stinger (test)'], ['snapshot', 'post-game from the live stats'], ['series+', 'series win +1'], ['series-', 'series win −1'], ['reset', 'reset the series']];
+        const G = [['scorebug', 'Scorebug'], ['boost', 'Boost bars'], ['player', 'Player card'], ['minimap', 'Minimap'], ['stinger', 'Goal stinger'], ['stats', 'Event icons'], ['transitions', 'Replay transitions'], ['banners', 'GO / OT / winner'], ['postgame', 'Post-game scoreboard']];
+        const T = [['A', 'blue (team A)'], ['B', 'orange (team B)'], ['{team}', 'the team of the event']];
+        if (!a.method) a.method = 'show';
+        return [h('select', { style: { width: 'auto' }, onchange: (e) => { a.method = e.target.value; a.target = ''; dirty(); paintA(); } }, M.map(([v, l]) => h('option', { value: v, selected: a.method === v }, l))),
+          ['show', 'hide', 'toggle'].includes(a.method) ? sel(a, 'target', G, 'choose a graphic…') : ['winner', 'goal', 'series+', 'series-'].includes(a.method) ? sel(a, 'target', T, 'which team…') : null]; })() : null,
       a.do === 'device' ? [sel(a, 'target', (ACT.devices || []).map((d) => [d.id, d.name]), 'choose a device…'),
         h('input', { value: a.method || '', placeholder: 'command', style: { width: '150px' }, oninput: (e) => { a.method = e.target.value; dirty(); } }), h('input', { value: a.value || '', placeholder: 'value', style: { width: '170px' }, oninput: (e) => { a.value = e.target.value; dirty(); } })] : null,
       a.do === 'amcp' ? h('input', { value: a.value || '', placeholder: 'PLAY 1-10 "STING"', style: { flex: '1 1 200px' }, oninput: (e) => { a.value = e.target.value; dirty(); } }) : null,
