@@ -142,6 +142,7 @@ test('sharing: production folder, invites, resumable uploads, rights, ZIP, comme
   const page = await onHost('/f/' + id + '/Day%201', 'sharing.site.example');
   assert.equal(page.status, 200); assert.match(page.body, /sharing\.js/);
   assert.doesNotMatch((await onHost('/', 'sharing.site.example')).body, /<title>(?!Sharing)/, 'the subdomain front page is Sharing');
+  assert.match((await onHost('/', 'sharing.other.example')).body, /sharing\.js/, 'any sharing.<name> is the Sharing site');
   assert.match(await (await fetch(app.url + '/sharing/invite/' + token)).text(), /sharing\.js/);
   assert.match(await (await fetch(app.url + '/sharing/sharing.js')).text(), /Uploads go in 32 MB pieces/);
   assert.equal((await admin.get('/api/config')).data.sharingUrl, 'https://sharing.site.example');
