@@ -18,6 +18,11 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.2.4
+
+- **Manage shared folders from the Studio** (Media & music → File sharing, e.g. admin.regemarkfp.com/app#/sharing): **+ New folder** (name, production, removal date), **Edit** (rename, link to another production or none, change the removal date) and **Delete** on every folder.
+- **Removal dates:** a folder can be removed from the server on a set day (1 week, 1 month, 3 months, 1 year, or any date; empty = never). Three days before, the invited people get one email to download what they need; the folder shows the date at the top for everyone. On the day it is removed for everyone. Deleted and expired folders, and each folder's bin, are kept aside on the NAS for 30 days and then deleted for good (`sharingKeepDays` in config to change it). The managers set the date in the Studio or in the folder's People panel on the Sharing site.
+
 ### 1.2.3
 
 - **Media & music → File sharing** (Studio, Producers and Admins): everyone invited to the team's shared folders on one page – each person with their folders and their role in each (change it right there), joined or not, last seen. Send an invitation again (↻), take someone out of one folder or out of everything, add them to more folders, or **+ Invite people** to several folders at once. Search, filter by folder or by joined / not opened yet, and tick people to change their role, add them to folders or remove them in one go. Below: the folders with their production, how many people, last activity, Invite and Open.

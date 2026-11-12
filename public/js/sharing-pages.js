@@ -1,7 +1,7 @@
 /* Media → File sharing: everyone invited to the team's shared folders (sharing.<website>), on one page. Per person:
  * their folders and role in each (viewer / editor), joined or not, last seen; change a role, take them out of a folder
  * or out of everything, send the invite again, add them to more folders. Tick people for the same on many at once.
- * The folders, with their production, and a link to each. Producers and Admins only (lib/sharing.js people()). */
+ * The folders: make, edit (name, production, removal date) and delete them, with a link to each. Producers and Admins only (lib/sharing.js people()). */
 'use strict';
 (() => {
   const { h, api, toast, oops, confirmBox } = UI;
@@ -32,6 +32,39 @@
       if (after) after();
     } }] });
   }
+
+  // a folder: make one, or change its name, production and removal date
+  const dayPlus = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+  const daysLeft = (d) => Math.round((Date.parse(d + 'T00:00:00Z') - Date.parse(new Date().toISOString().slice(0, 10) + 'T00:00:00Z')) / 864e5);
+  function folderBox(f, after) {
+    const isNew = !f;
+    const name = h('input', { value: f ? f.name : '', placeholder: 'Cup final 2026, Wedding Smith …' });
+    const prods = App.sorted('production').filter((p) => !p.data.archived).sort((a, b) => String(b.data.date || '').localeCompare(String(a.data.date || ''))).slice(0, 300);
+    const prod = h('select', {}, h('option', { value: '' }, '— not linked to a production —'), prods.map((p) => h('option', { value: p.id, selected: f && f.production === p.id }, [p.data.name, p.data.date].filter(Boolean).join(' · '))));
+    const exp = h('input', { type: 'date', value: f ? f.expires || '' : '', min: dayPlus(1) });
+    const quick = h('div', { class: 'row', style: { gap: '6px', marginTop: '6px' } }, [[7, '1 week'], [30, '1 month'], [90, '3 months'], [365, '1 year']].map(([n, t]) => h('button', { type: 'button', class: 'sm', onclick: () => { exp.value = dayPlus(n); } }, t)),
+      h('button', { type: 'button', class: 'sm ghost', onclick: () => { exp.value = ''; } }, 'Never'));
+    UI.modal({ title: isNew ? 'New shared folder' : 'Edit folder', body: h('div', { class: 'form' },
+      h('label', { class: 'f wide' }, h('span', {}, 'Name'), name),
+      h('label', { class: 'f wide' }, h('span', {}, 'Production (optional)'), prod),
+      h('div', { class: 'f wide' }, h('span', { class: 'flabel' }, 'Remove from the server on'), exp, quick,
+        h('p', { class: 'help', style: { whiteSpace: 'normal' } }, 'On that day the folder and its files are removed for everyone (kept aside on the NAS for 30 days, then deleted). Three days before, the invited people get an email to download what they need. Empty = never.'))),
+    actions: [{ label: 'Cancel' }, { label: isNew ? 'Make the folder' : 'Save', primary: true, onClick: async () => {
+      const b = { name: name.value, production: prod.value, expires: exp.value };
+      if (isNew) { const r = await api('POST', '/api/share', { team: App.team, ...b }); toast('Folder made'); if (after) after(r); }
+      else { await api('PUT', `/api/share/${enc(f.id)}`, b); toast('Saved'); if (after) after(); }
+    } }] });
+    setTimeout(() => name.focus(), 50);
+  }
+  async function deleteFolder(f, after) {
+    if (!(await confirmBox(`Delete the shared folder “${f.name}” for everyone? ${f.members ? `${f.members} invited ${f.members === 1 ? 'person loses' : 'people lose'} access at once. ` : ''}Its files are kept on the NAS for 30 days, then deleted.`))) return;
+    try { await api('DELETE', `/api/share/${enc(f.id)}`); toast('Folder deleted'); after(); } catch (e) { oops(e); }
+  }
+  const expiresCell = (f) => {
+    if (!f.expires) return h('span', { class: 'dim' }, 'Never');
+    const n = daysLeft(f.expires);
+    return h('span', { style: { color: n <= 3 ? 'var(--danger)' : n <= 14 ? 'var(--warn)' : '' }, title: `Removed from the server on ${f.expires}` }, UI.fmtDate(f.expires), h('div', { class: 'small dim' }, n <= 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`));
+  };
 
   App.pages.sharing = () => {
     const body = h('div', {}, h('div', { class: 'card dim' }, 'Loading…'));
@@ -74,12 +107,12 @@
           h('td', { class: 'nowrap r' }, h('button', { class: 'sm', title: 'Invite to more folders', onclick: () => inviteBox(data, { emails: p.email, after: load }) }, '+ Folder'), ' ',
             h('button', { class: 'sm ghost danger', title: 'Remove from every folder', onclick: async () => { if (await confirmBox(`Remove ${p.email} from all ${p.folders.length} folder${p.folders.length === 1 ? '' : 's'}? Their links stop working at once.`, 'Remove')) removeFrom(p.email, p.folders); } }, 'Remove')))))))
         : h('div', { class: 'card empty' }, data.people.length ? 'Nobody matches the search and filters.' : 'Nobody has been invited yet. Press Invite people, or open a folder in File Sharing and use People.');
-      const folders = h('div', { class: 'card', style: { marginTop: '16px' } }, h('h2', {}, `Folders (${data.folders.length})`),
-        data.folders.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, h('th', {}, 'Folder'), h('th', {}, 'Production'), h('th', { class: 'r' }, 'People'), h('th', {}, 'Last activity'), h('th', {}))),
+      const folders = h('div', { class: 'card', style: { marginTop: '16px' } }, h('div', { class: 'spread' }, h('h2', {}, `Folders (${data.folders.length})`), h('button', { class: 'sm primary', onclick: () => folderBox(null, load) }, '+ New folder')),
+        data.folders.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, h('th', {}, 'Folder'), h('th', {}, 'Production'), h('th', { class: 'r' }, 'People'), h('th', {}, 'Last activity'), h('th', {}, 'Removed on'), h('th', {}))),
           h('tbody', {}, data.folders.map((f) => h('tr', {}, h('td', {}, h('b', {}, f.name)), h('td', {}, f.production ? h('a', { href: '#/edit/production/' + f.production }, f.productionName || 'Production') : h('span', { class: 'dim' }, '–')),
-            h('td', { class: 'r num' }, h('a', { href: '#', onclick: (e) => { e.preventDefault(); ST.folder = f.id; paint(); window.scrollTo(0, 0); } }, f.members)), h('td', { class: 'small dim' }, f.lastActivity ? ago(f.lastActivity) : '–'),
-            h('td', { class: 'r nowrap' }, h('button', { class: 'sm', onclick: () => { ST.folder = f.id; inviteBox(data, { after: load }); } }, 'Invite'), ' ', h('a', { class: 'btn sm', href: f.url, target: '_blank', rel: 'noopener' }, 'Open ↗')))))))
-          : h('p', { class: 'dim' }, 'No shared folders yet.'));
+            h('td', { class: 'r num' }, h('a', { href: '#', onclick: (e) => { e.preventDefault(); ST.folder = f.id; paint(); window.scrollTo(0, 0); } }, f.members)), h('td', { class: 'small dim' }, f.lastActivity ? ago(f.lastActivity) : '–'), h('td', { class: 'small nowrap' }, expiresCell(f)),
+            h('td', { class: 'r nowrap' }, h('button', { class: 'sm', onclick: () => { ST.folder = f.id; inviteBox(data, { after: load }); } }, 'Invite'), ' ', h('a', { class: 'btn sm', href: f.url, target: '_blank', rel: 'noopener' }, 'Open ↗'), ' ', h('button', { class: 'sm', onclick: () => folderBox(f, load) }, 'Edit'), ' ', h('button', { class: 'sm ghost danger', title: 'Delete the folder', onclick: () => deleteFolder(f, load) }, 'Delete')))))))
+          : h('p', { class: 'dim' }, 'No shared folders yet. Press + New folder, or Shared folder on a production.'));
       body.replaceChildren(
         h('div', { class: 'row list-filters' },
           h('input', { type: 'search', placeholder: 'Search people or folders…', value: ST.q, style: { flex: '1 1 240px', maxWidth: '360px' }, oninput: UI.debounce((e) => { ST.q = e.target.value; paint(); }, 150) }),
@@ -91,7 +124,7 @@
     }
     load();
     const site = (App.cfg.sharingUrl || '/sharing').replace(/\/+$/, '') + '/';
-    return { el: h('div', {}, pageHead('File sharing', h('button', { class: 'primary', onclick: () => data && inviteBox(data, { after: load }) }, '+ Invite people'), h('a', { class: 'btn', href: site, target: '_blank', rel: 'noopener' }, 'Open File Sharing ↗')),
+    return { el: h('div', {}, pageHead('File sharing', h('button', { onclick: () => folderBox(null, load) }, '+ New folder'), h('button', { class: 'primary', onclick: () => data && inviteBox(data, { after: load }) }, '+ Invite people'), h('a', { class: 'btn', href: site, target: '_blank', rel: 'noopener' }, 'Open File Sharing ↗')),
       h('p', { class: 'dim', style: { marginTop: '-8px' } }, 'Everyone invited to your shared folders. Viewers see and download; editors also upload, rename and delete. Producers and Admins of the team always have access.'), body),
       keepScroll: true };
   };

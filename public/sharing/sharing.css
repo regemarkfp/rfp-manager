@@ -93,3 +93,5 @@ table.files tr:hover td { background: #171717; } table.files tr.sel td { backgro
   table.files .hide-sm { display: none; }
   main { padding: 14px; } .toolbar { top: 51px; }
 }
+
+.expiry { background: #2b2410; border-left: 4px solid var(--warn); padding: 8px 14px; margin: 0 0 10px; font-size: 14px; } .expiry.soon { background: #3a1414; border-color: var(--bad); }

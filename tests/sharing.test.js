@@ -163,6 +163,38 @@ test('sharing: production folder, invites, resumable uploads, rights, ZIP, comme
   assert.match(await (await fetch(app.url + '/sharing/sharing.js')).text(), /Uploads go in 32 MB pieces/);
   assert.equal((await admin.get('/api/config')).data.sharingUrl, 'https://sharing.site.example');
 
+  // editing a folder: name, production, removal date (Producers and Admins only)
+  const dPlus = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+  assert.equal((await editor.put(`/api/share/${id}`, { expires: dPlus(5) })).status, 403);
+  assert.equal((await admin.put(`/api/share/${id}`, { expires: '2020-01-01' })).status, 400, 'not in the past');
+  assert.equal((await admin.put(`/api/share/${id}`, { expires: 'soon' })).status, 400);
+  let ed = await admin.put(`/api/share/${id}`, { name: 'Cup final footage', expires: dPlus(30), production: '' });
+  assert.equal(ed.status, 200, JSON.stringify(ed.data));
+  assert.deepEqual([ed.data.name, ed.data.expires, ed.data.production, ed.data.productionName], ['Cup final footage', dPlus(30), '', '']);
+  ed = await admin.put(`/api/share/${id}`, { production: prod.id });
+  assert.equal(ed.data.productionName, 'Cup final · 2026-11-20');
+  assert.equal((await admin.get('/api/share-people?team=' + team)).data.folders[0].expires, dPlus(30));
+  // a new folder with a removal date, from the Studio
+  const nf = await admin.post('/api/share', { team, name: 'Logos', expires: dPlus(2) });
+  assert.equal(nf.status, 200, JSON.stringify(nf.data)); assert.equal(nf.data.expires, dPlus(2));
+  assert.equal((await admin.post('/api/share', { team, name: 'Old', expires: '2020-01-01' })).status, 400);
+  await admin.post(`/api/share/${nf.data.id}/people`, { emails: 'agency@example.com', role: 'viewer' });
+  // the daily tidy: 3 days before, one warning email; on the day, the folder is removed; kept files go after 30 days
+  let mails = app.mail.outbox.length;
+  let sw = await app.sharing.sweep();
+  assert.deepEqual([sw.removed, sw.warned], [0, 1]);
+  assert.ok(app.mail.outbox.slice(mails).some((m) => m.to.includes('agency@example.com') && /is removed on/.test(m.subject)));
+  mails = app.mail.outbox.length;
+  assert.equal((await app.sharing.sweep()).warned, 0, 'warned once');
+  const nd = await app.store.get(nf.data.id);
+  await app.save(nd.team, 'share', nd.id, { ...nd.data, expires: new Date().toISOString().slice(0, 10) }, 'test');
+  fs.mkdirSync(path.join(nas, '.deleted', 'shr_old-' + (Date.now() - 40 * 864e5)), { recursive: true });
+  sw = await app.sharing.sweep();
+  assert.equal(sw.removed, 1); assert.ok(sw.purged >= 1);
+  assert.equal((await admin.get(`/api/share/${nf.data.id}/list`)).status, 404);
+  assert.ok(!fs.readdirSync(path.join(nas, '.deleted')).some((n) => n.startsWith('shr_old-')), 'kept files older than 30 days are deleted');
+  assert.ok(fs.readdirSync(path.join(nas, '.deleted')).some((n) => n.startsWith(nf.data.id)), 'the expired folder is kept aside for now');
+
   // deleting the folder: gone for everyone, the files kept aside
   assert.equal((await admin.del(`/api/share/${id}`)).status, 200);
   assert.equal((await editor.get(`/api/share/${id}/list`)).status, 404);

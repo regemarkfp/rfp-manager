@@ -109,7 +109,7 @@
     } }, '+ New folder') : null;
     fill(main, h('div', { class: 'spread', style: { marginBottom: '16px' } }, h('div', {}, h('h1', {}, 'Shared folders'), h('p', { class: 'dim', style: { margin: 0 } }, `Signed in as ${ME.email}`)), newBtn),
       r.shares.length ? [...byTeam].map(([team, list]) => [h('h2', { style: { marginTop: '18px' } }, team || 'Folders'), h('div', { class: 'grid-shares' }, list.map((s) => h('a', { class: 'share', href: BASE + '/f/' + s.id + '/', onclick: (e) => { e.preventDefault(); go('/f/' + s.id + '/'); } },
-        h('b', {}, s.name), h('span', { class: 'pill ' + s.role }, s.role === 'manager' ? 'Manage' : s.role === 'editor' ? 'Can upload' : 'Can view'), s.members ? h('span', { class: 'dim', style: { marginLeft: '8px' } }, `${s.members.length} invited`) : null)))])
+        h('b', {}, s.name), h('span', { class: 'pill ' + s.role }, s.role === 'manager' ? 'Manage' : s.role === 'editor' ? 'Can upload' : 'Can view'), s.members ? h('span', { class: 'dim', style: { marginLeft: '8px' } }, `${s.members.length} invited`) : null, s.productionName && s.productionName !== s.name ? h('div', { class: 'dim small', style: { marginTop: '6px' } }, s.productionName) : null, s.expires ? h('div', { class: 'small', style: { marginTop: '6px', color: 'var(--warn)' } }, 'Removed on ' + s.expires) : null)))])
         : h('div', { class: 'card empty' }, r.canCreate.length ? 'No shared folders yet. Make one, or open a production in the Studio and press Shared folder.' : 'Nothing has been shared with you yet. When the production team invites you, the folder shows here.'));
   }
 
@@ -169,6 +169,7 @@
       body.addEventListener('drop', async (e) => { e.preventDefault(); body.classList.remove('over'); const got = await dropped(e.dataTransfer); if (got.length) upload(id, rel, got, reload); });
     }
     fill(main, h('div', { class: 'spread' }, h('div', {}, crumbs), h('span', { class: 'pill ' + s.role }, s.role === 'manager' ? 'You manage this folder' : s.role === 'editor' ? 'You can upload' : 'You can view and download')),
+      s.expires ? h('div', { class: 'expiry' + ((Date.parse(s.expires) - Date.now()) < 4 * 864e5 ? ' soon' : '') }, `This folder and its files are removed from the server on ${new Date(s.expires + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}. Download what you want to keep before then.`) : null,
       toolbar, body, r.free != null && canEdit ? h('p', { class: 'dim small', style: { marginTop: '14px' } }, `${size(r.free)} free on the server.`) : null);
     paintSel();
   }
@@ -315,13 +316,19 @@
       } }, 'Invite'), out,
       h('h2', { style: { marginTop: '22px' } }, 'Invited'), members,
       h('h2', { style: { marginTop: '22px' } }, 'This folder'),
-      h('div', { class: 'row' }, h('button', { class: 'sm', onclick: async () => { const n = prompt('Name of the folder', s.name); if (!n) return; try { await api('PUT', `/api/share/${enc(id)}`, { name: n }); reload(); document.querySelector('.side-panel').remove(); } catch (e) { oops(e); } } }, 'Rename'),
+      (() => {
+        const nm = h('input', { value: s.name }), ex = h('input', { type: 'date', value: s.expires || '', min: new Date(Date.now() + 864e5).toISOString().slice(0, 10) });
+        return [h('label', { class: 'f' }, h('span', {}, 'Name'), nm), h('label', { class: 'f' }, h('span', {}, 'Remove from the server on (empty = never)'), ex),
+          h('p', { class: 'dim small' }, 'On that day the folder and its files are removed for everyone. Three days before, the invited people get an email to download what they need.'),
+          h('div', { class: 'row', style: { marginBottom: '10px' } }, h('button', { class: 'sm primary', onclick: async () => { try { await api('PUT', `/api/share/${enc(id)}`, { name: nm.value, expires: ex.value }); toast('Saved'); document.querySelector('.side-panel').remove(); reload(); } catch (e) { oops(e); } } }, 'Save'))];
+      })(),
+      h('div', { class: 'row' },
         h('button', { class: 'sm danger', onclick: async () => { if (!confirm(`Delete the shared folder “${s.name}” for everyone? Its files are kept on the NAS for 30 days.`)) return; try { await api('DELETE', `/api/share/${enc(id)}`); document.querySelector('.side-panel').remove(); go('/'); } catch (e) { oops(e); } } }, 'Delete folder'))));
   }
   async function activityPanel(id) {
     const r = await api('GET', `/api/share/${enc(id)}/activity`).catch((e) => { oops(e); return null; });
     if (!r) return;
-    const W = { create: 'made the folder', upload: 'uploaded', folder: 'made the folder', delete: 'deleted', move: 'moved / renamed', comment: 'commented on', download: 'downloaded', invite: 'invited', uninvite: 'removed' };
+    const W = { edit: 'changed the folder:', create: 'made the folder', upload: 'uploaded', folder: 'made the folder', delete: 'deleted', move: 'moved / renamed', comment: 'commented on', download: 'downloaded', invite: 'invited', uninvite: 'removed' };
     sidePanel('Activity', r.activity.length ? r.activity.map((a) => h('div', { class: 'act' }, h('b', {}, a.name || a.email || 'Someone'), ' ', W[a.what] || a.what, ' ', a.target ? h('b', {}, a.target + (a.role ? ` (${a.role})` : '')) : null, a.path ? h('span', { class: 'ok' }, ' ' + a.path) : null,
       a.text ? h('div', { class: 'dim small' }, '“' + a.text + '”' + (a.tc != null ? ' @' + tcText(a.tc) : '')) : null, h('div', { class: 'dim' }, new Date(a.at).toLocaleString('en-GB')))) : h('p', { class: 'dim' }, 'Nothing yet.'));
   }
