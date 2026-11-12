@@ -374,9 +374,19 @@
     const pv = `/api/share/${enc(id)}/preview?path=${enc(x.path)}`;
     const stage = h('div', { class: 'pv-body' }, h('p', { class: 'dim' }, 'Loading…'));
     let media = null;
-    const close = () => { modal.remove(); document.removeEventListener('keydown', key); stopPolls(); if (dirty) reload(); };
+    const close = () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); modal.remove(); document.removeEventListener('keydown', key); document.removeEventListener('fullscreenchange', fsPaint); stopPolls(); if (dirty) reload(); };
+    // full screen: the picture, video, PDF or text alone on the whole screen (Esc or the button to come back)
+    const fsBtn = h('button', { class: 'sm', title: 'Full screen (F)' }, '⛶ Full screen');
+    const toggleFs = () => {
+      if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
+      if (stage.requestFullscreen) stage.requestFullscreen().catch(() => {});
+      else if (media && media.webkitEnterFullscreen) media.webkitEnterFullscreen();          // iPhone: the video itself
+    };
+    const fsPaint = () => { fsBtn.textContent = document.fullscreenElement ? '⛶ Exit full screen' : '⛶ Full screen'; };
+    fsBtn.onclick = toggleFs;
+    document.addEventListener('fullscreenchange', fsPaint);
     let dirty = false;
-    const key = (e) => { if (e.target.closest && e.target.closest('textarea,input')) return; if (e.key === 'Escape') close(); if (e.key === 'ArrowRight' && files[i + 1]) { close(); preview(id, files, i + 1, s, reload); } if (e.key === 'ArrowLeft' && i > 0) { close(); preview(id, files, i - 1, s, reload); } };
+    const key = (e) => { if (e.target.closest && e.target.closest('textarea,input')) return; if (e.key === 'Escape' && !document.fullscreenElement) close(); if (e.key === 'f' || e.key === 'F') toggleFs(); if (e.key === 'ArrowRight' && files[i + 1]) { close(); preview(id, files, i + 1, s, reload); } if (e.key === 'ArrowLeft' && i > 0) { close(); preview(id, files, i - 1, s, reload); } };
     document.addEventListener('keydown', key);
     async function show() {
       if (x.kind === 'pdf') { fill(stage, h('iframe', { src: fileUrl(false) })); return; }
@@ -386,6 +396,7 @@
       if (j.error) { fill(stage, h('div', { class: 'empty' }, h('p', {}, j.error), h('a', { class: 'btn primary', href: fileUrl(true) }, '⬇ Download'))); return; }
       if (j._status === 202) { fill(stage, h('div', { class: 'empty' }, h('p', {}, `Making a preview of this ${x.kind} for the browser… ${j.progress || 0}%`), h('p', { class: 'dim small' }, 'Large camera files take a while the first time. You can close this and come back.'))); polls.push(setTimeout(show, 3000)); return; }
       if (x.kind === 'image') media = h('img', { src: pv, alt: x.name });
+      if (x.kind === 'image') media.addEventListener('dblclick', toggleFs);
       else media = h(x.kind, { src: pv, controls: true, autoplay: true, preload: 'metadata' });
       fill(stage, media);
       if (i > 0) stage.append(h('button', { class: 'pv-nav', style: { left: '8px' }, onclick: () => { close(); preview(id, files, i - 1, s, reload); } }, '‹'));
@@ -407,7 +418,7 @@
     txt.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addC(); });
     const modal = h('div', { class: 'modal' }, h('div', { class: 'pv' },
       h('div', { class: 'pv-main' }, h('div', { class: 'pv-head' }, h('b', { class: 'grow', title: x.path }, x.name), h('span', { class: 'dim small nowrap' }, size(x.size) + (x.by ? ' · ' + x.by : '')),
-        h('a', { class: 'btn sm primary', href: fileUrl(true) }, '⬇ Download'), h('button', { class: 'sm', onclick: close }, '✕')), stage),
+        fsBtn, h('a', { class: 'btn sm primary', href: fileUrl(true) }, '⬇ Download'), h('button', { class: 'sm', onclick: close }, '✕')), stage),
       h('div', { class: 'pv-side' }, h('h3', {}, 'Comments'), list, h('div', { class: 'cform' }, txt,
         x.kind === 'video' || x.kind === 'audio' ? h('label', { class: 'small dim', style: { display: 'flex', gap: '6px', alignItems: 'center' } }, atTc, 'At the current time') : null,
         h('button', { class: 'primary sm', onclick: addC }, 'Comment')))));
