@@ -18,6 +18,15 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.2.6
+
+- **File Sharing in the RegemarkFP slant**: the upload panel, the + button, fields, tags, the progress (a slanted bar with the percentage instead of a ring), Previous transfers and the removal notice all have the slanted edges of the rest of the site.
+
+### 1.2.5
+
+- **File Sharing looks like WeTransfer**: on the left the upload panel – a big **+** for files or a whole folder (or drop them anywhere on the page), the folder they go to (and a new sub-folder if you like), **tag people**, a message, **Upload**, with a progress ring and "Upload complete". On the right your folders and **Previous transfers** (what you sent and what was sent to you, with the message and who was tagged; Everything / Sent by me / Sent to me). Inside a folder the panel uploads to that folder and the file explorer is on the right (Transfers lists that folder's).
+- **Tagging:** the folder's invited people and the team's Producers and Admins can be tagged. When the upload is complete each tagged person gets an email (files, message, a link straight to them) and a notification in the app and their browser (setting "Files are sent to you in a shared folder"), and the uploader gets a receipt by email. Files sent this way are not in the 10-minute summary email as well.
+
 ### 1.2.4
 
 - **Manage shared folders from the Studio** (Media & music → File sharing, e.g. admin.regemarkfp.com/app#/sharing): **+ New folder** (name, production, removal date), **Edit** (rename, link to another production or none, change the removal date) and **Delete** on every folder.

@@ -95,29 +95,142 @@
     fill(main, box);
   }
 
+  // ---------------------------------------------------------------- the upload panel (left, like WeTransfer)
+  // A big + for files or a folder (or drop them anywhere on the page), where they go, people to tag, a message, Upload.
+  // When it is done the tagged people get an email and a notification, and you get a receipt (POST …/transfer).
+  //   targets: the folders you can upload to [{ id, name }]; fixed: { id, dir } on a folder's own page
+  let PANEL = null;
+  function xferPanel({ targets, fixed, after }) {
+    const st = { files: [], target: fixed ? fixed.id : (targets[0] || {}).id || '', sub: '', tags: new Set(), message: '', phase: 'pick', batch: null, people: [], peopleFor: '' };
+    const box = h('div', { class: 'xfer card' });
+    const pickFiles = (dir) => { const i = h('input', { type: 'file', multiple: true, webkitdirectory: dir ? true : null, style: { display: 'none' } }); i.onchange = () => { add([...i.files].map((f) => ({ file: f, rel: dir ? (f.webkitRelativePath || f.name).split('/').slice(0, -1).join('/') : '' }))); i.remove(); }; document.body.append(i); i.click(); };
+    const add = (list) => { if (st.phase !== 'pick') { if (st.phase === 'done') reset(); else return; } const have = new Set(st.files.map((x) => x.rel + '/' + x.file.name + ':' + x.file.size)); for (const x of list) { const k = x.rel + '/' + x.file.name + ':' + x.file.size; if (!have.has(k)) { st.files.push(x); have.add(k); } } paint(); };
+    const reset = () => { st.files = []; st.tags.clear(); st.message = ''; st.sub = ''; st.phase = 'pick'; st.batch = null; paint(); };
+    async function loadPeople() {
+      if (!st.target || st.peopleFor === st.target) return;
+      st.peopleFor = st.target;
+      try { st.people = (await api('GET', `/api/share/${enc(st.target)}/taggable`)).people; } catch { st.people = []; }
+      if (st.phase === 'pick') paint();
+    }
+    const plus = () => {
+      const menu = h('div', { class: 'plus-menu', hidden: true }, h('button', { onclick: (e) => { e.stopPropagation(); menu.hidden = true; pickFiles(false); } }, 'Files'), h('button', { onclick: (e) => { e.stopPropagation(); menu.hidden = true; pickFiles(true); } }, 'A folder'));
+      document.addEventListener('click', () => { menu.hidden = true; });
+      return h('div', { class: 'plus-wrap' }, h('button', { class: 'plus', title: 'Add files or a folder', onclick: (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; } }, '+'), menu);
+    };
+    function paint() {
+      const total = st.files.reduce((n, x) => n + x.file.size, 0);
+      if (st.phase === 'sending' || st.phase === 'done') {
+        const b = st.batch, all = b.jobs.reduce((n, j) => n + j.file.size, 0), sent = b.jobs.reduce((n, j) => n + (j.state === 'done' ? j.file.size : j.sent), 0);
+        const ok = b.jobs.filter((j) => j.state === 'done').length, bad = b.jobs.filter((j) => j.state === 'error');
+        const f = all ? sent / all : ok / (b.jobs.length || 1);
+        const t = targets.find((x) => x.id === b.target) || fixed || {};
+        const pct = st.phase === 'done' ? 100 : Math.floor(f * 100);
+        fill(box, h('div', { class: 'prog' + (st.phase === 'done' ? (bad.length ? ' bad' : ' done') : '') }, h('div', { class: 'prog-num' }, st.phase === 'done' ? (bad.length ? '!' : '✓') : pct + '%'),
+          h('div', { class: 'prog-bar' }, h('i', { style: { width: pct + '%' } }))),
+          st.phase === 'sending' ? [h('h2', { class: 'ctr' }, 'Uploading…'), h('p', { class: 'dim ctr' }, `${ok} of ${b.jobs.length} files · ${size(sent)} of ${size(all)}`), h('p', { class: 'dim small ctr' }, 'Keep this page open. A dropped connection carries on by itself.')]
+            : [h('h2', { class: 'ctr' }, bad.length ? 'Uploaded, with problems' : 'Upload complete'), h('p', { class: 'ctr' }, `${ok} file${ok === 1 ? '' : 's'} in ${t.name || 'the folder'}${b.dir ? ' / ' + b.dir : ''}.`),
+              b.tagged ? h('p', { class: 'dim small ctr' }, b.tagged) : null, bad.length ? h('div', { class: 'err small' }, bad.slice(0, 5).map((j) => h('div', {}, `${j.file.name}: ${j.err}`))) : null,
+              h('div', { class: 'col' }, h('button', { class: 'primary', onclick: reset }, 'Send more'), h('a', { class: 'btn', href: BASE + '/f/' + b.target + '/' + (b.dir ? b.dir.split('/').map(enc).join('/') : ''), onclick: (e) => { e.preventDefault(); go('/f/' + b.target + '/' + (b.dir ? b.dir.split('/').map(enc).join('/') : '')); } }, 'Open the folder'))]);
+        return;
+      }
+      loadPeople();
+      const tagIn = h('input', { placeholder: st.people.length ? 'Type a name or email' : 'Nobody to tag in this folder yet', list: 'xfer-people', disabled: !st.people.length || null,
+        onkeydown: (e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); takeTag(e.target.value); } }, onchange: (e) => takeTag(e.target.value) });
+      const takeTag = (v) => { v = String(v || '').trim().toLowerCase(); const p = st.people.find((x) => x.email === v || (x.name && x.name.toLowerCase() === v) || ((x.name ? x.name + ' <' + x.email + '>' : x.email).toLowerCase() === v)); if (p) { st.tags.add(p.email); paint(); setTimeout(() => { const i = box.querySelector('.tags input'); if (i) i.focus(); }, 0); } else if (v) toast('Only people invited to this folder (or its producers) can be tagged', 'error'); };
+      const nameOf = (e) => { const p = st.people.find((x) => x.email === e); return p && p.name ? p.name : e; };
+      fill(box,
+        st.files.length ? null : [h('div', { class: 'plus-big' }, plus()), h('h2', { class: 'ctr' }, 'Add files'), h('p', { class: 'dim small ctr' }, 'or a whole folder · or drop them anywhere on this page')],
+        st.files.length ? [h('div', { class: 'xf-head' }, plus(), h('div', {}, h('b', {}, `${st.files.length} file${st.files.length === 1 ? '' : 's'}`), h('div', { class: 'dim small' }, size(total))), h('span', { class: 'grow' }), h('button', { class: 'sm ghost', onclick: () => { st.files = []; paint(); } }, 'Clear')),
+          h('div', { class: 'xf-list' }, st.files.slice(0, 300).map((x, i) => h('div', { class: 'xf' }, h('span', { class: 'nm', title: (x.rel ? x.rel + '/' : '') + x.file.name }, (x.rel ? x.rel + '/' : '') + x.file.name), h('span', { class: 'dim small nowrap' }, size(x.file.size)), h('button', { class: 'x', title: 'Take it out', onclick: () => { st.files.splice(i, 1); paint(); } }, '✕'))),
+            st.files.length > 300 ? h('div', { class: 'dim small' }, `… and ${st.files.length - 300} more`) : null)] : null,
+        fixed ? h('div', { class: 'f' }, h('span', {}, 'To'), h('div', { class: 'to-fixed' }, fixed.name + (fixed.dir ? ' / ' + fixed.dir : '')))
+          : h('label', { class: 'f' }, h('span', {}, 'To'), targets.length ? h('select', { onchange: (e) => { st.target = e.target.value; st.tags.clear(); paint(); } }, targets.map((t) => h('option', { value: t.id, selected: t.id === st.target }, t.name + (t.productionName && t.productionName !== t.name ? ' · ' + t.productionName : ''))))
+            : h('div', { class: 'dim small' }, 'You cannot upload to any folder yet.')),
+        h('label', { class: 'f' }, h('span', {}, 'Into a new folder (optional)'), h('input', { value: st.sub, placeholder: 'Day 1, Camera A, Photos …', oninput: (e) => { st.sub = e.target.value; } })),
+        h('div', { class: 'f tags' }, h('span', {}, 'Tag people (they get an email and a notification)'),
+          h('div', { class: 'chips' }, [...st.tags].map((e) => h('span', { class: 'chip' }, nameOf(e), h('button', { title: 'Untag', onclick: () => { st.tags.delete(e); paint(); } }, '✕'))), tagIn),
+          h('datalist', { id: 'xfer-people' }, st.people.filter((p) => !st.tags.has(p.email)).map((p) => h('option', { value: p.email }, p.name ? `${p.name} (${p.role === 'manager' ? 'producer' : p.role})` : p.role)))),
+        h('label', { class: 'f' }, h('span', {}, 'Message (optional)'), h('textarea', { rows: 2, placeholder: 'The interviews from Saturday …', oninput: (e) => { st.message = e.target.value; } }, st.message)),
+        h('button', { class: 'primary big', disabled: !st.files.length || !st.target || null, onclick: start }, st.files.length ? `Upload ${st.files.length} file${st.files.length === 1 ? '' : 's'}` : 'Upload'));
+    }
+    function start() {
+      if (!st.files.length || !st.target) return;
+      let sub; try { sub = st.sub.split('/').map((x) => x.trim()).filter(Boolean).join('/'); } catch { sub = ''; }
+      const dir = [fixed ? fixed.dir : '', sub].filter(Boolean).join('/');
+      const b = { jobs: [], target: st.target, dir, tagged: '', onProgress: () => { clearTimeout(b.t); b.t = setTimeout(paint, 150); }, onEnd: async () => {
+        const done = b.jobs.filter((j) => j.state === 'done');
+        if (done.length) {
+          try {
+            const r = await api('POST', `/api/share/${enc(b.target)}/transfer`, { dir, files: done.map((j) => ({ path: j.path, size: j.file.size })), tags: [...st.tags], message: st.message });
+            b.tagged = st.tags.size ? `${st.tags.size} tagged ${st.tags.size === 1 ? 'person was' : 'people were'} told${r.mailed ? ' by email' : ''}. A receipt is on its way to you.` : 'A receipt is on its way to you.';
+          } catch (e) { b.tagged = 'The files are in, but telling people failed: ' + e.message; }
+        }
+        st.phase = 'done'; paint(); if (after) after();
+      } };
+      st.batch = b; st.phase = 'sending'; paint();
+      upload(st.target, dir, st.files.slice(), null, b);
+    }
+    paint();
+    PANEL = { el: box, add, pick: pickFiles };
+    return PANEL;
+  }
+  // drop files anywhere: they go into the panel
+  addEventListener('dragover', (e) => { if (PANEL && PANEL.el.isConnected && [...(e.dataTransfer.types || [])].includes('Files')) { e.preventDefault(); document.body.classList.add('dropping'); } });
+  addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('dropping'); });
+  addEventListener('drop', async (e) => { document.body.classList.remove('dropping'); if (!PANEL || !PANEL.el.isConnected) return; e.preventDefault(); const got = await dropped(e.dataTransfer); if (got.length) PANEL.add(got); });
+
+  // previous transfers: what you sent, and what was sent to you
+  function transferList(list, { compact } = {}) {
+    if (!list.length) return h('div', { class: 'empty' }, 'No transfers yet. Files sent with the upload panel show here.');
+    return h('div', { class: 'txs' }, list.map((t) => {
+      const path = '/f/' + t.share + '/' + (t.dir ? t.dir.split('/').map(enc).join('/') : '');
+      return h('a', { class: 'tx' + (t.forMe ? ' for-me' : ''), href: BASE + path, onclick: (e) => { e.preventDefault(); go(path); } },
+        h('div', { class: 'tx-ico' }, t.count > 99 ? '99+' : t.count),
+        h('div', { class: 'tx-main' }, h('div', {}, h('b', {}, t.mine ? 'You' : t.name), t.mine ? ' sent ' : t.forMe ? ' sent you ' : ' uploaded ', h('b', {}, `${t.count} file${t.count === 1 ? '' : 's'}`), ` (${size(t.size)})`),
+          compact ? null : h('div', { class: 'dim small' }, 'to ', h('span', { class: 'ok' }, t.shareName + (t.dir ? ' / ' + t.dir : ''))),
+          t.message ? h('div', { class: 'small msg' }, '“' + t.message + '”') : null,
+          t.tags && t.tags.length ? h('div', { class: 'dim small' }, 'Tagged: ' + t.tags.join(', ')) : null,
+          h('div', { class: 'dim small' }, t.files.slice(0, 3).map((f) => f.path.split('/').pop()).join(', ') + (t.count > 3 ? ` … +${t.count - 3}` : ''))),
+        h('div', { class: 'dim small nowrap' }, when(t.at)));
+    }));
+  }
+
   async function homePage() {
     const main = $('main');
-    let r; try { r = await api('GET', '/api/share'); } catch (e) { fill(main, h('div', { class: 'card' }, e.message)); return; }
+    let r, tx; try { [r, tx] = await Promise.all([api('GET', '/api/share'), api('GET', '/api/share-transfers').catch(() => ({ transfers: [] }))]); } catch (e) { fill(main, h('div', { class: 'card' }, e.message)); return; }
     const byTeam = new Map();
     for (const s of r.shares) { if (!byTeam.has(s.teamName)) byTeam.set(s.teamName, []); byTeam.get(s.teamName).push(s); }
-    const newBtn = r.canCreate.length ? h('button', { class: 'primary', onclick: () => {
+    const newBtn = r.canCreate.length ? h('button', { class: 'sm primary', onclick: () => {
       const team = h('select', {}, r.teams.map((t) => h('option', { value: t.id }, t.name))), name = h('input', { placeholder: 'Cup final 2026, Wedding Smith …' }), err = h('p', { class: 'err small' });
       const box = sidePanel('New shared folder', h('div', {}, r.teams.length > 1 ? h('label', { class: 'f' }, h('span', {}, 'Production team'), team) : null, h('label', { class: 'f' }, h('span', {}, 'Name'), name), err,
         h('p', { class: 'dim small' }, 'A production\'s own folder: open the production in the Studio and press Shared folder.'),
         h('button', { class: 'primary', onclick: async () => { try { const s = await api('POST', '/api/share', { team: team.value || r.teams[0].id, name: name.value }); box.remove(); go('/f/' + s.id + '/'); } catch (e) { err.textContent = e.message; } } }, 'Make the folder')));
       setTimeout(() => name.focus(), 50);
     } }, '+ New folder') : null;
-    fill(main, h('div', { class: 'spread', style: { marginBottom: '16px' } }, h('div', {}, h('h1', {}, 'Shared folders'), h('p', { class: 'dim', style: { margin: 0 } }, `Signed in as ${ME.email}`)), newBtn),
-      r.shares.length ? [...byTeam].map(([team, list]) => [h('h2', { style: { marginTop: '18px' } }, team || 'Folders'), h('div', { class: 'grid-shares' }, list.map((s) => h('a', { class: 'share', href: BASE + '/f/' + s.id + '/', onclick: (e) => { e.preventDefault(); go('/f/' + s.id + '/'); } },
+    const targets = r.shares.filter((s) => s.role !== 'viewer');
+    let tab = (() => { try { return sessionStorage.getItem('rfp-share-tab') || 'folders'; } catch { return 'folders'; } })();
+    let txWho = '';
+    const right = h('div', { class: 'right' });
+    const folders = () => (r.shares.length ? [...byTeam].map(([team, list]) => [byTeam.size > 1 ? h('h3', { class: 'team' }, team || 'Folders') : null, h('div', { class: 'grid-shares' }, list.map((s) => h('a', { class: 'share', href: BASE + '/f/' + s.id + '/', onclick: (e) => { e.preventDefault(); go('/f/' + s.id + '/'); } },
         h('b', {}, s.name), h('span', { class: 'pill ' + s.role }, s.role === 'manager' ? 'Manage' : s.role === 'editor' ? 'Can upload' : 'Can view'), s.members ? h('span', { class: 'dim', style: { marginLeft: '8px' } }, `${s.members.length} invited`) : null, s.productionName && s.productionName !== s.name ? h('div', { class: 'dim small', style: { marginTop: '6px' } }, s.productionName) : null, s.expires ? h('div', { class: 'small', style: { marginTop: '6px', color: 'var(--warn)' } }, 'Removed on ' + s.expires) : null)))])
-        : h('div', { class: 'card empty' }, r.canCreate.length ? 'No shared folders yet. Make one, or open a production in the Studio and press Shared folder.' : 'Nothing has been shared with you yet. When the production team invites you, the folder shows here.'));
+      : h('div', { class: 'card empty' }, r.canCreate.length ? 'No shared folders yet. Make one, or open a production in the Studio and press Shared folder.' : 'Nothing has been shared with you yet. When the production team invites you, the folder shows here.'));
+    const paintRight = () => {
+      try { sessionStorage.setItem('rfp-share-tab', tab); } catch { /* fine */ }
+      const list = tx.transfers.filter((t) => !txWho || (txWho === 'me' ? t.mine : t.forMe));
+      fill(right, h('div', { class: 'spread', style: { marginBottom: '12px' } }, h('div', { class: 'tabs2' }, h('button', { class: tab === 'folders' ? 'on' : '', onclick: () => { tab = 'folders'; paintRight(); } }, `Folders (${r.shares.length})`),
+        h('button', { class: tab === 'transfers' ? 'on' : '', onclick: () => { tab = 'transfers'; paintRight(); } }, `Previous transfers (${tx.transfers.length})`)),
+        tab === 'folders' ? newBtn : h('select', { class: 'sm-sel', onchange: (e) => { txWho = e.target.value; paintRight(); } }, [['', 'Everything'], ['me', 'Sent by me'], ['to', 'Sent to me']].map(([v, t]) => h('option', { value: v, selected: v === txWho }, t)))),
+        tab === 'folders' ? folders() : transferList(list));
+    };
+    paintRight();
+    fill(main, h('div', { class: targets.length ? 'two' : '' }, targets.length ? xferPanel({ targets, after: async () => { try { tx = await api('GET', '/api/share-transfers'); paintRight(); } catch { /* later */ } } }).el : null, right));
   }
 
   // ---------------------------------------------------------------- a folder
   let polls = [];
   const stopPolls = () => { polls.forEach(clearTimeout); polls = []; };
   let viewMode = (() => { try { return localStorage.getItem('rfp-share-view') || 'list'; } catch { return 'list'; } })();
-  async function folderPage(id, rel) {
+  async function folderPage(id, rel, opts = {}) {
     const main = $('main');
     let r; try { r = await api('GET', `/api/share/${enc(id)}/list?path=${enc(rel)}`); } catch (e) { fill(main, h('div', { class: 'card narrow' }, h('h1', {}, 'Shared folder'), h('p', {}, e.message), h('a', { href: BASE + '/' }, '← My folders'))); return; }
     const s = r.share, canEdit = s.role !== 'viewer', sel = new Set();
@@ -128,7 +241,7 @@
     const crumbs = h('div', { class: 'crumbs' }, h('a', { href: BASE + '/', onclick: (e) => { e.preventDefault(); go('/'); } }, 'My folders'), h('i', {}, '›'),
       h('a', { href: BASE + url(''), onclick: (e) => { e.preventDefault(); go(url('')); } }, s.name),
       parts.map((x, i) => { const p = parts.slice(0, i + 1).join('/'); return [h('i', {}, '›'), h('a', { href: BASE + url(p), onclick: (e) => { e.preventDefault(); go(url(p)); } }, x)]; }));
-    const reload = () => folderPage(id, rel);
+    const reload = () => folderPage(id, rel, { keepPanel: true });
     const selBar = h('span', { class: 'dim small' });
     const files = r.items.filter((x) => !x.dir);
     const paintSel = () => { selBar.textContent = sel.size ? `${sel.size} selected` : ''; dlSel.hidden = !sel.size; delSel.hidden = !sel.size || !canEdit; body.querySelectorAll('[data-p]').forEach((el) => el.classList.toggle('sel', sel.has(el.dataset.p))); };
@@ -137,10 +250,11 @@
     const delSel = h('button', { class: 'sm danger', hidden: true, onclick: async () => { if (!confirm(`Delete ${sel.size} item${sel.size > 1 ? 's' : ''}? Deleted files are kept on the server for 30 days.`)) return; try { await api('POST', `/api/share/${enc(id)}/delete`, { paths: [...sel] }); toast('Deleted'); reload(); } catch (e) { oops(e); } } }, 'Delete');
     const pick = (multiple, dir) => { const i = h('input', { type: 'file', multiple: true, webkitdirectory: dir ? true : null, style: { display: 'none' } }); i.onchange = () => { upload(id, rel, [...i.files].map((f) => ({ file: f, rel: dir ? (f.webkitRelativePath || f.name).split('/').slice(0, -1).join('/') : '' })), reload); i.remove(); }; document.body.append(i); i.click(); };
     const toolbar = h('div', { class: 'toolbar' },
-      canEdit ? [h('button', { class: 'primary sm', onclick: () => pick(true, false) }, '⬆ Upload files'), h('button', { class: 'sm', onclick: () => pick(true, true) }, '⬆ Upload a folder'),
+      canEdit ? [h('button', { class: 'sm', onclick: () => (PANEL ? PANEL.pick(false) : pick(true, false)) }, '⬆ Files'), h('button', { class: 'sm', onclick: () => (PANEL ? PANEL.pick(true) : pick(true, true)) }, '⬆ Folder'),
         h('button', { class: 'sm', onclick: async () => { const n = prompt('Name of the new folder'); if (!n) return; try { await api('POST', `/api/share/${enc(id)}/folder`, { path: (rel ? rel + '/' : '') + n }); reload(); } catch (e) { oops(e); } } }, '+ Folder')] : null,
       h('a', { class: 'btn sm', href: zipUrl([rel]), title: 'Everything in this folder as one ZIP' }, '⬇ Download all'), dlSel, delSel, selBar, h('span', { class: 'grow' }),
       h('button', { class: 'sm ghost', title: 'List or tiles', onclick: () => { viewMode = viewMode === 'list' ? 'tiles' : 'list'; try { localStorage.setItem('rfp-share-view', viewMode); } catch { /* fine */ } reload(); } }, viewMode === 'list' ? '▦ Tiles' : '☰ List'),
+      h('button', { class: 'sm', onclick: () => transfersPanel(id) }, 'Transfers'),
       h('button', { class: 'sm', onclick: () => activityPanel(id) }, 'Activity'),
       h('button', { class: 'sm', onclick: () => peoplePanel(id, s, reload) }, s.role === 'manager' ? `People (${(s.members || []).length})` : 'Emails'));
     const thumbOf = (x) => {
@@ -163,12 +277,12 @@
       h('tbody', {}, r.items.map((x) => h('tr', { 'data-p': x.path }, h('td', {}, tick(x)), h('td', {}, h('div', { class: 'fname', onclick: () => openItem(x) }, thumbOf(x), h('span', {}, x.name), x.comments ? h('span', { class: 'cm' }, '💬 ' + x.comments) : null)),
         h('td', { class: 'r nowrap dim' }, x.dir ? '' : size(x.size)), h('td', { class: 'hide-sm dim small' }, x.by || ''), h('td', { class: 'hide-sm dim small nowrap' }, when(x.mtime)), h('td', { class: 'r' }, rowMenu(x))))));
     const body = h('div', { class: 'drop' }, list);
-    if (canEdit) {
-      body.addEventListener('dragover', (e) => { e.preventDefault(); body.classList.add('over'); });
-      body.addEventListener('dragleave', (e) => { if (!body.contains(e.relatedTarget)) body.classList.remove('over'); });
-      body.addEventListener('drop', async (e) => { e.preventDefault(); body.classList.remove('over'); const got = await dropped(e.dataTransfer); if (got.length) upload(id, rel, got, reload); });
-    }
-    fill(main, h('div', { class: 'spread' }, h('div', {}, crumbs), h('span', { class: 'pill ' + s.role }, s.role === 'manager' ? 'You manage this folder' : s.role === 'editor' ? 'You can upload' : 'You can view and download')),
+    const key = id + '|' + rel;
+    const panel = !canEdit ? null : opts.keepPanel && PANEL && PANEL.key === key ? PANEL : Object.assign(xferPanel({ targets: [], fixed: { id, name: s.name, dir: rel }, after: reload }), { key });
+    if (!panel) PANEL = null;
+    const right = h('div', { class: 'right' });
+    fill(main, h('div', { class: panel ? 'two' : '' }, panel ? panel.el : null, right));
+    fill(right, h('div', { class: 'spread' }, h('div', {}, crumbs), h('span', { class: 'pill ' + s.role }, s.role === 'manager' ? 'You manage this folder' : s.role === 'editor' ? 'You can upload' : 'You can view and download')),
       s.expires ? h('div', { class: 'expiry' + ((Date.parse(s.expires) - Date.now()) < 4 * 864e5 ? ' soon' : '') }, `This folder and its files are removed from the server on ${new Date(s.expires + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}. Download what you want to keep before then.`) : null,
       toolbar, body, r.free != null && canEdit ? h('p', { class: 'dim small', style: { marginTop: '14px' } }, `${size(r.free)} free on the server.`) : null);
     paintSel();
@@ -189,27 +303,29 @@
   // ---------------------------------------------------------------- uploads: pieces, two files at a time, retries
   const Q = [];
   let running = 0, onDone = null;
-  function upload(id, rel, list, after) {
-    for (const x of list) Q.push({ id, dir: [rel, x.rel].filter(Boolean).join('/'), file: x.file, sent: 0, state: 'waiting', err: '' });
-    onDone = after; paintQueue(); pump();
+  // batch: a transfer from the upload panel ({ jobs, onProgress, onEnd }); its files tell nobody one by one (?quiet=1)
+  function upload(id, rel, list, after, batch) {
+    for (const x of list) { const j = { id, dir: [rel, x.rel].filter(Boolean).join('/'), file: x.file, sent: 0, state: 'waiting', err: '', batch }; Q.push(j); if (batch) batch.jobs.push(j); }
+    if (after) onDone = after; paintQueue(); pump();
   }
-  function pump() { while (running < 2) { const j = Q.find((x) => x.state === 'waiting'); if (!j) break; running++; j.state = 'sending'; send(j).finally(() => { running--; paintQueue(); pump(); if (!Q.some((x) => x.state === 'waiting' || x.state === 'sending') && onDone) onDone(); }); } }
+  const batchTick = (b) => { if (!b) return; if (b.onProgress) b.onProgress(); if (!b.ended && b.jobs.every((x) => x.state === 'done' || x.state === 'error')) { b.ended = true; b.onEnd(); } };
+  function pump() { while (running < 2) { const j = Q.find((x) => x.state === 'waiting'); if (!j) break; running++; j.state = 'sending'; send(j).finally(() => { running--; paintQueue(); batchTick(j.batch); pump(); if (!Q.some((x) => x.state === 'waiting' || x.state === 'sending') && onDone && !j.batch) onDone(); }); } }
   async function send(j) {
     let tries = 0;
     for (;;) {
       try {
         const st = await api('POST', `/api/share/${enc(j.id)}/upload`, { dir: j.dir, name: j.file.name, size: j.file.size });
-        j.sent = st.received; paintQueue();
+        j.sent = st.received; paintQueue(); if (j.batch && j.batch.onProgress) j.batch.onProgress();
         while (j.sent < j.file.size) {
           const piece = j.file.slice(j.sent, Math.min(j.file.size, j.sent + st.chunk));
           const r = await fetch(`/api/share/${enc(j.id)}/upload/${st.upload}?offset=${j.sent}`, { method: 'PUT', credentials: 'same-origin', headers: { 'x-rfp': '1', 'content-type': 'application/octet-stream' }, body: piece });
           const k = await r.json().catch(() => ({}));
           if (r.status === 409 && /Send from byte (\d+)/.test(k.error || '')) { j.sent = Number(/Send from byte (\d+)/.exec(k.error)[1]); continue; }
           if (!r.ok) throw Object.assign(new Error(k.error || 'Upload failed (' + r.status + ')'), { status: r.status });
-          j.sent = k.received; tries = 0; paintQueue();
+          j.sent = k.received; tries = 0; paintQueue(); if (j.batch && j.batch.onProgress) j.batch.onProgress();
         }
-        await api('POST', `/api/share/${enc(j.id)}/upload/${st.upload}/done`, {});
-        j.state = 'done'; return;
+        const fin = await api('POST', `/api/share/${enc(j.id)}/upload/${st.upload}/done${j.batch ? '?quiet=1' : ''}`, {});
+        j.path = fin.path; j.state = 'done'; return;
       } catch (e) {
         if ([400, 401, 403, 404, 507].includes(e.status) || ++tries > 30) { j.state = 'error'; j.err = e.message; return; }
         j.err = 'Connection lost, trying again…'; paintQueue();
@@ -219,15 +335,17 @@
     }
   }
   let qPaint = 0;
+  const QQ = Q;
   function paintQueue() {
-    if (Date.now() - qPaint < 200 && Q.some((x) => x.state === 'sending')) { clearTimeout(paintQueue.t); paintQueue.t = setTimeout(paintQueue, 220); return; }
+    if (Date.now() - qPaint < 200 && QQ.some((x) => x.state === 'sending')) { clearTimeout(paintQueue.t); paintQueue.t = setTimeout(paintQueue, 220); return; }
     qPaint = Date.now();
     const box = $('queue');
+    const Q = QQ.filter((x) => !x.batch);
     if (!Q.length) { box.hidden = true; return; }
     const total = Q.reduce((n, x) => n + x.file.size, 0), sent = Q.reduce((n, x) => n + (x.state === 'done' ? x.file.size : x.sent), 0), busy = Q.some((x) => x.state === 'waiting' || x.state === 'sending');
     box.hidden = false;
     fill(box, h('div', { class: 'qh' }, h('span', { class: 'grow' }, busy ? `Uploading ${Q.filter((x) => x.state !== 'done').length} file(s) · ${Math.floor((sent / (total || 1)) * 100)}%` : `${Q.filter((x) => x.state === 'done').length} uploaded`),
-      busy ? null : h('button', { class: 'sm ghost', onclick: () => { Q.length = 0; paintQueue(); } }, 'Close')),
+      busy ? null : h('button', { class: 'sm ghost', onclick: () => { for (let i = QQ.length - 1; i >= 0; i--) if (!QQ[i].batch) QQ.splice(i, 1); paintQueue(); } }, 'Close')),
       Q.slice(-200).map((j) => h('div', { class: 'qi' + (j.state === 'error' ? ' err' : '') }, h('div', { class: 'nm' }, h('span', { title: (j.dir ? j.dir + '/' : '') + j.file.name }, (j.dir ? j.dir + '/' : '') + j.file.name),
         h('span', { class: 'dim nowrap' }, j.state === 'done' ? '✓' : j.state === 'error' ? 'failed' : size(j.file.size))), j.err ? h('div', { class: j.state === 'error' ? 'err' : 'dim' }, j.err) : null,
         h('div', { class: 'bar' }, h('i', { style: { width: (j.state === 'done' ? 100 : (j.sent / (j.file.size || 1)) * 100) + '%' } })))));
@@ -325,10 +443,14 @@
       h('div', { class: 'row' },
         h('button', { class: 'sm danger', onclick: async () => { if (!confirm(`Delete the shared folder “${s.name}” for everyone? Its files are kept on the NAS for 30 days.`)) return; try { await api('DELETE', `/api/share/${enc(id)}`); document.querySelector('.side-panel').remove(); go('/'); } catch (e) { oops(e); } } }, 'Delete folder'))));
   }
+  async function transfersPanel(id) {
+    const r = await api('GET', '/api/share-transfers?share=' + enc(id)).catch((e) => { oops(e); return null; });
+    if (r) sidePanel('Transfers', transferList(r.transfers, { compact: true }));
+  }
   async function activityPanel(id) {
     const r = await api('GET', `/api/share/${enc(id)}/activity`).catch((e) => { oops(e); return null; });
     if (!r) return;
-    const W = { edit: 'changed the folder:', create: 'made the folder', upload: 'uploaded', folder: 'made the folder', delete: 'deleted', move: 'moved / renamed', comment: 'commented on', download: 'downloaded', invite: 'invited', uninvite: 'removed' };
+    const W = { transfer: 'sent files to', edit: 'changed the folder:', create: 'made the folder', upload: 'uploaded', folder: 'made the folder', delete: 'deleted', move: 'moved / renamed', comment: 'commented on', download: 'downloaded', invite: 'invited', uninvite: 'removed' };
     sidePanel('Activity', r.activity.length ? r.activity.map((a) => h('div', { class: 'act' }, h('b', {}, a.name || a.email || 'Someone'), ' ', W[a.what] || a.what, ' ', a.target ? h('b', {}, a.target + (a.role ? ` (${a.role})` : '')) : null, a.path ? h('span', { class: 'ok' }, ' ' + a.path) : null,
       a.text ? h('div', { class: 'dim small' }, '“' + a.text + '”' + (a.tc != null ? ' @' + tcText(a.tc) : '')) : null, h('div', { class: 'dim' }, new Date(a.at).toLocaleString('en-GB')))) : h('p', { class: 'dim' }, 'Nothing yet.'));
   }

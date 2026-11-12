@@ -132,6 +132,36 @@ test('sharing: production folder, invites, resumable uploads, rights, ZIP, comme
   while (!app.mail.outbox.some((m) => /new comment|new file/.test(m.subject)) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 40));
   assert.ok(app.mail.outbox.some((m) => /new (file|comment)/.test(m.subject)), 'summary email');
 
+  // a transfer (the upload panel): files uploaded quietly, then people tagged get an email and a notification, the
+  // uploader a receipt; nobody else gets the 10-minute summary for these files
+  const tg = await editor.get(`/api/share/${id}/taggable`);
+  assert.equal(tg.status, 200, JSON.stringify(tg.data));
+  assert.deepEqual(tg.data.people.map((p) => [p.email, p.role]).sort(), [['admin@example.com', 'manager'], ['client@example.com', 'viewer']]);
+  assert.equal((await viewer.get(`/api/share/${id}/taggable`)).status, 403, 'viewers cannot upload, so cannot tag');
+  await new Promise((r) => setTimeout(r, 200));               // the earlier summary has gone out
+  const mBefore = app.mail.outbox.length;
+  const q1 = (await editor.post(`/api/share/${id}/upload`, { dir: 'Day 3', name: 'C001.mp4', size: 6 })).data;
+  await editor.put(`/api/share/${id}/upload/${q1.upload}?offset=0`, Buffer.from('abcdef'), { 'content-type': 'application/octet-stream' });
+  const qd = await editor.post(`/api/share/${id}/upload/${q1.upload}/done?quiet=1`, {});
+  assert.equal(qd.data.path, 'Day 3/C001.mp4');
+  const tr = await editor.post(`/api/share/${id}/transfer`, { dir: 'Day 3', files: [{ path: qd.data.path, size: 6 }], tags: ['client@example.com', 'stranger@example.com'], message: 'Interviews from Saturday' });
+  assert.equal(tr.status, 200, JSON.stringify(tr.data));
+  assert.deepEqual(tr.data.transfer.tags, ['client@example.com'], 'only people of the folder can be tagged');
+  assert.equal(tr.data.mailed, 1);
+  await new Promise((r) => setTimeout(r, 200));
+  const newMail = app.mail.outbox.slice(mBefore);
+  assert.ok(newMail.some((m) => m.to.includes('client@example.com') && /Editor sent you 1 file/.test(m.subject) && /Interviews from Saturday/.test(m.text) && /\/f\/shr_[\w-]+\/Day%203/.test(m.text)), newMail.map((m) => m.subject).join(' | '));
+  assert.ok(newMail.some((m) => m.to.includes('editor@example.com') && /Your 1 file/.test(m.subject)), 'the receipt');
+  assert.ok(!newMail.some((m) => /new file/.test(m.subject)), 'no summary email for a transfer');
+  const inbox = (await viewer.get('/api/notifications')).data;
+  assert.ok((inbox.list || []).some((n) => n.kind === 'file_shared'), JSON.stringify(inbox));
+  // previous transfers: the uploader's and the tagged person's
+  const tl = (await viewer.get('/api/share-transfers')).data.transfers;
+  assert.equal(tl.length, 1); assert.equal(tl[0].forMe, true); assert.equal(tl[0].shareName, 'Cup final · 2026-11-20'); assert.equal(tl[0].message, 'Interviews from Saturday');
+  assert.equal((await editor.get('/api/share-transfers?share=' + id)).data.transfers[0].mine, true);
+  assert.equal((await outsider.get('/api/share-transfers')).data.transfers.length, 0);
+  assert.equal((await editor.post(`/api/share/${id}/transfer`, { files: [] })).status, 400);
+
   // the folder knows its production's name (shown next to "File Sharing")
   assert.equal((await viewer.get(`/api/share/${id}/list`)).data.share.productionName, 'Cup final · 2026-11-20');
   // Media → File sharing: everyone invited to the team's folders; only Producers and Admins
