@@ -18,6 +18,22 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.1.0
+
+- **Sharing: shared folders on the NAS** at **sharing.regemarkfp.com** (or `/sharing` on the website). A folder per production or event that you invite people into: crew, clients, editors, agencies.
+  - **Who manages:** Producers and Admins of the team. They make folders (Sharing → + New folder) and invite people. A production's folder is made the first time someone presses **Shared folder** on the production (next to Call sheet); on a production PC that button opens the website's folder. The Studio menu has **Productions → Shared folders**.
+  - **Invites by email** as **Viewer** (see, preview, download, comment) or **Editor** (also upload, make folders, rename, move, delete). The email has an *Open the folder* link: they sign in with Google, or make a password the first time. If email is not set up, the People panel shows each person's link to send yourself. Removing someone stops their access and their link at once.
+  - **Big uploads that carry on:** files and whole folders (button or drag and drop), two at a time, in 32 MB pieces (under Cloudflare's 100 MB limit). After a dropped connection it carries on by itself; after closing the tab, drop the same file again and it continues where it was. The same name twice keeps both (`A001 (2).mov`).
+  - **Previews in the browser:** photos, PDFs, text, audio and video. Camera files the browser cannot play (ProRes, MXF, HEVC, AVCHD …) get a 720p preview made by ffmpeg the first time they are opened; thumbnails for video and photos. Without ffmpeg those files are download-only.
+  - **Download as ZIP:** the whole folder, a sub-folder or a selection as one ZIP, written as it downloads (no waiting, no size limit; ZIP64 past 4 GB). Single files download with resume (byte ranges).
+  - **Comments and activity:** comments on any file, with the video's timecode (click it to jump there); an activity list (uploads, moves, deletes, comments, invites); a summary email to the invited people at most every 10 minutes when new files or comments arrive (each person can turn it off).
+  - Deleted files go to the folder's bin on the NAS (`<folder>/.rfp/bin/<date>`); a deleted shared folder is moved to `<sharing folder>/.deleted/`. Clear those by hand when you are sure.
+  - **Set-up** (the website on the home server):
+    1. Cloudflare → Zero Trust → Networks → Tunnels → your tunnel → **Public hostname**: `sharing.regemarkfp.com` → `http://localhost:8080` (the same service as the website).
+    2. In `config.json` (or the environment): `"sharingUrl": "https://sharing.regemarkfp.com"` (`SHARING_URL`). The files go to `"sharingDir"` (`SHARING_DIR`, e.g. `/srv/nas/sharing`); without it, `<NAS folder>/sharing`, next to the media folder, or `data/sharing`.
+    3. Google sign-in on the subdomain: add `https://sharing.regemarkfp.com` to the client's **Authorised JavaScript origins** (Google Cloud → Clients).
+    4. Optional, for previews and thumbnails: `sudo apt install ffmpeg` (or `"ffmpeg": "/path/to/ffmpeg"` in config).
+
 ### 1.0.21
 
 - **E-Sports: Rocket League.** A sport of its own (category E-Sports; production type E-Sports): fixtures, competitions, teams and players, and a hand scorer (goals, shots, assists, saves, epic saves, demolitions; 5 minutes, then golden-goal overtime; 3v3, 2v2, 1v1) for when the game feed is not there.

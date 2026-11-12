@@ -288,7 +288,7 @@
         const fx = (p.fixtures || []).map((r) => App.docs.get(r.fixture)).filter(Boolean);
         box.replaceChildren(...[
           fx.length ? h('div', { class: 'card' }, h('h2', {}, 'Matches in this production'), fx.map((d) => App.fixtureRow(d))) : null,
-          h('div', { class: 'card' }, h('div', { class: 'spread' }, h('h2', {}, 'Costing'), h('div', { class: 'row no-print' }, h('a', { class: 'btn sm', href: '#/rundown/production/' + doc.id }, `Rundown (${(p.rundown || []).length})`), h('a', { class: 'btn sm', href: '#/callsheet/' + doc.id }, 'Call sheet'), h('a', { class: 'btn sm', href: '#/report/' + doc.id, title: 'Post-production report and music cue sheets' }, 'Report & cue sheet'), App.canEdit('production') ? h('a', { class: 'btn sm' + (p.status === 'Completed' ? '' : ' primary'), href: '#/complete/' + doc.id, title: 'Rate the production, list its issues and see its report' }, p.status === 'Completed' ? 'Edit report' : 'Complete production') : null, App.canEdit('production') ? h('button', { class: 'sm', onclick: (e) => { e.preventDefault(); App.sendCallsheet(doc.id); } }, 'Send call sheet') : null)),
+          h('div', { class: 'card' }, h('div', { class: 'spread' }, h('h2', {}, 'Costing'), h('div', { class: 'row no-print' }, h('a', { class: 'btn sm', href: '#/rundown/production/' + doc.id }, `Rundown (${(p.rundown || []).length})`), h('a', { class: 'btn sm', href: '#/callsheet/' + doc.id }, 'Call sheet'), App.canEdit('production') ? h('button', { class: 'sm', title: 'A folder on the NAS for this production: invite crew and clients to upload and download footage', onclick: (e) => { e.preventDefault(); App.openShare(doc.id); } }, 'Shared folder') : null, h('a', { class: 'btn sm', href: '#/report/' + doc.id, title: 'Post-production report and music cue sheets' }, 'Report & cue sheet'), App.canEdit('production') ? h('a', { class: 'btn sm' + (p.status === 'Completed' ? '' : ' primary'), href: '#/complete/' + doc.id, title: 'Rate the production, list its issues and see its report' }, p.status === 'Completed' ? 'Edit report' : 'Complete production') : null, App.canEdit('production') ? h('button', { class: 'sm', onclick: (e) => { e.preventDefault(); App.sendCallsheet(doc.id); } }, 'Send call sheet') : null)),
             warn.concat(clash.length ? ['Booked twice: ' + [...new Set(clash)].join(', ')] : []).map((w) => h('div', { class: 'pill warn', style: { marginBottom: '8px', marginRight: '6px' } }, w)),
             c.lines.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' },
               h('thead', {}, h('tr', {}, h('th', {}, 'Item'), h('th', { class: 'r' }, 'Qty'), h('th', { class: 'r' }, 'Days'), h('th', { class: 'r' }, 'Cost'), h('th', { class: 'r' }, 'Invoice'))),
@@ -357,6 +357,20 @@
   // call and TX times, additional information and emergency contacts.
   // Send call sheet: pick the crew, add a note, email it (the sheet in the email and as a PDF attachment)
   const csPdf = (id, dl) => `/api/productions/${encodeURIComponent(id)}/callsheet.pdf?team=${App.team}${dl ? '&download=1' : ''}`;
+  // Shared folder (sharing.<website>): made the first time it is opened; on a production PC it opens on the website
+  App.openShare = async (id) => {
+    const w = window.open('about:blank', '_blank');
+    try {
+      if (App.cfg.mode === 'local') {
+        const site = (App.cfg.sharingUrl || ((App.cfg.cloudUrl || '').replace(/\/+$/, '') + '/sharing'));
+        if (!App.cfg.cloudUrl && !App.cfg.sharingUrl) throw new Error('Link this PC to the website first: shared folders live on the website');
+        w.location = `${site.replace(/\/+$/, '')}/p/${encodeURIComponent(App.team)}/${encodeURIComponent(id)}`;
+        return;
+      }
+      const r = await api('POST', `/api/share/production/${encodeURIComponent(id)}?team=${App.team}`, {});
+      w.location = r.url;
+    } catch (e) { if (w) w.close(); oops(e); }
+  };
   App.sendCallsheet = async (id) => {
     let r;
     try { r = await api('GET', `/api/productions/${encodeURIComponent(id)}/callsheet/recipients?team=${App.team}`); } catch (e) { oops(e); return; }

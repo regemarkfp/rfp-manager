@@ -74,7 +74,7 @@
     '#/images': 'image', '#/list/track': 'note', '#/music': 'queue', '#/musicrights': 'copyright',
     '#/list/song': 'songs', '#/ccli': 'report', '#/bibles': 'book', '#/settings': 'settings',
   };
-  const forLink = (href, group) => (group === 'Worship' && href === '#/list/service' ? 'church' : group === '' && href === '#/' ? 'dashboard' : BY_HREF[href] || 'chevron');
+  const forLink = (href, group) => (group === 'Worship' && href === '#/list/service' ? 'church' : group === '' && href === '#/' ? 'dashboard' : BY_HREF[href] || (/\/sharing\/?$|^https?:\/\/sharing\./.test(href) ? 'download' : 'chevron'));
   function svg(name, size) {
     const ns = 'http://www.w3.org/2000/svg', s = document.createElementNS(ns, 'svg'), p = document.createElementNS(ns, 'path');
     s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', size || 24); s.setAttribute('height', size || 24); s.setAttribute('aria-hidden', 'true'); s.setAttribute('fill', 'currentColor');
