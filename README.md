@@ -18,6 +18,32 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.4.0
+
+Easy to use for anyone, everywhere (the File Sharing approach across the Studio, the website and the live screens):
+
+- **Help on every page:** a green **?** (bottom right, or press ?) opens what this page is for and how to do the usual things on it, with a search over all the help and short answers (getting started, who can do what, selecting many). The live screens (Graphics control, Scoring, Worship, Dashboards, Timelines, Master control, Rocket League) have it too, with their keyboard keys. The menu shows the same one-line explanation when you point at an item.
+- **Search everything** in the Studio: the box at the top of the menu (or Ctrl+K, or /; the ⌕ on the Android app) finds any record – productions, clients, crew, matches, teams, players, venues, invoices, videos, songs … – grouped by kind; ↑ ↓ and Enter to open.
+- **Search this page** on every page with a long list that had no search of its own (VOD, playlists, streams, sales, ratings, notifications, analytics …).
+- **Choose instead of type:** fields like category, position, town, sponsor, preacher, series, unit, condition are a drop-down of what was used before, with "✎ Something else…" to type a new one. In File Sharing, "Inside it" is a drop-down of the folders that are there, or "+ A new folder…".
+- **Empty pages say what they are for** and have a big "+ Add the first …" button; "Nothing matches" has "Clear them".
+- **No more browser pop-ups:** the last confirm / prompt / alert boxes (payments, WhatsApp, booking form, client portal) are our own dialogs.
+- **Website:** search on phones (⌕ in the top bar), **Help** in the footer (watching, tickets, subscribing, booking, paying), "Search this channel" on channel pages, and a clearer booking form ("Send my request", "Nothing to pay now").
+
+### 1.3.0
+
+- **File Sharing made simple for anyone** (not only production people):
+  - **Sending** goes in plain numbered steps: ① add files (the big + opens your files straight away; "or choose a whole folder" below), ② where should they go (with "+ Put them in a new folder"), ③ who should know – tap people to tick them, ④ add a message – then **Send 4 files**. "Done! Your files are in" when it is finished.
+  - **A first-visit guide** (three steps along the top, closed with ✕) and a **? Help** button in the header with "How File Sharing works".
+  - **In a folder:** the folder name as a big title, "← Your folders" to go back, click any row to open it, **⬇** on every file and a **⋯** menu (Open, Download, Rename…, Move to…, Delete). Tick files and the bar turns into **Download · Move to… · Delete · Cancel**. Move to… lets you open the folder to move into (no typing paths). **List / Grid**, **History** (uploads, and everything that happened, in sentences) and **Who has access**.
+  - **Clear words everywhere:** "You can look and download" / "You can add and change files", "Can look" / "Can add files" when inviting, "Has opened the folder" / "Has not opened the invitation yet", "Delete it automatically on", friendly empty folders.
+  - **Our own dialogs** instead of the browser's pop-ups for new folders, renaming, moving and deleting, saying exactly what happens (and that the production team can get deleted files back for 30 days).
+  - **Phones:** a tidy header, the file type and size under each name, and a one-time tip in the viewer ("Swipe left or right for the next file").
+
+### 1.2.9
+
+- **Going through files in File Sharing**: in an opened file, ‹ › (or ← →), a swipe left or right on phones and tablets, or the scroll wheel / a trackpad swipe go to the next or previous file in the same window (with "3 / 12" at the bottom and the next photo loaded in advance). In **full screen it stays full screen** while you go through the files. Comments follow the file shown.
+
 ### 1.2.8
 
 - **Opening a file in File Sharing**: the photo, video, PDF or text always fits the screen whole (tall and wide pictures included, on phones too), on a black background. **⛶ Full screen** (or F, or double-click a photo) shows it alone on the whole screen; Esc comes back.

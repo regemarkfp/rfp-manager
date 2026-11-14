@@ -26,6 +26,40 @@
   }
   function toast(text, kind) { const t = h('div', { class: 'toast' + (kind === 'error' ? ' error' : '') }, text); $('toasts').append(t); setTimeout(() => t.remove(), kind === 'error' ? 6000 : 3000); }
   const oops = (e) => toast(e.message || String(e), 'error');
+  // ---- friendly dialogs (instead of the browser's own confirm / prompt) and small menus
+  function dialog({ title, text, body, ok = 'OK', danger = false, cancel = 'Cancel', onOk }) {
+    return new Promise((resolve) => {
+      const err = h('p', { class: 'err small' });
+      const done = (v) => { bg.remove(); document.removeEventListener('keydown', key); resolve(v); };
+      const okB = h('button', { class: danger ? 'danger-solid' : 'primary', onclick: async () => { if (onOk) { try { const v = await onOk(); if (v === false) return; done(v === undefined ? true : v); } catch (e) { err.textContent = e.message; } } else done(true); } }, ok);
+      const key = (e) => { if (e.key === 'Escape') done(false); if (e.key === 'Enter' && !(e.target && e.target.tagName === 'TEXTAREA')) { e.preventDefault(); okB.click(); } };
+      const bg = h('div', { class: 'dlg-bg', onclick: (e) => { if (e.target === bg) done(false); } }, h('div', { class: 'dlg', role: 'dialog' }, h('h2', {}, title), text ? h('p', { class: 'dim' }, text) : null, body || null, err,
+        h('div', { class: 'dlg-actions' }, cancel ? h('button', { class: 'ghost', onclick: () => done(false) }, cancel) : null, okB)));
+      document.body.append(bg); document.addEventListener('keydown', key);
+      setTimeout(() => { const f = bg.querySelector('input, textarea, select'); (f || okB).focus(); if (f && f.select) f.select(); }, 30);
+    });
+  }
+  const askText = (title, label, value = '', ok = 'OK', placeholder = '') => { const i = h('input', { value, placeholder }); return dialog({ title, body: h('label', { class: 'f' }, h('span', {}, label), i), ok, onOk: () => { const v = i.value.trim(); if (!v) throw new Error('Type a name first'); return v; } }); };
+  const sure = (title, text, ok = 'Delete') => dialog({ title, text, ok, danger: true });
+  // a small menu under a button: [[label, fn, { danger }], …]
+  function menuAt(btn, items) {
+    document.querySelectorAll('.pop').forEach((m) => m.remove());
+    const r = btn.getBoundingClientRect();
+    const m = h('div', { class: 'pop', style: { top: Math.min(r.bottom + 4, innerHeight - 40 * items.length - 10) + 'px', left: Math.max(8, Math.min(r.right - 190, innerWidth - 200)) + 'px' } },
+      items.filter(Boolean).map(([label, fn, o = {}]) => h('button', { class: o.danger ? 'danger' : '', onclick: (e) => { e.stopPropagation(); m.remove(); fn(); } }, label)));
+    document.body.append(m);
+    setTimeout(() => document.addEventListener('click', () => m.remove(), { once: true }), 0);
+  }
+  // the ? in the header: how it works, in plain words
+  function helpBox() {
+    const step = (n, t, d) => h('div', { class: 'help-step' }, h('span', { class: 'n' }, n), h('div', {}, h('b', {}, t), h('div', { class: 'dim small' }, d)));
+    dialog({ title: 'How File Sharing works', cancel: null, ok: 'Got it', body: h('div', {},
+      step('1', 'Send files', 'Press the big green + (or drag files onto the page), choose the folder they go to, and press Send. Big video files are fine: if your internet drops, it carries on by itself.'),
+      step('2', 'Tell people', 'Tick the people who should know. They get an email and a notification with a link straight to the files.'),
+      step('3', 'Find and open files', 'Open a folder on the right. Click a file to see it; use the arrows (or swipe) to go to the next one. Full screen is at the top.'),
+      step('4', 'Download', 'Use ⬇ next to a file, tick a few files and press Download, or Download all to get everything as one ZIP.'),
+      h('p', { class: 'dim small', style: { marginTop: '14px' } }, 'What you can do depends on how you were invited: viewers can look and download; editors can also add, rename, move and delete. Questions? Reply to the invitation email.')) });
+  }
   const size = (n) => (n < 1024 ? n + ' B' : n < 1024 ** 2 ? (n / 1024).toFixed(0) + ' KB' : n < 1024 ** 3 ? (n / 1024 ** 2).toFixed(1) + ' MB' : (n / 1024 ** 3).toFixed(2) + ' GB');
   const when = (t) => { const d = new Date(t), now = Date.now(); return now - t < 60e3 ? 'just now' : now - t < 3600e3 ? Math.floor((now - t) / 60e3) + ' min ago' : d.toDateString() === new Date().toDateString() ? d.toTimeString().slice(0, 5) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: now - t > 300 * 864e5 ? 'numeric' : undefined }); };
   const tcText = (s) => { s = Math.max(0, Number(s) || 0); const m = Math.floor(s / 60), x = Math.floor(s % 60); return `${Math.floor(m / 60) ? Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') : m}:${String(x).padStart(2, '0')}`; };
@@ -33,6 +67,7 @@
   const go = (url) => { history.pushState(null, '', BASE + url); route(); };
   addEventListener('popstate', () => route());
   $('home').href = BASE + '/'; $('home').onclick = (e) => { e.preventDefault(); go('/'); };
+  if ($('help')) $('help').onclick = () => helpBox();
 
   let ME = null, CFG = {};
   async function whoami() { try { ME = (await api('GET', '/api/me')).user || null; } catch { ME = null; } paintMe(); return ME; }
@@ -67,7 +102,7 @@
     let m;
     if ((m = /^\/invite\/([\w-]+)\/?$/.exec(p))) return invitePage(m[1]);
     if (!ME) await whoami();
-    if (!ME) { fill($('main'), signInBox({ note: 'Shared folders of RegemarkFP productions. Sign in with the email you were invited with.', done: () => route() })); return; }
+    if (!ME) { fill($('main'), signInBox({ title: 'Welcome to File Sharing', note: 'Send and receive photos, videos and other files with RegemarkFP. Sign in with the email address your invitation was sent to.', done: () => route() })); return; }
     if ((m = /^\/p\/([\w-]+)\/([\w-]+)\/?$/.exec(p))) {   // a production's folder (from the Studio on a production PC)
       try { const r = await api('POST', `/api/share/production/${enc(m[2])}?team=${enc(m[1])}`, {}); history.replaceState(null, '', BASE + '/f/' + r.id + '/'); return route(); } catch (e) { fill($('main'), h('div', { class: 'card narrow' }, h('h1', {}, 'Shared folder'), h('p', {}, e.message))); return; }
     }
@@ -82,7 +117,7 @@
     if (!ME) await whoami();
     const open = () => go('/f/' + v.id + '/');
     if (ME && ME.email.toLowerCase() === v.email) return open();
-    const intro = `${v.invitedBy} invited ${v.email} to “${v.name}” as ${v.role === 'editor' ? 'an editor (see, download and upload)' : 'a viewer (see and download)'}.`;
+    const intro = `${v.invitedBy} shared the folder “${v.name}” with ${v.email}. You can ${v.role === 'editor' ? 'look at, download and add files' : 'look at and download the files'}.`;
     if (ME) { fill(main, h('div', { class: 'card narrow' }, h('h1', {}, v.name), h('p', {}, intro), h('p', { class: 'err' }, `You are signed in as ${ME.email}. Sign out and sign in as ${v.email}.`), h('button', { onclick: async () => { await api('POST', '/api/auth/logout', {}); ME = null; paintMe(); invitePage(token); } }, 'Sign out'))); return; }
     if (v.account) { fill(main, signInBox({ email: v.email, title: v.name, note: intro + (v.account.google && !v.account.password ? ' Use Sign in with Google.' : ''), done: open })); return; }
     // no account yet: Google, or a new password for that email
@@ -90,8 +125,8 @@
     const make = async () => { err.textContent = ''; try { await api('POST', '/api/sharing/invite/' + enc(token) + '/password', { name: nm.value, password: pw.value }); await whoami(); open(); } catch (e) { err.textContent = e.message; } };
     const box = signInBox({ email: v.email, title: v.name, note: intro, done: open });
     box.querySelectorAll('label.f, button.primary').forEach((x) => x.remove());
-    const orEl = box.querySelector('.or'); if (orEl) orEl.textContent = 'or make a password';
-    box.append(h('label', { class: 'f' }, h('span', {}, 'Email'), h('input', { value: v.email, readonly: true })), h('label', { class: 'f' }, h('span', {}, 'Your name'), nm), h('label', { class: 'f' }, h('span', {}, 'Choose a password'), pw), err, h('button', { class: 'primary', onclick: make }, 'Open the folder'));
+    const orEl = box.querySelector('.or'); if (orEl) orEl.textContent = 'or make a password (first time only)';
+    box.append(h('label', { class: 'f' }, h('span', {}, 'Email'), h('input', { value: v.email, readonly: true })), h('label', { class: 'f' }, h('span', {}, 'Your name'), nm), h('label', { class: 'f' }, h('span', {}, 'Choose a password'), pw), err, h('button', { class: 'primary', onclick: make }, 'Open the folder'), h('p', { class: 'dim small' }, 'Next time, sign in with this email and password.'));
     fill(main, box);
   }
 
@@ -105,18 +140,20 @@
     const box = h('div', { class: 'xfer card' });
     const pickFiles = (dir) => { const i = h('input', { type: 'file', multiple: true, webkitdirectory: dir ? true : null, style: { display: 'none' } }); i.onchange = () => { add([...i.files].map((f) => ({ file: f, rel: dir ? (f.webkitRelativePath || f.name).split('/').slice(0, -1).join('/') : '' }))); i.remove(); }; document.body.append(i); i.click(); };
     const add = (list) => { if (st.phase !== 'pick') { if (st.phase === 'done') reset(); else return; } const have = new Set(st.files.map((x) => x.rel + '/' + x.file.name + ':' + x.file.size)); for (const x of list) { const k = x.rel + '/' + x.file.name + ':' + x.file.size; if (!have.has(k)) { st.files.push(x); have.add(k); } } paint(); };
-    const reset = () => { st.files = []; st.tags.clear(); st.message = ''; st.sub = ''; st.phase = 'pick'; st.batch = null; paint(); };
+    const reset = () => { st.files = []; st.tags.clear(); st.message = ''; st.sub = ''; st.subOpen = false; st.find = ''; st.phase = 'pick'; st.batch = null; paint(); };
     async function loadPeople() {
       if (!st.target || st.peopleFor === st.target) return;
       st.peopleFor = st.target;
       try { st.people = (await api('GET', `/api/share/${enc(st.target)}/taggable`)).people; } catch { st.people = []; }
       if (st.phase === 'pick') paint();
     }
-    const plus = () => {
-      const menu = h('div', { class: 'plus-menu', hidden: true }, h('button', { onclick: (e) => { e.stopPropagation(); menu.hidden = true; pickFiles(false); } }, 'Files'), h('button', { onclick: (e) => { e.stopPropagation(); menu.hidden = true; pickFiles(true); } }, 'A folder'));
-      document.addEventListener('click', () => { menu.hidden = true; });
-      return h('div', { class: 'plus-wrap' }, h('button', { class: 'plus', title: 'Add files or a folder', onclick: (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; } }, '+'), menu);
-    };
+    async function loadSubs() {
+      const where = st.target + '|' + (fixed ? fixed.dir : '');
+      if (!st.target || st.subsFor === where) return;
+      st.subsFor = where;
+      try { const r = await api('GET', `/api/share/${enc(st.target)}/list?path=${enc(fixed ? fixed.dir : '')}`); st.subs = r.items.filter((x) => x.dir).map((x) => x.name); } catch { st.subs = []; }
+      if (st.phase === 'pick') paint();
+    }
     function paint() {
       const total = st.files.reduce((n, x) => n + x.file.size, 0);
       if (st.phase === 'sending' || st.phase === 'done') {
@@ -127,31 +164,51 @@
         const pct = st.phase === 'done' ? 100 : Math.floor(f * 100);
         fill(box, h('div', { class: 'prog' + (st.phase === 'done' ? (bad.length ? ' bad' : ' done') : '') }, h('div', { class: 'prog-num' }, st.phase === 'done' ? (bad.length ? '!' : '✓') : pct + '%'),
           h('div', { class: 'prog-bar' }, h('i', { style: { width: pct + '%' } }))),
-          st.phase === 'sending' ? [h('h2', { class: 'ctr' }, 'Uploading…'), h('p', { class: 'dim ctr' }, `${ok} of ${b.jobs.length} files · ${size(sent)} of ${size(all)}`), h('p', { class: 'dim small ctr' }, 'Keep this page open. A dropped connection carries on by itself.')]
-            : [h('h2', { class: 'ctr' }, bad.length ? 'Uploaded, with problems' : 'Upload complete'), h('p', { class: 'ctr' }, `${ok} file${ok === 1 ? '' : 's'} in ${t.name || 'the folder'}${b.dir ? ' / ' + b.dir : ''}.`),
+          st.phase === 'sending' ? [h('h2', { class: 'ctr' }, 'Sending…'), h('p', { class: 'dim ctr' }, `${ok} of ${b.jobs.length} files · ${size(sent)} of ${size(all)}`), h('p', { class: 'dim small ctr' }, 'Please keep this page open until it is done. If your internet drops, it carries on by itself.')]
+            : [h('h2', { class: 'ctr' }, bad.length ? 'Some files did not go through' : 'Done! Your files are in'), h('p', { class: 'ctr' }, `${ok} file${ok === 1 ? '' : 's'} in ${t.name || 'the folder'}${b.dir ? ' / ' + b.dir : ''}.`),
               b.tagged ? h('p', { class: 'dim small ctr' }, b.tagged) : null, bad.length ? h('div', { class: 'err small' }, bad.slice(0, 5).map((j) => h('div', {}, `${j.file.name}: ${j.err}`))) : null,
-              h('div', { class: 'col' }, h('button', { class: 'primary', onclick: reset }, 'Send more'), h('a', { class: 'btn', href: BASE + '/f/' + b.target + '/' + (b.dir ? b.dir.split('/').map(enc).join('/') : ''), onclick: (e) => { e.preventDefault(); go('/f/' + b.target + '/' + (b.dir ? b.dir.split('/').map(enc).join('/') : '')); } }, 'Open the folder'))]);
+              h('div', { class: 'col' }, h('button', { class: 'primary', onclick: reset }, 'Send more files'), h('a', { class: 'btn', href: BASE + '/f/' + b.target + '/' + (b.dir ? b.dir.split('/').map(enc).join('/') : ''), onclick: (e) => { e.preventDefault(); go('/f/' + b.target + '/' + (b.dir ? b.dir.split('/').map(enc).join('/') : '')); } }, 'Open the folder'))]);
         return;
       }
-      loadPeople();
-      const tagIn = h('input', { placeholder: st.people.length ? 'Type a name or email' : 'Nobody to tag in this folder yet', list: 'xfer-people', disabled: !st.people.length || null,
-        onkeydown: (e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); takeTag(e.target.value); } }, onchange: (e) => takeTag(e.target.value) });
-      const takeTag = (v) => { v = String(v || '').trim().toLowerCase(); const p = st.people.find((x) => x.email === v || (x.name && x.name.toLowerCase() === v) || ((x.name ? x.name + ' <' + x.email + '>' : x.email).toLowerCase() === v)); if (p) { st.tags.add(p.email); paint(); setTimeout(() => { const i = box.querySelector('.tags input'); if (i) i.focus(); }, 0); } else if (v) toast('Only people invited to this folder (or its producers) can be tagged', 'error'); };
+      loadPeople(); loadSubs();
       const nameOf = (e) => { const p = st.people.find((x) => x.email === e); return p && p.name ? p.name : e; };
-      fill(box,
-        st.files.length ? null : [h('div', { class: 'plus-big' }, plus()), h('h2', { class: 'ctr' }, 'Add files'), h('p', { class: 'dim small ctr' }, 'or a whole folder · or drop them anywhere on this page')],
-        st.files.length ? [h('div', { class: 'xf-head' }, plus(), h('div', {}, h('b', {}, `${st.files.length} file${st.files.length === 1 ? '' : 's'}`), h('div', { class: 'dim small' }, size(total))), h('span', { class: 'grow' }), h('button', { class: 'sm ghost', onclick: () => { st.files = []; paint(); } }, 'Clear')),
-          h('div', { class: 'xf-list' }, st.files.slice(0, 300).map((x, i) => h('div', { class: 'xf' }, h('span', { class: 'nm', title: (x.rel ? x.rel + '/' : '') + x.file.name }, (x.rel ? x.rel + '/' : '') + x.file.name), h('span', { class: 'dim small nowrap' }, size(x.file.size)), h('button', { class: 'x', title: 'Take it out', onclick: () => { st.files.splice(i, 1); paint(); } }, '✕'))),
-            st.files.length > 300 ? h('div', { class: 'dim small' }, `… and ${st.files.length - 300} more`) : null)] : null,
-        fixed ? h('div', { class: 'f' }, h('span', {}, 'To'), h('div', { class: 'to-fixed' }, fixed.name + (fixed.dir ? ' / ' + fixed.dir : '')))
-          : h('label', { class: 'f' }, h('span', {}, 'To'), targets.length ? h('select', { onchange: (e) => { st.target = e.target.value; st.tags.clear(); paint(); } }, targets.map((t) => h('option', { value: t.id, selected: t.id === st.target }, t.name + (t.productionName && t.productionName !== t.name ? ' · ' + t.productionName : ''))))
-            : h('div', { class: 'dim small' }, 'You cannot upload to any folder yet.')),
-        h('label', { class: 'f' }, h('span', {}, 'Into a new folder (optional)'), h('input', { value: st.sub, placeholder: 'Day 1, Camera A, Photos …', oninput: (e) => { st.sub = e.target.value; } })),
-        h('div', { class: 'f tags' }, h('span', {}, 'Tag people (they get an email and a notification)'),
-          h('div', { class: 'chips' }, [...st.tags].map((e) => h('span', { class: 'chip' }, nameOf(e), h('button', { title: 'Untag', onclick: () => { st.tags.delete(e); paint(); } }, '✕'))), tagIn),
-          h('datalist', { id: 'xfer-people' }, st.people.filter((p) => !st.tags.has(p.email)).map((p) => h('option', { value: p.email }, p.name ? `${p.name} (${p.role === 'manager' ? 'producer' : p.role})` : p.role)))),
-        h('label', { class: 'f' }, h('span', {}, 'Message (optional)'), h('textarea', { rows: 2, placeholder: 'The interviews from Saturday …', oninput: (e) => { st.message = e.target.value; } }, st.message)),
-        h('button', { class: 'primary big', disabled: !st.files.length || !st.target || null, onclick: start }, st.files.length ? `Upload ${st.files.length} file${st.files.length === 1 ? '' : 's'}` : 'Upload'));
+      const step = (n, title, hint, ...kids) => h('div', { class: 'xstep' }, h('div', { class: 'xs-head' }, h('span', { class: 'n' }, n), h('b', {}, title), hint ? h('span', { class: 'dim small' }, ' ' + hint) : null), kids);
+      const addLinks = h('div', { class: 'add-links' }, h('button', { class: 'linkish', onclick: () => pickFiles(false) }, '+ Add more files'), h('button', { class: 'linkish', onclick: () => pickFiles(true) }, '+ Add a folder'));
+      // 1. the files
+      const one = !st.files.length
+        ? [h('div', { class: 'plus-big' }, h('button', { class: 'plus', title: 'Choose files to send', onclick: () => pickFiles(false) }, '+')),
+          h('h2', { class: 'ctr' }, 'Send files'), h('p', { class: 'dim small ctr' }, matchMedia('(pointer: coarse)').matches ? 'Press + to choose photos, videos or other files.' : 'Press + to choose files, or drag them onto this page.'),
+          h('p', { class: 'ctr' }, h('button', { class: 'linkish', onclick: () => pickFiles(true) }, 'or choose a whole folder'))]
+        : step('1', `${st.files.length} file${st.files.length === 1 ? '' : 's'} chosen`, '· ' + size(total),
+          h('div', { class: 'xf-list' }, st.files.slice(0, 300).map((x, i) => h('div', { class: 'xf' }, h('span', { class: 'nm', title: (x.rel ? x.rel + '/' : '') + x.file.name }, (x.rel ? x.rel + '/' : '') + x.file.name), h('span', { class: 'dim small nowrap' }, size(x.file.size)), h('button', { class: 'x', title: 'Take this file out', onclick: () => { st.files.splice(i, 1); paint(); } }, '✕'))),
+            st.files.length > 300 ? h('div', { class: 'dim small' }, `… and ${st.files.length - 300} more`) : null),
+          h('div', { class: 'spread' }, addLinks, h('button', { class: 'linkish dim', onclick: () => { st.files = []; paint(); } }, 'Start again')));
+      if (!st.files.length) { fill(box, one); return; }
+      // 2. where to
+      const two = step('2', 'Where should they go?', null,
+        fixed ? h('div', { class: 'to-fixed' }, '📁 ' + fixed.name + (fixed.dir ? ' / ' + fixed.dir : ''))
+          : targets.length ? h('select', { 'aria-label': 'Folder', onchange: (e) => { st.target = e.target.value; st.tags.clear(); st.sub = ''; st.subOpen = false; paint(); } }, targets.map((t) => h('option', { value: t.id, selected: t.id === st.target }, t.name + (t.productionName && t.productionName !== t.name ? ' · ' + t.productionName : ''))))
+            : h('div', { class: 'dim small' }, 'You cannot add files to any folder yet.'),
+        // inside it: straight in, a folder that is already there, or a new one
+        h('label', { class: 'f' }, h('span', {}, 'Inside it'), h('select', { onchange: (e) => { const v = e.target.value; if (v === '\u0000new') { st.subOpen = true; st.sub = ''; } else { st.subOpen = false; st.sub = v; } paint(); if (st.subOpen) setTimeout(() => { const i = box.querySelector('.newsub'); if (i) i.focus(); }, 0); } },
+          h('option', { value: '', selected: !st.sub && !st.subOpen }, 'Straight in (not in a folder inside it)'),
+          (st.subs || []).map((d) => h('option', { value: d, selected: !st.subOpen && st.sub === d }, '📁 ' + d)),
+          h('option', { value: '\u0000new', selected: st.subOpen }, '+ A new folder…'))),
+        st.subOpen ? h('input', { class: 'newsub', value: st.sub, placeholder: 'Name of the new folder: Day 1, Camera A …', oninput: (e) => { st.sub = e.target.value; } }) : null);
+      // 3. who should know: tap people to tick them
+      const many = st.people.length > 8;
+      const shown = st.people.filter((p) => !st.find || (p.name + ' ' + p.email).toLowerCase().includes(st.find.toLowerCase()));
+      const three = step('3', 'Who should know?', '(optional)',
+        st.people.length ? [h('p', { class: 'dim small', style: { margin: '0 0 8px' } }, 'Tick the people to tell. They get an email and a notification once the files are in.'),
+          many ? h('input', { class: 'find', placeholder: 'Find a person…', value: st.find || '', oninput: (e) => { st.find = e.target.value; paint(); setTimeout(() => { const i = box.querySelector('input.find'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 0); } }) : null,
+          h('div', { class: 'people' }, shown.map((p) => h('button', { class: 'person' + (st.tags.has(p.email) ? ' on' : ''), title: p.email, onclick: () => { if (st.tags.has(p.email)) st.tags.delete(p.email); else st.tags.add(p.email); paint(); } },
+            h('span', { class: 'tick' }, st.tags.has(p.email) ? '✓' : ''), h('span', { class: 'pn' }, p.name || p.email), p.name ? h('span', { class: 'dim small pe' }, p.email) : null)))]
+          : h('p', { class: 'dim small', style: { margin: 0 } }, 'Nobody else is invited to this folder yet, so there is nobody to tell.'));
+      // 4. a note
+      const four = step('4', 'Add a message', '(optional)', h('textarea', { rows: 2, placeholder: 'e.g. The interviews from Saturday', oninput: (e) => { st.message = e.target.value; } }, st.message));
+      fill(box, one, two, three, four,
+        h('button', { class: 'primary big', disabled: !st.target || null, onclick: start }, `Send ${st.files.length} file${st.files.length === 1 ? '' : 's'}`),
+        st.tags.size ? h('p', { class: 'dim small ctr' }, `${[...st.tags].map(nameOf).join(', ')} will be told.`) : null);
     }
     function start() {
       if (!st.files.length || !st.target) return;
@@ -212,18 +269,23 @@
     let txWho = '';
     const right = h('div', { class: 'right' });
     const folders = () => (r.shares.length ? [...byTeam].map(([team, list]) => [byTeam.size > 1 ? h('h3', { class: 'team' }, team || 'Folders') : null, h('div', { class: 'grid-shares' }, list.map((s) => h('a', { class: 'share', href: BASE + '/f/' + s.id + '/', onclick: (e) => { e.preventDefault(); go('/f/' + s.id + '/'); } },
-        h('b', {}, s.name), h('span', { class: 'pill ' + s.role }, s.role === 'manager' ? 'Manage' : s.role === 'editor' ? 'Can upload' : 'Can view'), s.members ? h('span', { class: 'dim', style: { marginLeft: '8px' } }, `${s.members.length} invited`) : null, s.productionName && s.productionName !== s.name ? h('div', { class: 'dim small', style: { marginTop: '6px' } }, s.productionName) : null, s.expires ? h('div', { class: 'small', style: { marginTop: '6px', color: 'var(--warn)' } }, 'Removed on ' + s.expires) : null)))])
-      : h('div', { class: 'card empty' }, r.canCreate.length ? 'No shared folders yet. Make one, or open a production in the Studio and press Shared folder.' : 'Nothing has been shared with you yet. When the production team invites you, the folder shows here.'));
+        h('b', {}, s.name), h('span', { class: 'pill ' + s.role }, s.role === 'manager' ? 'You manage it' : s.role === 'editor' ? 'You can add files' : 'You can look'), s.members ? h('span', { class: 'dim', style: { marginLeft: '8px' } }, `${s.members.length} ${s.members.length === 1 ? 'person' : 'people'} invited`) : null, s.productionName && s.productionName !== s.name ? h('div', { class: 'dim small', style: { marginTop: '6px' } }, s.productionName) : null, s.expires ? h('div', { class: 'small', style: { marginTop: '6px', color: 'var(--warn)' } }, '⏳ Deleted on ' + s.expires) : null)))])
+      : h('div', { class: 'card empty big-empty' }, h('div', { class: 'em-ico' }, '📂'), h('h2', {}, 'No shared folders yet'), h('p', { class: 'dim' }, r.canCreate.length ? 'Press + New folder to make one. A production\'s own folder is made when you press Shared folder on the production in the Studio.' : 'When someone shares a folder with you, you get an email and the folder shows up here.')));
     const paintRight = () => {
       try { sessionStorage.setItem('rfp-share-tab', tab); } catch { /* fine */ }
       const list = tx.transfers.filter((t) => !txWho || (txWho === 'me' ? t.mine : t.forMe));
-      fill(right, h('div', { class: 'spread', style: { marginBottom: '12px' } }, h('div', { class: 'tabs2' }, h('button', { class: tab === 'folders' ? 'on' : '', onclick: () => { tab = 'folders'; paintRight(); } }, `Folders (${r.shares.length})`),
-        h('button', { class: tab === 'transfers' ? 'on' : '', onclick: () => { tab = 'transfers'; paintRight(); } }, `Previous transfers (${tx.transfers.length})`)),
-        tab === 'folders' ? newBtn : h('select', { class: 'sm-sel', onchange: (e) => { txWho = e.target.value; paintRight(); } }, [['', 'Everything'], ['me', 'Sent by me'], ['to', 'Sent to me']].map(([v, t]) => h('option', { value: v, selected: v === txWho }, t)))),
+      fill(right, h('div', { class: 'spread', style: { marginBottom: '12px' } }, h('div', { class: 'tabs2' }, h('button', { class: tab === 'folders' ? 'on' : '', onclick: () => { tab = 'folders'; paintRight(); } }, `Your folders (${r.shares.length})`),
+        h('button', { class: tab === 'transfers' ? 'on' : '', onclick: () => { tab = 'transfers'; paintRight(); } }, `Sent & received (${tx.transfers.length})`)),
+        tab === 'folders' ? newBtn : h('select', { class: 'sm-sel', onchange: (e) => { txWho = e.target.value; paintRight(); } }, [['', 'All'], ['me', 'Sent by me'], ['to', 'Sent to me']].map(([v, t]) => h('option', { value: v, selected: v === txWho }, t)))),
         tab === 'folders' ? folders() : transferList(list));
     };
+    // the first time: three steps, in plain words (closed for good with ✕)
+    const seenIntro = (() => { try { return localStorage.getItem('rfp-share-intro') === '1'; } catch { return false; } })();
+    const intro = seenIntro ? null : h('div', { class: 'intro' }, h('div', { class: 'intro-steps' },
+      [['1', 'Add files', 'Press the green + or drag files here'], ['2', 'Choose a folder', 'and tick who should know'], ['3', 'Send', 'They get an email with a link']].map(([n, t, d]) => h('div', { class: 'help-step' }, h('span', { class: 'n' }, n), h('div', {}, h('b', {}, t), h('div', { class: 'dim small' }, d))))),
+      h('button', { class: 'sm ghost', title: 'Hide this', onclick: (e) => { try { localStorage.setItem('rfp-share-intro', '1'); } catch { /* fine */ } e.currentTarget.parentNode.remove(); } }, '✕'));
     paintRight();
-    fill(main, h('div', { class: targets.length ? 'two' : '' }, targets.length ? xferPanel({ targets, after: async () => { try { tx = await api('GET', '/api/share-transfers'); paintRight(); } catch { /* later */ } } }).el : null, right));
+    fill(main, intro, h('div', { class: targets.length ? 'two' : '' }, targets.length ? xferPanel({ targets, after: async () => { try { tx = await api('GET', '/api/share-transfers'); paintRight(); } catch { /* later */ } } }).el : null, right));
   }
 
   // ---------------------------------------------------------------- a folder
@@ -232,37 +294,72 @@
   let viewMode = (() => { try { return localStorage.getItem('rfp-share-view') || 'list'; } catch { return 'list'; } })();
   async function folderPage(id, rel, opts = {}) {
     const main = $('main');
-    let r; try { r = await api('GET', `/api/share/${enc(id)}/list?path=${enc(rel)}`); } catch (e) { fill(main, h('div', { class: 'card narrow' }, h('h1', {}, 'Shared folder'), h('p', {}, e.message), h('a', { href: BASE + '/' }, '← My folders'))); return; }
+    let r; try { r = await api('GET', `/api/share/${enc(id)}/list?path=${enc(rel)}`); } catch (e) { fill(main, h('div', { class: 'card narrow' }, h('h1', {}, 'This folder cannot be opened'), h('p', {}, e.message), h('a', { class: 'btn', href: BASE + '/', onclick: (ev) => { ev.preventDefault(); go('/'); } }, '← Your folders'))); return; }
     const s = r.share, canEdit = s.role !== 'viewer', sel = new Set();
     $('prod').textContent = s.productionName || ''; $('prod').title = s.productionName ? 'Production: ' + s.productionName : '';
     document.title = s.name + ' · File Sharing';
     const url = (p) => '/f/' + id + '/' + (p ? p.split('/').map(enc).join('/') : '');
     const parts = rel ? rel.split('/') : [];
-    const crumbs = h('div', { class: 'crumbs' }, h('a', { href: BASE + '/', onclick: (e) => { e.preventDefault(); go('/'); } }, 'My folders'), h('i', {}, '›'),
+    const crumbs = h('div', { class: 'crumbs' }, h('a', { href: BASE + '/', onclick: (e) => { e.preventDefault(); go('/'); } }, '← Your folders'), h('i', {}, '/'),
       h('a', { href: BASE + url(''), onclick: (e) => { e.preventDefault(); go(url('')); } }, s.name),
-      parts.map((x, i) => { const p = parts.slice(0, i + 1).join('/'); return [h('i', {}, '›'), h('a', { href: BASE + url(p), onclick: (e) => { e.preventDefault(); go(url(p)); } }, x)]; }));
+      parts.map((x, i) => { const p = parts.slice(0, i + 1).join('/'); return [h('i', {}, '/'), h('a', { href: BASE + url(p), onclick: (e) => { e.preventDefault(); go(url(p)); } }, x)]; }));
     const reload = () => folderPage(id, rel, { keepPanel: true });
-    const selBar = h('span', { class: 'dim small' });
     const files = r.items.filter((x) => !x.dir);
-    const paintSel = () => { selBar.textContent = sel.size ? `${sel.size} selected` : ''; dlSel.hidden = !sel.size; delSel.hidden = !sel.size || !canEdit; body.querySelectorAll('[data-p]').forEach((el) => el.classList.toggle('sel', sel.has(el.dataset.p))); };
     const zipUrl = (paths) => `/api/share/${enc(id)}/zip?` + paths.map((p) => 'p=' + enc(p)).join('&');
-    const dlSel = h('a', { class: 'btn sm', hidden: true, onclick: (e) => { e.currentTarget.href = zipUrl([...sel]); } }, '⬇ Download selected');
-    const delSel = h('button', { class: 'sm danger', hidden: true, onclick: async () => { if (!confirm(`Delete ${sel.size} item${sel.size > 1 ? 's' : ''}? Deleted files are kept on the server for 30 days.`)) return; try { await api('POST', `/api/share/${enc(id)}/delete`, { paths: [...sel] }); toast('Deleted'); reload(); } catch (e) { oops(e); } } }, 'Delete');
-    const pick = (multiple, dir) => { const i = h('input', { type: 'file', multiple: true, webkitdirectory: dir ? true : null, style: { display: 'none' } }); i.onchange = () => { upload(id, rel, [...i.files].map((f) => ({ file: f, rel: dir ? (f.webkitRelativePath || f.name).split('/').slice(0, -1).join('/') : '' })), reload); i.remove(); }; document.body.append(i); i.click(); };
-    const toolbar = h('div', { class: 'toolbar' },
-      canEdit ? [h('button', { class: 'sm', onclick: () => (PANEL ? PANEL.pick(false) : pick(true, false)) }, '⬆ Files'), h('button', { class: 'sm', onclick: () => (PANEL ? PANEL.pick(true) : pick(true, true)) }, '⬆ Folder'),
-        h('button', { class: 'sm', onclick: async () => { const n = prompt('Name of the new folder'); if (!n) return; try { await api('POST', `/api/share/${enc(id)}/folder`, { path: (rel ? rel + '/' : '') + n }); reload(); } catch (e) { oops(e); } } }, '+ Folder')] : null,
-      h('a', { class: 'btn sm', href: zipUrl([rel]), title: 'Everything in this folder as one ZIP' }, '⬇ Download all'), dlSel, delSel, selBar, h('span', { class: 'grow' }),
-      h('button', { class: 'sm ghost', title: 'List or tiles', onclick: () => { viewMode = viewMode === 'list' ? 'tiles' : 'list'; try { localStorage.setItem('rfp-share-view', viewMode); } catch { /* fine */ } reload(); } }, viewMode === 'list' ? '▦ Tiles' : '☰ List'),
-      h('button', { class: 'sm', onclick: () => transfersPanel(id) }, 'Transfers'),
-      h('button', { class: 'sm', onclick: () => activityPanel(id) }, 'Activity'),
-      h('button', { class: 'sm', onclick: () => peoplePanel(id, s, reload) }, s.role === 'manager' ? `People (${(s.members || []).length})` : 'Emails'));
-    // previews in the list and the tiles: photos and video stills (ffmpeg on the server, or the browser itself for
-    // mp4 / webm / mov), the first lines of text files, a page icon for PDFs; the file type when there is nothing to show
+    const dlUrl = (x) => (x.dir ? zipUrl([x.path]) : `/api/share/${enc(id)}/file?path=${enc(x.path)}`);
+    const download = (href) => { const a = h('a', { href, style: { display: 'none' } }); document.body.append(a); a.click(); setTimeout(() => a.remove(), 500); };
+    // actions on files and folders
+    const newFolder = async () => { const n = await askText('New folder', 'Name of the folder', '', 'Make the folder', 'Day 1, Camera A, Photos …'); if (!n) return; try { await api('POST', `/api/share/${enc(id)}/folder`, { path: (rel ? rel + '/' : '') + n }); toast('Folder made'); reload(); } catch (e) { oops(e); } };
+    const rename = async (x) => { const n = await askText(x.dir ? 'Rename folder' : 'Rename file', 'New name', x.name, 'Rename'); if (!n || n === x.name) return; try { await api('POST', `/api/share/${enc(id)}/move`, { from: x.path, name: n }); toast('Renamed'); reload(); } catch (e) { oops(e); } };
+    const remove = async (paths) => {
+      const one = paths.length === 1 ? r.items.find((x) => x.path === paths[0]) : null;
+      if (!(await sure(one ? `Delete “${one.name}”?` : `Delete ${paths.length} items?`, `${one && one.dir ? 'The folder and everything in it disappears' : 'They disappear'} for everyone in this shared folder. The production team can still get ${paths.length === 1 ? 'it' : 'them'} back for 30 days.`))) return;
+      try { await api('POST', `/api/share/${enc(id)}/delete`, { paths }); toast(paths.length === 1 ? 'Deleted' : `${paths.length} deleted`); sel.clear(); reload(); } catch (e) { oops(e); }
+    };
+    const moveTo = async (paths) => {
+      const dest = await folderPicker(id, s.name, rel, paths);
+      if (dest === false || dest === null) return;
+      let n = 0;
+      for (const p of paths) { const name = p.split('/').pop(); try { await api('POST', `/api/share/${enc(id)}/move`, { from: p, to: (dest ? dest + '/' : '') + name }); n++; } catch (e) { oops(e); } }
+      if (n) toast(`Moved ${n === 1 ? '' : n + ' items '}to ${dest || s.name}`); sel.clear(); reload();
+    };
+    const itemMenu = (x, btn) => menuAt(btn, [
+      [x.dir ? 'Open' : 'Open / view', () => openItem(x)],
+      [x.dir ? 'Download as ZIP' : 'Download', () => download(dlUrl(x))],
+      canEdit && ['Rename…', () => rename(x)],
+      canEdit && ['Move to…', () => moveTo([x.path])],
+      canEdit && ['Delete', () => remove([x.path]), { danger: true }],
+    ]);
+    // the bar: normal, or what to do with the ticked items
+    const bar = h('div', { class: 'toolbar' });
+    const paintBar = () => {
+      body.querySelectorAll('[data-p]').forEach((el) => { el.classList.toggle('sel', sel.has(el.dataset.p)); const c = el.querySelector('input[type=checkbox]'); if (c) c.checked = sel.has(el.dataset.p); });
+      const all = body.querySelector('.all-box'); if (all) all.checked = r.items.length > 0 && r.items.every((x) => sel.has(x.path));
+      if (sel.size) {
+        fill(bar, h('b', { class: 'selcount' }, `${sel.size} selected`),
+          h('button', { class: 'sm primary', onclick: () => download(zipUrl([...sel])) }, '⬇ Download'),
+          canEdit ? h('button', { class: 'sm', onclick: () => moveTo([...sel]) }, 'Move to…') : null,
+          canEdit ? h('button', { class: 'sm danger', onclick: () => remove([...sel]) }, 'Delete') : null,
+          h('span', { class: 'grow' }), h('button', { class: 'sm ghost', onclick: () => { sel.clear(); paintBar(); } }, '✕ Cancel'));
+        bar.classList.add('selecting'); return;
+      }
+      bar.classList.remove('selecting');
+      fill(bar,
+        canEdit ? h('button', { class: 'sm', title: 'Make a folder inside this one', onclick: newFolder }, '+ New folder') : null,
+        r.items.length ? h('button', { class: 'sm', title: 'Everything in this folder as one ZIP file', onclick: () => download(zipUrl([rel])) }, '⬇ Download all') : null,
+        h('span', { class: 'grow' }),
+        h('div', { class: 'seg', title: 'How to show the files' }, h('button', { class: viewMode === 'list' ? 'on' : '', onclick: () => setView('list') }, '☰ List'), h('button', { class: viewMode === 'tiles' ? 'on' : '', onclick: () => setView('tiles') }, '▦ Grid')),
+        h('button', { class: 'sm', title: 'Who uploaded, changed or commented, and when', onclick: () => historyPanel(id) }, 'History'),
+        h('button', { class: 'sm', title: s.role === 'manager' ? 'Invite people, change who can do what' : 'Your email settings for this folder', onclick: () => peoplePanel(id, s, reload) }, s.role === 'manager' ? `👥 Who has access (${(s.members || []).length})` : 'Email me…'));
+    };
+    const setView = (v) => { viewMode = v; try { localStorage.setItem('rfp-share-view', viewMode); } catch { /* fine */ } reload(); };
+    const toggle = (x, on) => { if (on) sel.add(x.path); else sel.delete(x.path); paintBar(); };
+    // previews in the list and the grid: photos and video stills (ffmpeg on the server, or the browser itself for
+    // mp4 / webm / mov), the first lines of text files; the file type when there is nothing to show
     const WEBV = /\.(mp4|m4v|webm|mov)$/i;
     const thumbOf = (x) => {
       const ext = (x.name.split('.').pop() || '').toUpperCase().slice(0, 5);
-      const t = h('div', { class: 'thumb' + (x.dir ? ' folder' : '') + ' k-' + x.kind }, h('span', { class: 'tlabel' }, x.dir ? 'FOLDER' : ext));
+      const t = h('div', { class: 'thumb' + (x.dir ? ' folder' : '') + ' k-' + x.kind }, h('span', { class: 'tlabel' }, x.dir ? '📁' : ext));
       if (x.dir) return t;
       const fileUrl = `/api/share/${enc(id)}/file?path=${enc(x.path)}&download=0`;
       const asVideo = () => { if (!WEBV.test(x.name)) return; const v = h('video', { src: fileUrl + '#t=1', muted: true, preload: 'metadata', playsinline: true }); v.muted = true; v.addEventListener('loadeddata', () => t.classList.add('has'), { once: true }); v.addEventListener('error', () => v.remove(), { once: true }); t.prepend(v); };
@@ -278,29 +375,52 @@
       return t;
     };
     const openItem = (x) => (x.dir ? go(url(x.path)) : preview(id, files, files.indexOf(x), s, reload));
-    const tick = (x) => h('input', { type: 'checkbox', checked: sel.has(x.path), onclick: (e) => e.stopPropagation(), onchange: (e) => { if (e.target.checked) sel.add(x.path); else sel.delete(x.path); paintSel(); } });
-    const rowMenu = (x) => canEdit ? h('button', { class: 'menu-btn', title: 'Rename or move', onclick: async (e) => {
-      e.stopPropagation();
-      const to = prompt('New name, or a path to move it (Day 2/' + x.name + ')', x.name);
-      if (!to || to === x.name) return;
-      try { await api('POST', `/api/share/${enc(id)}/move`, to.includes('/') ? { from: x.path, to } : { from: x.path, name: to }); reload(); } catch (err) { oops(err); }
-    } }, '⋯') : null;
+    const tick = (x) => h('input', { type: 'checkbox', title: 'Select', 'aria-label': 'Select ' + x.name, checked: sel.has(x.path), onclick: (e) => e.stopPropagation(), onchange: (e) => toggle(x, e.target.checked) });
+    const acts = (x) => h('div', { class: 'acts' },
+      h('a', { class: 'ico', title: x.dir ? 'Download the folder as a ZIP' : 'Download', href: dlUrl(x), onclick: (e) => e.stopPropagation() }, '⬇'),
+      h('button', { class: 'ico', title: 'More: rename, move, delete …', onclick: (e) => { e.stopPropagation(); itemMenu(x, e.currentTarget); } }, '⋯'));
+    const what = (x) => (x.dir ? 'Folder' : { image: 'Photo', video: 'Video', audio: 'Audio', pdf: 'PDF', text: 'Text', doc: 'Document', archive: 'ZIP / archive' }[x.kind] || 'File');
     let list;
-    if (!r.items.length) list = h('div', { class: 'empty' }, canEdit ? 'This folder is empty. Drag files or whole folders here, or press Upload.' : 'This folder is empty.');
-    else if (viewMode === 'tiles') list = h('div', { class: 'tiles' }, r.items.map((x) => h('div', { class: 'tile', 'data-p': x.path, onclick: () => openItem(x) }, thumbOf(x), tick(x), h('div', { class: 'nm', title: x.name }, x.name, x.comments ? h('span', { class: 'cm' }, ` 💬${x.comments}`) : null))));
-    else list = h('table', { class: 'files' }, h('thead', {}, h('tr', {}, h('th', { style: { width: '28px' } }, h('input', { type: 'checkbox', title: 'Select all', onchange: (e) => { r.items.forEach((x) => (e.target.checked ? sel.add(x.path) : sel.delete(x.path))); body.querySelectorAll('td input[type=checkbox]').forEach((c) => { c.checked = e.target.checked; }); paintSel(); } })), h('th', {}, 'Name'), h('th', { class: 'r' }, 'Size'), h('th', { class: 'hide-sm' }, 'Added by'), h('th', { class: 'hide-sm' }, 'Changed'), h('th', {}))),
-      h('tbody', {}, r.items.map((x) => h('tr', { 'data-p': x.path }, h('td', {}, tick(x)), h('td', {}, h('div', { class: 'fname', onclick: () => openItem(x) }, thumbOf(x), h('span', {}, x.name), x.comments ? h('span', { class: 'cm' }, '💬 ' + x.comments) : null)),
-        h('td', { class: 'r nowrap dim' }, x.dir ? '' : size(x.size)), h('td', { class: 'hide-sm dim small' }, x.by || ''), h('td', { class: 'hide-sm dim small nowrap' }, when(x.mtime)), h('td', { class: 'r' }, rowMenu(x))))));
+    if (!r.items.length) list = h('div', { class: 'empty big-empty' }, h('div', { class: 'em-ico' }, '📂'), h('h2', {}, 'This folder is empty'),
+      h('p', { class: 'dim' }, canEdit ? (innerWidth > 900 ? 'Add files with the green + on the left, or drag them onto this page.' : 'Add files with the green + above.') : 'Nothing has been added yet. You get an email when files arrive.'));
+    else if (viewMode === 'tiles') list = h('div', { class: 'tiles' }, r.items.map((x) => h('div', { class: 'tile', 'data-p': x.path, tabindex: 0, title: x.dir ? 'Open the folder' : 'Open ' + x.name, onclick: () => openItem(x), onkeydown: (e) => { if (e.key === 'Enter') openItem(x); } },
+      thumbOf(x), tick(x), acts(x), h('div', { class: 'nm', title: x.name }, x.name, h('div', { class: 'dim small' }, x.dir ? 'Folder' : size(x.size), x.comments ? h('span', { class: 'cm' }, `  💬 ${x.comments}`) : null)))));
+    else list = h('table', { class: 'files' }, h('thead', {}, h('tr', {}, h('th', { style: { width: '28px' } }, h('input', { type: 'checkbox', class: 'all-box', title: 'Select everything', onchange: (e) => { r.items.forEach((x) => (e.target.checked ? sel.add(x.path) : sel.delete(x.path))); paintBar(); } })),
+      h('th', {}, 'Name'), h('th', { class: 'r' }, 'Size'), h('th', { class: 'hide-sm' }, 'Added by'), h('th', { class: 'hide-sm' }, 'When'), h('th', {}))),
+      h('tbody', {}, r.items.map((x) => h('tr', { 'data-p': x.path, class: 'click', tabindex: 0, title: x.dir ? 'Open the folder' : 'Open ' + x.name, onclick: () => openItem(x), onkeydown: (e) => { if (e.key === 'Enter') openItem(x); } },
+        h('td', { onclick: (e) => e.stopPropagation() }, tick(x)),
+        h('td', {}, h('div', { class: 'fname' }, thumbOf(x), h('div', { style: { minWidth: 0 } }, h('span', { class: 'fn' }, x.name), h('div', { class: 'dim small show-sm' }, what(x) + (x.dir ? '' : ' · ' + size(x.size)))), x.comments ? h('span', { class: 'cm', title: 'Comments' }, '💬 ' + x.comments) : null)),
+        h('td', { class: 'r nowrap dim hide-xs' }, x.dir ? '' : size(x.size)), h('td', { class: 'hide-sm dim small' }, x.by || ''), h('td', { class: 'hide-sm dim small nowrap' }, when(x.mtime)), h('td', { class: 'r' }, acts(x))))));
     const body = h('div', { class: 'drop' }, list);
     const key = id + '|' + rel;
     const panel = !canEdit ? null : opts.keepPanel && PANEL && PANEL.key === key ? PANEL : Object.assign(xferPanel({ targets: [], fixed: { id, name: s.name, dir: rel }, after: reload }), { key });
     if (!panel) PANEL = null;
     const right = h('div', { class: 'right' });
     fill(main, h('div', { class: panel ? 'two' : '' }, panel ? panel.el : null, right));
-    fill(right, h('div', { class: 'spread' }, h('div', {}, crumbs), h('span', { class: 'pill ' + s.role }, s.role === 'manager' ? 'You manage this folder' : s.role === 'editor' ? 'You can upload' : 'You can view and download')),
-      s.expires ? h('div', { class: 'expiry' + ((Date.parse(s.expires) - Date.now()) < 4 * 864e5 ? ' soon' : '') }, `This folder and its files are removed from the server on ${new Date(s.expires + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}. Download what you want to keep before then.`) : null,
-      toolbar, body, r.free != null && canEdit ? h('p', { class: 'dim small', style: { marginTop: '14px' } }, `${size(r.free)} free on the server.`) : null);
-    paintSel();
+    const roleText = s.role === 'manager' ? 'You manage this folder' : s.role === 'editor' ? 'You can add and change files' : 'You can look and download';
+    fill(right, h('div', { class: 'spread' }, crumbs, h('span', { class: 'pill ' + s.role, title: roleText }, roleText)),
+      parts.length ? null : h('h1', { class: 'ftitle' }, s.name),
+      parts.length ? h('h1', { class: 'ftitle' }, parts[parts.length - 1]) : null,
+      s.expires ? h('div', { class: 'expiry' + ((Date.parse(s.expires) - Date.now()) < 4 * 864e5 ? ' soon' : '') }, `⏳ This folder is removed on ${new Date(s.expires + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}. Download what you want to keep before then.`) : null,
+      bar, body, r.free != null && canEdit ? h('p', { class: 'dim small', style: { marginTop: '14px' } }, `${size(r.free)} of space left.`) : null);
+    paintBar();
+  }
+  // choose a folder inside a shared folder (for Move to…): walk in, go back, "Move here"
+  function folderPicker(id, rootName, start, moving) {
+    let at = start;
+    const box = h('div', { class: 'picker' });
+    const paint = async () => {
+      fill(box, h('p', { class: 'dim' }, 'Loading…'));
+      let r; try { r = await api('GET', `/api/share/${enc(id)}/list?path=${enc(at)}`); } catch (e) { fill(box, h('p', { class: 'err' }, e.message)); return; }
+      const dirs = r.items.filter((x) => x.dir && !moving.includes(x.path));
+      const parts = at ? at.split('/') : [];
+      fill(box, h('div', { class: 'crumbs small' }, h('a', { href: '#', onclick: (e) => { e.preventDefault(); at = ''; paint(); } }, rootName), parts.map((x, i) => [h('i', {}, '/'), h('a', { href: '#', onclick: (e) => { e.preventDefault(); at = parts.slice(0, i + 1).join('/'); paint(); } }, x)])),
+        h('div', { class: 'pick-list' }, at ? h('button', { class: 'pick', onclick: () => { at = parts.slice(0, -1).join('/'); paint(); } }, '↑ Up one level') : null,
+          dirs.length ? dirs.map((d) => h('button', { class: 'pick', onclick: () => { at = d.path; paint(); } }, '📁 ' + d.name, h('span', { class: 'dim' }, ' ›'))) : h('p', { class: 'dim small' }, 'No folders in here.')),
+        h('p', { class: 'small' }, 'Moving to: ', h('b', {}, at ? rootName + ' / ' + at : rootName)));
+    };
+    paint();
+    return dialog({ title: `Move ${moving.length === 1 ? '“' + moving[0].split('/').pop() + '”' : moving.length + ' items'}`, text: 'Open the folder they should go to, then press Move here.', body: box, ok: 'Move here', onOk: () => (at === start ? Promise.reject(new Error('They are already here: open another folder first')) : at) });
   }
   // files and folders dropped on the page (folders are walked)
   async function dropped(dt) {
@@ -368,14 +488,21 @@
   addEventListener('beforeunload', (e) => { if (Q.some((x) => x.state === 'sending' || x.state === 'waiting')) { e.preventDefault(); e.returnValue = ''; } });
 
   // ---------------------------------------------------------------- preview with comments
-  function preview(id, files, i, s, reload) {
-    const x = files[i]; if (!x) return;
+  // One viewer for the whole folder: ‹ › (or ← →), a swipe on phones, a scroll or trackpad swipe on computers go to the
+  // next or previous file, in the same window; in full screen it stays full screen.
+  function preview(id, files, start, s, reload) {
+    if (!files[start]) return;
+    let i = start, x = files[i], media = null, dirty = false, seq = 0;
     const fileUrl = (dl) => `/api/share/${enc(id)}/file?path=${enc(x.path)}${dl ? '' : '&download=0'}`;
-    const pv = `/api/share/${enc(id)}/preview?path=${enc(x.path)}`;
-    const stage = h('div', { class: 'pv-body' }, h('p', { class: 'dim' }, 'Loading…'));
-    let media = null;
-    const close = () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); modal.remove(); document.removeEventListener('keydown', key); document.removeEventListener('fullscreenchange', fsPaint); stopPolls(); if (dirty) reload(); };
-    // full screen: the picture, video, PDF or text alone on the whole screen (Esc or the button to come back)
+    const pvUrl = () => `/api/share/${enc(id)}/preview?path=${enc(x.path)}`;
+    const slot = h('div', { class: 'pv-slot' }, h('p', { class: 'dim' }, 'Loading…'));
+    const prevB = h('button', { class: 'pv-nav', style: { left: '8px' }, title: 'Previous (←)', onclick: (e) => { e.stopPropagation(); step(-1); } }, '‹');
+    const nextB = h('button', { class: 'pv-nav', style: { right: '8px' }, title: 'Next (→)', onclick: (e) => { e.stopPropagation(); step(1); } }, '›');
+    const count = h('span', { class: 'pv-count' });
+    const stage = h('div', { class: 'pv-body' }, slot, prevB, nextB, count);
+    const nameEl = h('b', { class: 'grow' }), infoEl = h('span', { class: 'dim small nowrap' }), dlA = h('a', { class: 'btn sm primary' }, '⬇ Download');
+    const close = () => { stopMedia(); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); modal.remove(); document.removeEventListener('keydown', key); document.removeEventListener('fullscreenchange', fsPaint); stopPolls(); if (dirty) reload(); };
+    // full screen: the file alone on the whole screen; going to the next one keeps it (the same element stays full screen)
     const fsBtn = h('button', { class: 'sm', title: 'Full screen (F)' }, '⛶ Full screen');
     const toggleFs = () => {
       if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
@@ -385,27 +512,63 @@
     const fsPaint = () => { fsBtn.textContent = document.fullscreenElement ? '⛶ Exit full screen' : '⛶ Full screen'; };
     fsBtn.onclick = toggleFs;
     document.addEventListener('fullscreenchange', fsPaint);
-    let dirty = false;
-    const key = (e) => { if (e.target.closest && e.target.closest('textarea,input')) return; if (e.key === 'Escape' && !document.fullscreenElement) close(); if (e.key === 'f' || e.key === 'F') toggleFs(); if (e.key === 'ArrowRight' && files[i + 1]) { close(); preview(id, files, i + 1, s, reload); } if (e.key === 'ArrowLeft' && i > 0) { close(); preview(id, files, i - 1, s, reload); } };
+    const stopMedia = () => { if (media && media.pause) { try { media.pause(); media.removeAttribute('src'); media.load && media.load(); } catch { /* gone */ } } media = null; };
+    function step(d) {
+      const n = i + d;
+      if (n < 0 || n >= files.length) { stage.classList.remove('bump'); void stage.offsetWidth; stage.classList.add('bump'); return; }
+      i = n; x = files[i]; stopMedia(); stopPolls();
+      slot.classList.remove('in-l', 'in-r'); void slot.offsetWidth; slot.classList.add(d > 0 ? 'in-r' : 'in-l');
+      paintHead(); show(); loadC();
+    }
+    const key = (e) => { if (e.target.closest && e.target.closest('textarea,input')) return; if (e.key === 'Escape') { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else close(); } if (e.key === 'f' || e.key === 'F') toggleFs(); if (e.key === 'ArrowRight') step(1); if (e.key === 'ArrowLeft') step(-1); };
     document.addEventListener('keydown', key);
+    // swipe (touch / pen) left or right; not when it starts on a video's controls at the bottom
+    let sw = null;
+    stage.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') return; const r = stage.getBoundingClientRect(); if (e.target.tagName === 'VIDEO' && e.clientY > r.bottom - 70) return; sw = { x: e.clientX, y: e.clientY, t: Date.now() }; });
+    stage.addEventListener('pointerup', (e) => { if (!sw) return; const dx = e.clientX - sw.x, dy = e.clientY - sw.y, dt = Date.now() - sw.t; sw = null; if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.4 && dt < 800) step(dx < 0 ? 1 : -1); });
+    stage.addEventListener('pointercancel', () => { sw = null; });
+    // scroll wheel / trackpad: sideways always; up and down too on photos and videos (PDFs and text scroll themselves)
+    let wheelAt = 0, wheelSum = 0;
+    stage.addEventListener('wheel', (e) => {
+      const flat = ['image', 'video', 'audio'].includes(x.kind) || !['pdf', 'text'].includes(x.kind);
+      const side = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+      if (!side && !flat) return;
+      e.preventDefault();
+      if (Date.now() - wheelAt < 450) return;
+      wheelSum += side ? e.deltaX : e.deltaY;
+      if (Math.abs(wheelSum) > 40) { wheelAt = Date.now(); const d = wheelSum > 0 ? 1 : -1; wheelSum = 0; step(d); }
+    }, { passive: false });
+    function paintHead() {
+      nameEl.textContent = x.name; nameEl.title = x.path;
+      infoEl.textContent = size(x.size) + (x.by ? ' · ' + x.by : '');
+      dlA.href = fileUrl(true);
+      count.textContent = files.length > 1 ? `${i + 1} / ${files.length}` : '';
+      prevB.hidden = i === 0; nextB.hidden = i >= files.length - 1;
+      atBox.style.display = x.kind === 'video' || x.kind === 'audio' ? 'flex' : 'none';
+    }
     async function show() {
-      if (x.kind === 'pdf') { fill(stage, h('iframe', { src: fileUrl(false) })); return; }
-      if (x.kind === 'text') { try { const t = await (await fetch(fileUrl(false), { credentials: 'same-origin' })).text(); fill(stage, h('pre', {}, t.slice(0, 500000))); } catch (e) { fill(stage, h('p', {}, e.message)); } return; }
-      if (!['image', 'video', 'audio'].includes(x.kind)) { fill(stage, h('div', { class: 'empty' }, h('p', {}, 'This kind of file cannot be shown in the browser.'), h('a', { class: 'btn primary', href: fileUrl(true) }, '⬇ Download ' + size(x.size)))); return; }
-      const j = await api('GET', pv + '&check=1').catch((e) => ({ error: e.message }));
-      if (j.error) { fill(stage, h('div', { class: 'empty' }, h('p', {}, j.error), h('a', { class: 'btn primary', href: fileUrl(true) }, '⬇ Download'))); return; }
-      if (j._status === 202) { fill(stage, h('div', { class: 'empty' }, h('p', {}, `Making a preview of this ${x.kind} for the browser… ${j.progress || 0}%`), h('p', { class: 'dim small' }, 'Large camera files take a while the first time. You can close this and come back.'))); polls.push(setTimeout(show, 3000)); return; }
-      if (x.kind === 'image') media = h('img', { src: pv, alt: x.name });
-      if (x.kind === 'image') media.addEventListener('dblclick', toggleFs);
-      else media = h(x.kind, { src: pv, controls: true, autoplay: true, preload: 'metadata' });
-      fill(stage, media);
-      if (i > 0) stage.append(h('button', { class: 'pv-nav', style: { left: '8px' }, onclick: () => { close(); preview(id, files, i - 1, s, reload); } }, '‹'));
-      if (files[i + 1]) stage.append(h('button', { class: 'pv-nav', style: { right: '8px' }, onclick: () => { close(); preview(id, files, i + 1, s, reload); } }, '›'));
+      const my = ++seq, still = () => my === seq;
+      fill(slot, h('p', { class: 'dim' }, 'Loading…'));
+      if (x.kind === 'pdf') { fill(slot, h('iframe', { src: fileUrl(false) })); return; }
+      if (x.kind === 'text') { try { const t = await (await fetch(fileUrl(false), { credentials: 'same-origin' })).text(); if (still()) fill(slot, h('pre', {}, t.slice(0, 500000))); } catch (e) { if (still()) fill(slot, h('p', {}, e.message)); } return; }
+      if (!['image', 'video', 'audio'].includes(x.kind)) { fill(slot, h('div', { class: 'empty' }, h('p', {}, 'This kind of file cannot be shown in the browser.'), h('a', { class: 'btn primary', href: fileUrl(true) }, '⬇ Download ' + size(x.size)))); return; }
+      const j = await api('GET', pvUrl() + '&check=1').catch((e) => ({ error: e.message }));
+      if (!still()) return;
+      if (j.error) { fill(slot, h('div', { class: 'empty' }, h('p', {}, j.error), h('a', { class: 'btn primary', href: fileUrl(true) }, '⬇ Download'))); return; }
+      if (j._status === 202) { fill(slot, h('div', { class: 'empty' }, h('p', {}, `Making a preview of this ${x.kind} for the browser… ${j.progress || 0}%`), h('p', { class: 'dim small' }, 'Large camera files take a while the first time. Go to another file and come back later.'))); polls.push(setTimeout(() => { if (still()) show(); }, 3000)); return; }
+      if (x.kind === 'image') { media = h('img', { src: pvUrl(), alt: x.name, draggable: 'false' }); media.addEventListener('dblclick', toggleFs); }
+      else media = h(x.kind, { src: pvUrl(), controls: true, autoplay: true, preload: 'metadata', playsinline: true });
+      fill(slot, media);
+      // the next photo loads in the background, so swiping on is quick
+      const nx = files[i + 1]; if (nx && nx.kind === 'image') { const im = new Image(); im.src = `/api/share/${enc(id)}/preview?path=${enc(nx.path)}`; }
     }
     // comments
     const list = h('div', { class: 'comments' }), txt = h('textarea', { rows: 3, placeholder: 'Comment…' }), atTc = h('input', { type: 'checkbox', checked: true });
+    const atBox = h('label', { class: 'small dim', style: { display: 'flex', gap: '6px', alignItems: 'center' } }, atTc, 'At the current time');
     async function loadC() {
-      let r; try { r = await api('GET', `/api/share/${enc(id)}/comments?path=${enc(x.path)}`); } catch (e) { fill(list, h('p', { class: 'err' }, e.message)); return; }
+      const forPath = x.path;
+      let r; try { r = await api('GET', `/api/share/${enc(id)}/comments?path=${enc(forPath)}`); } catch (e) { fill(list, h('p', { class: 'err' }, e.message)); return; }
+      if (forPath !== x.path) return;
       fill(list, ...(r.comments.length ? r.comments.map((c) => h('div', { class: 'c' }, h('div', { class: 'w' }, h('b', {}, c.name), h('span', {}, when(c.at)), c.tc != null ? h('span', { class: 'tc', title: 'Go there', onclick: () => { if (media && media.currentTime !== undefined) { media.currentTime = c.tc; media.play && media.play().catch(() => {}); } } }, '@' + tcText(c.tc)) : null,
         h('span', { class: 'grow' }), c.canRemove ? h('button', { class: 'sm ghost', title: 'Remove', onclick: async () => { await api('DELETE', `/api/share/${enc(id)}/comments/${enc(c.id)}`).catch(oops); dirty = true; loadC(); } }, '✕') : null), h('p', {}, c.text)))
         : [h('p', { class: 'dim small' }, 'No comments yet.')]));
@@ -417,13 +580,13 @@
     };
     txt.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addC(); });
     const modal = h('div', { class: 'modal' }, h('div', { class: 'pv' },
-      h('div', { class: 'pv-main' }, h('div', { class: 'pv-head' }, h('b', { class: 'grow', title: x.path }, x.name), h('span', { class: 'dim small nowrap' }, size(x.size) + (x.by ? ' · ' + x.by : '')),
-        fsBtn, h('a', { class: 'btn sm primary', href: fileUrl(true) }, '⬇ Download'), h('button', { class: 'sm', onclick: close }, '✕')), stage),
-      h('div', { class: 'pv-side' }, h('h3', {}, 'Comments'), list, h('div', { class: 'cform' }, txt,
-        x.kind === 'video' || x.kind === 'audio' ? h('label', { class: 'small dim', style: { display: 'flex', gap: '6px', alignItems: 'center' } }, atTc, 'At the current time') : null,
-        h('button', { class: 'primary sm', onclick: addC }, 'Comment')))));
+      h('div', { class: 'pv-main' }, h('div', { class: 'pv-head' }, nameEl, infoEl, fsBtn, dlA, h('button', { class: 'sm', onclick: close }, '✕')), stage),
+      h('div', { class: 'pv-side' }, h('h3', {}, 'Comments'), list, h('div', { class: 'cform' }, txt, atBox, h('button', { class: 'primary sm', onclick: addC }, 'Comment')))));
     document.body.append(modal);
-    show(); loadC();
+    paintHead(); show(); loadC();
+    // the first time: how to go to the next file
+    let hinted = false; try { hinted = localStorage.getItem('rfp-share-swipe') === '1'; localStorage.setItem('rfp-share-swipe', '1'); } catch { hinted = true; }
+    if (!hinted && files.length > 1) { const tip = h('div', { class: 'pv-tip' }, matchMedia('(pointer: coarse)').matches ? 'Swipe left or right for the next file' : 'Use ← → (or scroll) for the next file · F for full screen'); stage.append(tip); setTimeout(() => tip.remove(), 3500); }
   }
 
   // ---------------------------------------------------------------- side panels: people, activity
@@ -436,19 +599,20 @@
   async function peoplePanel(id, s, reload) {
     if (s.role !== 'manager') {
       const cb = h('input', { type: 'checkbox', checked: s.notify !== false, onchange: async (e) => { try { await api('PUT', `/api/share/${enc(id)}/people/${enc(ME.email)}`, { notify: e.target.checked }); toast('Saved'); } catch (err) { oops(err); } } });
-      sidePanel('Emails', h('label', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, cb, 'Email me when new files or comments are added (at most every 10 minutes)'));
+      sidePanel('Emails', h('label', { style: { display: 'flex', gap: '10px', alignItems: 'center' } }, cb, 'Send me an email when files or comments are added to this folder (at most one every 10 minutes). You always get an email when someone sends files to you.'));
       return;
     }
     const info = await api('GET', `/api/share/${enc(id)}`).catch((e) => { oops(e); return null; });
     if (!info) return;
-    const emails = h('textarea', { rows: 3, placeholder: 'one@example.com, two@example.com' }), role = h('select', {}, h('option', { value: 'viewer' }, 'Viewer: see and download'), h('option', { value: 'editor' }, 'Editor: also upload, rename, delete')), note = h('textarea', { rows: 2, placeholder: 'A message in the invite (optional)' });
+    const emails = h('textarea', { rows: 3, placeholder: 'one@example.com, two@example.com' }), role = h('select', {}, h('option', { value: 'viewer' }, 'Can look and download'), h('option', { value: 'editor' }, 'Can also add, rename, move and delete files')), note = h('textarea', { rows: 2, placeholder: 'A message in the invite (optional)' });
     const out = h('div', {});
-    const members = h('div', {}, (info.members || []).length ? info.members.map((m) => h('div', { class: 'mem' }, h('div', {}, h('div', {}, m.email), h('div', { class: 'dim small' }, (m.accepted ? 'Joined' : 'Invited') + ' ' + when(m.at) + ' by ' + m.invitedBy)),
-      h('select', { onchange: async (e) => { try { await api('PUT', `/api/share/${enc(id)}/people/${enc(m.email)}`, { role: e.target.value }); toast('Saved'); } catch (err) { oops(err); } } }, ['viewer', 'editor'].map((v) => h('option', { value: v, selected: m.role === v }, v === 'viewer' ? 'Viewer' : 'Editor'))),
-      h('button', { class: 'sm ghost danger', title: 'Remove', onclick: async () => { if (!confirm(`Remove ${m.email} from this folder?`)) return; try { await api('DELETE', `/api/share/${enc(id)}/people/${enc(m.email)}`); peoplePanel(id, s, reload); } catch (err) { oops(err); } } }, '✕')))
-      : h('p', { class: 'dim' }, 'Nobody invited yet. Producers and Admins of the team always have access.'));
-    sidePanel('People', h('div', {},
-      h('label', { class: 'f' }, h('span', {}, 'Invite by email'), emails), h('label', { class: 'f' }, h('span', {}, 'As'), role), h('label', { class: 'f' }, h('span', {}, 'Message'), note),
+    const members = h('div', {}, (info.members || []).length ? info.members.map((m) => h('div', { class: 'mem' }, h('div', {}, h('div', {}, m.email), h('div', { class: 'dim small' }, (m.accepted ? '✓ Has opened the folder' : 'Has not opened the invitation yet') + ' · invited ' + when(m.at))),
+      h('select', { onchange: async (e) => { try { await api('PUT', `/api/share/${enc(id)}/people/${enc(m.email)}`, { role: e.target.value }); toast('Saved'); } catch (err) { oops(err); } } }, ['viewer', 'editor'].map((v) => h('option', { value: v, selected: m.role === v }, v === 'viewer' ? 'Can look' : 'Can add files'))),
+      h('button', { class: 'sm ghost danger', title: 'Remove', onclick: async () => { if (!(await sure(`Take away ${m.email}'s access?`, 'They can no longer open this folder, and their invitation link stops working.', 'Take away access'))) return; try { await api('DELETE', `/api/share/${enc(id)}/people/${enc(m.email)}`); peoplePanel(id, s, reload); } catch (err) { oops(err); } } }, '✕')))
+      : h('p', { class: 'dim' }, 'Nobody invited yet. The production team (Producers and Admins) always has access.'));
+    sidePanel('Who has access', h('div', {},
+      h('p', { class: 'dim small', style: { marginTop: 0 } }, 'Invite someone by email. They get a link, and sign in with Google or make a password the first time.'),
+      h('label', { class: 'f' }, h('span', {}, 'Their email addresses'), emails), h('label', { class: 'f' }, h('span', {}, 'What they can do'), role), h('label', { class: 'f' }, h('span', {}, 'A message in the email (optional)'), note),
       h('button', { class: 'primary', onclick: async () => {
         try {
           const r = await api('POST', `/api/share/${enc(id)}/people`, { emails: emails.value, role: role.value, note: note.value });
@@ -457,28 +621,32 @@
             r.links.length && r.mailed < r.links.length ? [h('p', { class: 'dim small' }, 'Email is not set up (or did not go out): send them their link yourself:'), r.links.map((l) => h('div', { class: 'small' }, l.email + ': ', h('a', { href: l.url }, l.url)))] : null);
           setTimeout(() => peoplePanel(id, s, reload).then(() => document.querySelector('.side-panel').append(out)), 300);
         } catch (e) { oops(e); }
-      } }, 'Invite'), out,
-      h('h2', { style: { marginTop: '22px' } }, 'Invited'), members,
-      h('h2', { style: { marginTop: '22px' } }, 'This folder'),
+      } }, 'Send the invitation'), out,
+      h('h2', { style: { marginTop: '22px' } }, 'People invited'), members,
+      h('h2', { style: { marginTop: '22px' } }, 'Folder settings'),
       (() => {
         const nm = h('input', { value: s.name }), ex = h('input', { type: 'date', value: s.expires || '', min: new Date(Date.now() + 864e5).toISOString().slice(0, 10) });
-        return [h('label', { class: 'f' }, h('span', {}, 'Name'), nm), h('label', { class: 'f' }, h('span', {}, 'Remove from the server on (empty = never)'), ex),
+        return [h('label', { class: 'f' }, h('span', {}, 'Name'), nm), h('label', { class: 'f' }, h('span', {}, 'Delete it automatically on (leave empty to keep it)'), ex),
           h('p', { class: 'dim small' }, 'On that day the folder and its files are removed for everyone. Three days before, the invited people get an email to download what they need.'),
           h('div', { class: 'row', style: { marginBottom: '10px' } }, h('button', { class: 'sm primary', onclick: async () => { try { await api('PUT', `/api/share/${enc(id)}`, { name: nm.value, expires: ex.value }); toast('Saved'); document.querySelector('.side-panel').remove(); reload(); } catch (e) { oops(e); } } }, 'Save'))];
       })(),
       h('div', { class: 'row' },
-        h('button', { class: 'sm danger', onclick: async () => { if (!confirm(`Delete the shared folder “${s.name}” for everyone? Its files are kept on the NAS for 30 days.`)) return; try { await api('DELETE', `/api/share/${enc(id)}`); document.querySelector('.side-panel').remove(); go('/'); } catch (e) { oops(e); } } }, 'Delete folder'))));
+        h('button', { class: 'sm danger', onclick: async () => { if (!(await sure(`Delete “${s.name}” for everyone?`, 'Nobody can open it any more. The production team can still get the files back for 30 days.', 'Delete the folder'))) return; try { await api('DELETE', `/api/share/${enc(id)}`); document.querySelector('.side-panel').remove(); go('/'); } catch (e) { oops(e); } } }, 'Delete this folder'))));
   }
-  async function transfersPanel(id) {
-    const r = await api('GET', '/api/share-transfers?share=' + enc(id)).catch((e) => { oops(e); return null; });
-    if (r) sidePanel('Transfers', transferList(r.transfers, { compact: true }));
-  }
-  async function activityPanel(id) {
-    const r = await api('GET', `/api/share/${enc(id)}/activity`).catch((e) => { oops(e); return null; });
-    if (!r) return;
-    const W = { transfer: 'sent files to', edit: 'changed the folder:', create: 'made the folder', upload: 'uploaded', folder: 'made the folder', delete: 'deleted', move: 'moved / renamed', comment: 'commented on', download: 'downloaded', invite: 'invited', uninvite: 'removed' };
-    sidePanel('Activity', r.activity.length ? r.activity.map((a) => h('div', { class: 'act' }, h('b', {}, a.name || a.email || 'Someone'), ' ', W[a.what] || a.what, ' ', a.target ? h('b', {}, a.target + (a.role ? ` (${a.role})` : '')) : null, a.path ? h('span', { class: 'ok' }, ' ' + a.path) : null,
-      a.text ? h('div', { class: 'dim small' }, '“' + a.text + '”' + (a.tc != null ? ' @' + tcText(a.tc) : '')) : null, h('div', { class: 'dim' }, new Date(a.at).toLocaleString('en-GB')))) : h('p', { class: 'dim' }, 'Nothing yet.'));
+  // History: the uploads (who sent what, to whom) and everything else that happened, in plain sentences
+  async function historyPanel(id) {
+    const [tx, ac] = await Promise.all([api('GET', '/api/share-transfers?share=' + enc(id)).catch(() => ({ transfers: [] })), api('GET', `/api/share/${enc(id)}/activity`).catch((e) => { oops(e); return null; })]);
+    if (!ac) return;
+    const W = { transfer: 'sent files to', edit: 'changed the folder:', create: 'made this shared folder', upload: 'added', folder: 'made the folder', delete: 'deleted', move: 'moved or renamed', comment: 'commented on', download: 'downloaded', invite: 'invited', uninvite: 'took away access for' };
+    const body = h('div', {});
+    let tab = 'uploads';
+    const paint = () => fill(body, h('div', { class: 'tabs2', style: { marginBottom: '12px' } }, h('button', { class: tab === 'uploads' ? 'on' : '', onclick: () => { tab = 'uploads'; paint(); } }, `Uploads (${tx.transfers.length})`), h('button', { class: tab === 'all' ? 'on' : '', onclick: () => { tab = 'all'; paint(); } }, 'Everything')),
+      tab === 'uploads' ? transferList(tx.transfers, { compact: true })
+        : ac.activity.length ? ac.activity.filter((a) => a.what !== 'upload' || !a.quiet).map((a) => h('div', { class: 'act' }, h('b', {}, a.name || a.email || 'Someone'), ' ', W[a.what] || a.what, ' ', a.target ? h('b', {}, a.target + (a.role ? ` (${a.role === 'editor' ? 'can add files' : 'can view'})` : '')) : null, a.path ? h('span', { class: 'ok' }, ' ' + a.path) : null,
+          a.count ? h('span', { class: 'dim' }, ` (${a.count} file${a.count === 1 ? '' : 's'})`) : null,
+          a.text ? h('div', { class: 'dim small' }, '“' + a.text + '”' + (a.tc != null ? ' at ' + tcText(a.tc) : '')) : null, h('div', { class: 'dim' }, when(a.at)))) : h('p', { class: 'dim' }, 'Nothing has happened yet.'));
+    paint();
+    sidePanel('History', body);
   }
 
   (async () => { try { CFG = await api('GET', '/api/config'); } catch { CFG = {}; } route(); })();

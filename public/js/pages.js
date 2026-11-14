@@ -254,7 +254,9 @@
           ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('thead', {}, h('tr', {}, multi ? h('th', { class: 'pick' }, h('input', { type: 'checkbox', checked: allOn, title: 'Select all shown', 'aria-label': 'Select all', onchange: (ev) => { for (const d of docs) { if (ev.target.checked) picked.add(d.id); else picked.delete(d.id); } paint(); } })) : null, cols.map(th))),
             h('tbody', {}, docs.map((d) => h('tr', { class: 'click' + (picked.has(d.id) ? ' picked' : ''), tabindex: '0', style: d.data.archived ? { opacity: '.45' } : {}, onclick: () => { location.hash = `#/edit/${type}/${d.id}`; }, onkeydown: (ev) => { if (ev.key === 'Enter') location.hash = `#/edit/${type}/${d.id}`; } },
               multi ? tick(d) : null, cols.map((f) => h('td', { class: f.t === 'money' || f.t === 'number' ? 'r num' : '' }, cell(type, f, d.data[f.k], d.data))))))))
-          : h('div', { class: 'card empty' }, filtered ? 'Nothing matches the search and filters.' : `No ${e.plural.toLowerCase()} yet.`, ' ', App.canCreate(type) && !filtered ? h('a', { href: `#/edit/${type}/new` }, 'Add the first one') : null),
+          : filtered ? h('div', { class: 'card empty' }, 'Nothing matches the search and filters. ', h('a', { href: '#', onclick: (ev) => { ev.preventDefault(); st.q = ''; st.f = {}; st.archived = ''; st.from = ''; st.to = ''; route(); } }, 'Clear them'))
+            : h('div', { class: 'card empty big-empty' }, h('div', { class: 'em-title' }, `No ${e.plural.toLowerCase()} yet`), window.RFPHelp && RFPHelp.hint('#/list/' + type) ? h('p', { class: 'dim' }, RFPHelp.hint('#/list/' + type)) : null,
+              App.canCreate(type) ? h('a', { class: 'btn primary', href: `#/edit/${type}/new` }, '+ Add the first ' + e.label.toLowerCase()) : null),
         type === 'advert' ? adReport() : null);
       bar.paint();
     };

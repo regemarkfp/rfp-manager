@@ -66,6 +66,31 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   }
   // ---- following teams and clubs: match updates in the app, the browser and the inbox
   const following = (id) => !!(D && D.me && (D.me.follows || []).includes(id));
+  // a friendly box instead of the browser's own alert / confirm / prompt
+  function ask({ title, text, input, ok = 'OK', cancel = 'Cancel', danger }) {
+    return new Promise((resolve) => {
+      const inp = input ? el('input', { type: input.type || 'text', placeholder: input.placeholder || '', value: input.value || '', style: { width: '100%', marginTop: '8px' } }) : null;
+      const done = (v) => { wrap.remove(); resolve(v); };
+      const okB = el('button', { class: danger ? 'danger-solid' : 'primary', onclick: () => done(inp ? inp.value.trim() || null : true) }, ok);
+      const wrap = el('div', { class: 'modal', onclick: (e) => { if (e.target === wrap) done(inp ? null : false); } }, el('div', { class: 'modal-box', style: { textAlign: 'left' } }, el('h2', {}, title), text ? el('p', { class: 'sub' }, text) : null, inp,
+        el('div', { style: { display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' } }, cancel ? el('button', { onclick: () => done(inp ? null : false) }, cancel) : null, okB)));
+      wrap.addEventListener('keydown', (e) => { if (e.key === 'Enter') okB.click(); if (e.key === 'Escape') done(inp ? null : false); });
+      document.body.append(wrap); setTimeout(() => (inp || okB).focus(), 30);
+    });
+  }
+  // Help in the footer: the website in plain words
+  function helpBox() {
+    const q = (t, d) => el('div', { style: { margin: '12px 0' } }, el('b', {}, t), el('div', { class: 'sub' }, d));
+    const wrap = el('div', { class: 'modal', onclick: (e) => { if (e.target === wrap) wrap.remove(); } }, el('div', { class: 'modal-box', style: { textAlign: 'left', maxWidth: '520px' } },
+      el('button', { class: 'icon x', onclick: () => wrap.remove(), 'aria-label': 'Close' }, '✕'), el('h2', {}, 'Help'),
+      q('Watch', 'Browse shows everything: live streams, videos, series and matches. Use the search (⌕) and the filters to find something. Click to play.'),
+      q('Live streams and tickets', 'A stream with a price asks you to buy a ticket once; you get it by email and it works on all your devices.'),
+      q('Get told when a channel goes live', 'Sign in and press Subscribe on the channel. You can also follow teams for match updates.'),
+      q('Book us', 'Press Book services, fill in what you can, and send. We reply with a quote, usually the same day.'),
+      q('Quotes, invoices and paying', 'Use the link in our email. It shows your quotes and invoices; accept a quote or pay an invoice there.'),
+      q('Still stuck?', 'Reply to any of our emails, or use the contact details on Company information (at the bottom of every page).')));
+    document.body.append(wrap);
+  }
   const say = (t) => { const n = el('div', { class: 'toast' }, t); document.body.append(n); setTimeout(() => n.remove(), 3500); };
   // PayFast: start a payment (the server makes the signed form) and go there
   async function payGo(url, body = {}) {
@@ -263,7 +288,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const want = new URLSearchParams(location.search).get('pay');
     const payInvoice = async (x, btn, c) => {
       let email = c.clientEmail;
-      if (!email) { email = prompt('Your email address (for the PayFast receipt):', '') || ''; if (!email) return; }
+      if (!email) { email = (await ask({ title: 'Your email address', text: 'PayFast sends the receipt for this payment to it.', input: { type: 'email', placeholder: 'you@example.com' }, ok: 'Continue to pay' })) || ''; if (!email) return; }
       btn.disabled = true;
       try { await payGo(x.pay, { email }); } catch (e) { say(e.message); btn.disabled = false; }
     };
@@ -417,11 +442,11 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
             c.ads.length ? el('div', { class: 'up-list', style: { marginBottom: '14px' } }, c.ads.map((a) => el('div', { class: 'up-row' }, a.image ? el('img', { src: img(a.image), alt: '', style: { width: '140px', maxHeight: '70px', objectFit: 'contain', background: '#222' } }) : el('span', {}),
               el('div', { class: 'what' }, el('b', {}, a.name), el('span', { class: 'sub' }, (c.slots.find((s) => s.id === a.slot) || {}).name || '')),
               el('div', { class: 'row', style: { display: 'flex', gap: '6px', alignItems: 'center' } }, el('span', { class: 'chip' + (a.approval === 'Approved' ? ' on' : '') }, a.approval === 'Pending' ? 'Waiting for approval' : a.approval),
-                a.approval !== 'Approved' ? el('button', { class: 'sm', onclick: async () => { if (!confirm('Remove this advert?')) return; try { await del(`${base}/ads/${encodeURIComponent(a.id)}`); render2(); } catch (e) { say(e.message); } } }, 'Remove') : null)))) : null,
+                a.approval !== 'Approved' ? el('button', { class: 'sm', onclick: async () => { if (!(await ask({ title: 'Remove this advert?', text: 'It is taken off the list and will not be shown.', ok: 'Remove', danger: true }))) return; try { await del(`${base}/ads/${encodeURIComponent(a.id)}`); render2(); } catch (e) { say(e.message); } } }, 'Remove') : null)))) : null,
             c.slots.length ? el('div', { class: 'svc-grid' }, c.slots.map(slot)) : el('p', { class: 'sub' }, 'No advert spaces are offered right now.')]),
           section('Your details', detailsBox(c, render2)),
           section('People on this portal', el('div', {}, el('div', { class: 'up-list' }, c.users.map((u) => el('div', { class: 'up-row' }, el('div', { class: 'when' }, el('b', {}, u.name || '')), el('div', { class: 'what' }, el('b', {}, u.email), u.me ? el('span', { class: 'sub' }, 'you') : null),
-            !u.me ? el('button', { class: 'sm', onclick: async () => { if (!confirm(`Take ${u.email} off? Their link stops working.`)) return; try { await del(`${base}/users/${encodeURIComponent(u.email)}`); render2(); } catch (e) { say(e.message); } } }, 'Remove') : el('span', {})))),
+            !u.me ? el('button', { class: 'sm', onclick: async () => { if (!(await ask({ title: `Take ${u.email} off?`, text: 'Their link stops working.', ok: 'Take off', danger: true }))) return; try { await del(`${base}/users/${encodeURIComponent(u.email)}`); render2(); } catch (e) { say(e.message); } } }, 'Remove') : el('span', {})))),
             el('div', { class: 'portal-add' }, el('input', { type: 'email', placeholder: 'Colleague\'s email', oninput: (e) => { nu.email = e.target.value; } }), el('input', { placeholder: 'Name', oninput: (e) => { nu.name = e.target.value; } }),
               el('button', { class: 'primary', onclick: async () => { try { await post(`${base}/users`, nu); say(`Added: ${nu.email} gets an email with their own link.`); render2(); } catch (e) { say(e.message); } } }, 'Add')))),
           el('p', { class: 'sub small', style: { marginTop: '24px' } }, `Questions? ${[c.company.email, c.company.phone].filter(Boolean).join(' · ')}`));
@@ -838,7 +863,8 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
           section('Videos', vids.length ? el('div', { class: 'grid' }, vids.slice(0, 12).map((s) => streamCard(s, { noChannel: true }))) : null), !live.length && !up.length && !vids.length && !sers.length ? el('div', { class: 'empty' }, 'Nothing here yet.') : null];
     return [el('div', { class: 'banner', style: { backgroundImage: ch.banner ? `url("${img(ch.banner)}")` : `linear-gradient(120deg, ${ch.color}, #151515 75%)` } }),
       el('div', { class: 'chead' }, ch.logo ? el('img', { class: 'big', src: img(ch.logo), alt: '' }) : el('span', { class: 'big avatar', style: { fontSize: '44px' } }, ch.name.slice(0, 1)),
-        el('div', { style: { flex: 1, minWidth: '200px' } }, el('h1', {}, ch.name), el('div', { class: 'sub' }, `/c/${ch.slug} · ${c.subscribers} subscriber${c.subscribers === 1 ? '' : 's'} · ${vids.length} video${vids.length === 1 ? '' : 's'}`)), sub),
+        el('div', { style: { flex: 1, minWidth: '200px' } }, el('h1', {}, ch.name), el('div', { class: 'sub' }, `/c/${ch.slug} · ${c.subscribers} subscriber${c.subscribers === 1 ? '' : 's'} · ${vids.length} video${vids.length === 1 ? '' : 's'}`)),
+        el('form', { class: 'ch-search', onsubmit: (e) => { e.preventDefault(); const q = e.target.querySelector('input').value.trim(); history.pushState(null, '', browseUrl({ channel: ch.id, q }, '/browse')); window.scrollTo(0, 0); render(); } }, el('input', { type: 'search', placeholder: 'Search this channel', 'aria-label': 'Search this channel' })), sub),
       el('div', { class: 'tabs' }, tabLink('home', 'Home'), tabLink('upcoming', 'Upcoming' + (up.length ? ` (${up.length})` : '')), tabLink('videos', 'Videos'), sers.length ? tabLink('series', 'Series') : null, pls.length ? tabLink('playlists', 'Playlists') : null, ch.owner === 'Church' || /church|kerk|gemeente|ministr/i.test(ch.name + ' ' + (ch.company || '')) || t === 'sermons' ? tabLink('sermons', 'Sermons') : null, tabLink('about', 'About')), body];
   }
 
@@ -1193,7 +1219,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const head = (t, sub) => el('div', { class: 'wide book-sec' }, el('h2', {}, t), sub ? el('p', { class: 'sub' }, sub) : null);
     const err = el('p', { class: 'err' });
     const box = el('div', { class: 'book' });
-    const btn = el('button', { class: 'primary', type: 'submit' }, 'Send request');
+    const btn = el('button', { class: 'primary btn-big send-req', type: 'submit' }, 'Send my request');
     const extra = el('div', { class: 'wide book-extra' });
     const visible = () => F.groups.filter((g) => BF.shown(g, f.service, kind));
     const paintExtra = () => {
@@ -1232,9 +1258,9 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       pick('budget', 'Budget', ['Choose…', ...((C.budget && C.budget.opts) || [])]), pick('heard', 'How did you hear about us?', ['Choose…', ...((C.heard && C.heard.opts) || [])]),
       on('details') ? el('label', { class: 'fld wide' }, el('span', {}, label('details', 'Tell us more') + star('details')), el('textarea', { class: 'details', rows: 4, required: C.details && C.details.req ? '' : null, placeholder: 'Anything we should know: the programme, special requests, links …' })) : null,
       el('input', { class: 'hp', name: 'website', tabindex: '-1', autocomplete: 'off', oninput: (e) => { f.website = e.target.value; } }),
-      err, el('div', { class: 'wide' }, btn));
+      err, el('div', { class: 'wide' }, btn, el('p', { class: 'sub', style: { marginTop: '10px' } }, 'Nothing to pay now: we reply with a quote, usually within a day.')));
     paintExtra();
-    box.append(el('h1', {}, 'Book services'), F.intro ? el('p', { class: 'sub' }, F.intro) : null, form);
+    box.append(el('h1', {}, 'Book services'), F.intro ? el('p', { class: 'sub' }, F.intro) : null, el('p', { class: 'sub small' }, 'Fields with * are needed. Fill in what you know; we can sort out the rest together.'), form);
     return box;
   }
   // the section rules, as in shared/bookingform.js (the website sends the form already cleaned)
@@ -1307,7 +1333,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       const r = await post('/api/public/subscribe', { channel: id, on });
       D.me.subscriptions = r.subscriptions;
       render();
-    } catch (e) { alert(e.message); }
+    } catch (e) { say(e.message); }
   }
 
   // ---- data and routing
@@ -1379,7 +1405,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     const year = new Date().getFullYear();
     const line = el('span', {}, `© ${year} ${D.site || ''}. All rights reserved.`);
     legalInfo().then((L) => { line.textContent = `© ${L.year} ${L.company}. All rights reserved.`; }).catch(() => {});
-    return el('footer', { class: 'site-foot' }, line, el('nav', {}, el('a', { href: '/terms', 'data-nav': '' }, 'Terms'), el('a', { href: '/privacy', 'data-nav': '' }, 'Privacy'), el('a', { href: '/legal', 'data-nav': '' }, 'Company information')));
+    return el('footer', { class: 'site-foot' }, line, el('nav', {}, el('a', { href: '#', onclick: (e) => { e.preventDefault(); helpBox(); } }, 'Help'), el('a', { href: '/terms', 'data-nav': '' }, 'Terms'), el('a', { href: '/privacy', 'data-nav': '' }, 'Privacy'), el('a', { href: '/legal', 'data-nav': '' }, 'Company information')));
   }
   async function render() {
     stopMedia();
@@ -1424,6 +1450,10 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   });
   window.addEventListener('popstate', render);
   $('menu').addEventListener('click', () => document.body.classList.toggle('side-open'));
+  // phones: the ⌕ in the header opens the search over the top bar
+  if ($('msearch')) $('msearch').addEventListener('click', () => { document.body.classList.toggle('msearching'); if (document.body.classList.contains('msearching')) setTimeout(() => $('search').querySelector('input').focus(), 30); });
+  $('search').addEventListener('submit', () => document.body.classList.remove('msearching'));
+  $('search').querySelector('input').addEventListener('blur', (e) => { if (!e.target.value) setTimeout(() => document.body.classList.remove('msearching'), 150); });
   // the search box: on Matches, Channels and Teams it narrows that page; everywhere else it searches everything (/browse?q=)
   const LOCAL_SEARCH = ['/matches', '/channels', '/teams'];
   $('search').addEventListener('submit', (e) => {

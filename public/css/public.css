@@ -409,3 +409,16 @@ input:not([type=checkbox]):not([type=radio]):focus, select:focus, textarea:focus
 .yt-box { overflow: hidden; background: #000; }
 .yt-box.paused .yt-sheet, .yt-box.ended .yt-sheet { background: rgba(0,0,0,.55) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%23000' fill-opacity='.55'/%3E%3Cpath d='M9.5 7.5v9l7-4.5z' fill='%23fff'/%3E%3C/svg%3E") center / 68px no-repeat; }
 .yt-box.ended .yt-sheet { background-color: #000; }
+
+/* 1.4.0: search on phones, friendly boxes */
+.msearch { display: none; font-size: 20px; }
+@media (max-width: 900px) {
+  .msearch { display: inline-flex; margin-left: auto; } .me { margin-left: 0; }
+  body.msearching .search { display: flex; position: absolute; left: 8px; right: 8px; top: 8px; z-index: 30; margin: 0; max-width: none; }
+  body.msearching .search input { font-size: 16px; }
+  body.landing .msearch { display: none; } body.landing .me { margin-left: auto; }
+}
+button.danger-solid { background: #ff4d4d; color: #fff; }
+.send-req { background: var(--accent) !important; color: #062b17 !important; font-weight: 800; }
+.ch-search input { background: #121212; border: 1px solid var(--line); color: var(--text); padding: 8px 14px; font: inherit; width: 200px; }
+@media (max-width: 600px) { .ch-search { order: 3; width: 100%; } .ch-search input { width: 100%; } }

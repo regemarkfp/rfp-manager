@@ -456,3 +456,19 @@ table.t tr.picked td { background: rgba(0, 255, 130, .07); }
 .fs-chip button { padding: 2px 6px; }
 .fs-chip.waiting { outline: 1px dashed #ffc43d88; }
 .fs-picks { display: grid; gap: 6px; max-height: 280px; overflow: auto; padding: 4px 0; } .fs-picks label { gap: 8px; align-items: center; cursor: pointer; }
+
+/* 1.4.0: search everything, search this page, empty pages */
+.gs { position: relative; margin: 6px 0 8px; }
+.gs input { padding-left: 32px; background: #111 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23888' d='M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z'/%3E%3C/svg%3E") 9px center / 18px no-repeat; }
+.side-min .gs { display: none; }
+.gs-res { position: absolute; left: 0; top: calc(100% + 4px); z-index: 70; width: min(420px, 90vw); max-height: 70vh; overflow: auto; background: var(--panel2, #262626); border: 1px solid var(--line, #333); box-shadow: 0 14px 40px rgba(0,0,0,.6); padding: 4px 0; }
+.gs.big .gs-res { position: static; width: 100%; max-height: 60vh; box-shadow: none; border: 0; background: transparent; }
+.gs-g { padding: 8px 14px 4px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim, #aaa); }
+.gs-hit { display: block; padding: 7px 14px; color: var(--text, #f1f1f1); text-decoration: none; } .gs-hit:hover, .gs-hit.on { background: rgba(0,255,130,.1); }
+.gs-hit b { display: block; font-weight: 600; } .gs-hit span { display: block; font-size: 12px; color: var(--dim, #aaa); }
+.gs-none { padding: 10px 14px; color: var(--dim, #aaa); }
+.pf { display: inline-flex; align-items: center; gap: 8px; } .pf input { width: 220px; }
+.big-empty { text-align: center; padding: 36px 20px; } .big-empty h2 { margin: 0 0 6px; } .big-empty p { max-width: 520px; margin: 0 auto 14px; }
+button.appbar-icon { background: transparent; border: 0; clip-path: none; padding: 6px; color: inherit; }
+.gs input.gs-in { padding-left: 34px !important; }
+.big-empty .em-title { font-size: 19px; font-weight: 700; margin-bottom: 6px; color: var(--text); }

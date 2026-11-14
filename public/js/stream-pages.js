@@ -343,8 +343,8 @@
         h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } },
           h('button', { class: 'primary', onclick: async () => { try { const r = await api('POST', '/api/pay/config', { merchantId: f.merchantId.value, merchantKey: f.merchantKey.value, passphrase: f.passphrase.value, sandbox: f.sandbox.checked }); App.cfg.payments = r.on; toast('Saved'); paint(); } catch (e) { oops(e); } } }, 'Save'),
           c.on ? h('button', { onclick: (e) => testPay(e.target) }, 'Test PayFast') : null,
-          c.hasPassphrase ? h('button', { class: 'sm ghost', onclick: async () => { if (!confirm('Remove the saved passphrase? Do this when your PayFast account (or sandbox account) has no passphrase set.')) return; try { await api('POST', '/api/pay/config', { clearPassphrase: true }); toast('Passphrase removed'); paint(); } catch (e) { oops(e); } } }, 'Remove passphrase') : null,
-          c.on ? h('button', { class: 'danger sm', onclick: async () => { if (!confirm('Switch payments off? The merchant details are removed from this website.')) return; try { await api('POST', '/api/pay/config', { off: true }); App.cfg.payments = false; paint(); } catch (e) { oops(e); } } }, 'Switch off') : null), result);
+          c.hasPassphrase ? h('button', { class: 'sm ghost', onclick: async () => { if (!(await UI.confirmBox('Remove the saved passphrase? Do this when your PayFast account (or sandbox account) has no passphrase set.', 'Yes'))) return; try { await api('POST', '/api/pay/config', { clearPassphrase: true }); toast('Passphrase removed'); paint(); } catch (e) { oops(e); } } }, 'Remove passphrase') : null,
+          c.on ? h('button', { class: 'danger sm', onclick: async () => { if (!(await UI.confirmBox('Switch payments off? The merchant details are removed from this website.', 'Yes'))) return; try { await api('POST', '/api/pay/config', { off: true }); App.cfg.payments = false; paint(); } catch (e) { oops(e); } } }, 'Switch off') : null), result);
     };
     paint();
     return box;
@@ -378,7 +378,7 @@
       const s = L.state;
       if (s === 'open') return [warn,
         h('p', {}, `Linked as +${L.me}. It shows on your phone under WhatsApp → Settings → Linked devices. Keep the phone on the internet now and then (WhatsApp unlinks devices after about two weeks without the phone).`),
-        h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } }, testRow(), h('button', { class: 'danger sm', onclick: async () => { if (!confirm('Unlink WhatsApp from this website?')) return; try { await api('DELETE', '/api/whatsapp/link'); App.cfg.whatsapp = false; paint(); } catch (e) { oops(e); } } }, 'Unlink'))];
+        h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } }, testRow(), h('button', { class: 'danger sm', onclick: async () => { if (!(await UI.confirmBox('Unlink WhatsApp from this website?', 'Yes'))) return; try { await api('DELETE', '/api/whatsapp/link'); App.cfg.whatsapp = false; paint(); } catch (e) { oops(e); } } }, 'Unlink'))];
       if (s === 'installing') return [warn, h('p', {}, '⏳ Installing WhatsApp support on the server (the first time only, up to a few minutes)…')];
       if (s === 'connecting') return [warn, h('p', {}, '⏳ Connecting to WhatsApp…'), h('button', { class: 'sm', onclick: async () => { try { await api('DELETE', '/api/whatsapp/link'); paint(); } catch (e) { oops(e); } } }, 'Cancel')];
       if (s === 'waiting') return [warn,

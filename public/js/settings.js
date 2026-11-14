@@ -357,7 +357,7 @@
         h('div', { class: 'row', style: { gap: '6px', alignItems: 'center', flexWrap: 'wrap' } },
           sm(open ? '▾' : '▸', () => { if (open) opener.delete(g.id); else opener.add(g.id); paint(); }),
           h('b', { style: { flex: 1, minWidth: '140px' } }, g.title || 'Section', h('span', { class: 'dim small' }, ` · ${g.questions.length} question${g.questions.length === 1 ? '' : 's'}`)),
-          sm('↑', () => move(F.groups, i, -1)), sm('↓', () => move(F.groups, i, 1)), sm('Remove', () => { if (confirm(`Remove the section "${g.title}"?`)) { F.groups.splice(i, 1); paint(); } }, 'danger')),
+          sm('↑', () => move(F.groups, i, -1)), sm('↓', () => move(F.groups, i, 1)), sm('Remove', async () => { if (await UI.confirmBox(`Remove the section "${g.title}"?`, 'Remove')) { F.groups.splice(i, 1); paint(); } }, 'danger')),
         open ? h('div', { style: { display: 'grid', gap: '8px', marginTop: '8px' } },
           h('label', { class: 'f' }, h('span', {}, 'Heading'), h('input', { value: g.title, oninput: (e) => { g.title = e.target.value; } })),
           h('label', { class: 'f' }, h('span', {}, 'Line under the heading (optional)'), h('input', { value: g.sub || '', oninput: (e) => { g.sub = e.target.value; } })),
@@ -393,7 +393,7 @@
         h('div', { class: 'row', style: { marginTop: '16px', gap: '8px', flexWrap: 'wrap' } },
           bfSaved,
           h('a', { class: 'btn', href: (App.cfg.siteUrl || '') + '/book', target: '_blank', rel: 'noopener' }, 'Open the form ↗'),
-          h('button', { class: 'danger sm', onclick: async () => { if (!confirm('Put the booking form back to the standard one? Your changes to it are lost.')) return; try { const r = await api('PUT', '/api/site/booking-form', { reset: true }); F = r.form; toast('Back to the standard form'); paint(); } catch (e) { oops(e); } } }, 'Back to the standard form')));
+          h('button', { class: 'danger sm', onclick: async () => { if (!(await UI.confirmBox('Put the booking form back to the standard one? Your changes to it are lost.', 'Yes'))) return; try { const r = await api('PUT', '/api/site/booking-form', { reset: true }); F = r.form; toast('Back to the standard form'); paint(); } catch (e) { oops(e); } } }, 'Back to the standard form')));
     }
     // saves by itself: typing and choices, and the buttons that add, move or remove sections and questions
     const bfSaved = UI.autosave(box, async () => { await api('PUT', '/api/site/booking-form', { form: F }); });

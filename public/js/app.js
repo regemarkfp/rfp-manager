@@ -239,6 +239,7 @@ function shell(content) {
         await App.selectTeam(e.target.value); location.hash = '#/'; route();
       } }, App.teams.map((t) => h('option', { value: t.id, selected: t.id === App.team }, t.name)), h('option', { value: '+' }, '+ New production team…')),
       App.pcs ? h('div', { id: 'pc-picker' }, pcPicker()) : null,
+      App.searchBox ? App.searchBox() : null,
       (() => {
         const NAV = navFor();
         const groups = NAV.filter(([g]) => g).map(([g]) => g), here = (NAV.find(([g, links]) => g && links.some(([href]) => on(href))) || [])[0];
@@ -247,7 +248,7 @@ function shell(content) {
         const parts = [];
         const paint = () => parts.forEach((p) => { const o = p.g === openG; p.list.style.display = o ? '' : 'none'; p.head.textContent = (o ? '▾ ' : '▸ ') + p.g; });
         const nav = h('nav', { class: 'nav' }, NAV.map(([g, links]) => {
-          const list = h('div', {}, links.map(([href, label]) => h('a', { href, class: on(href) ? 'on' : '', title: label, onclick: () => root.classList.remove('open') }, icon(window.RFPIcons.forLink(href, g), 20), h('span', { class: 'nl' }, label))));
+          const list = h('div', {}, links.map(([href, label]) => h('a', { href, class: on(href) ? 'on' : '', title: (window.RFPHelp && RFPHelp.hint(href)) ? label + ': ' + RFPHelp.hint(href) : label, onclick: () => root.classList.remove('open') }, icon(window.RFPIcons.forLink(href, g), 20), h('span', { class: 'nl' }, label))));
           if (!g) return list;
           const head = h('div', { class: 'nav-group', role: 'button', tabindex: '0', title: 'Open this part of the menu (the others close)', style: { cursor: 'pointer', userSelect: 'none' },
             onclick: () => { openG = openG === g ? '' : g; navStore.set('rfp-nav-open', openG); paint(); }, onkeydown: (e) => { if (e.key === 'Enter') head.click(); } }, g);
@@ -327,6 +328,7 @@ function androidShell(content) {
     h('header', { class: 'appbar no-print' },
       h('a', { href: '#/', class: 'appbar-logo', 'aria-label': 'Home' }, h('img', { src: '/brand/rfp-logo-sm.png', alt: 'RFP' })),
       h('div', { class: 'grow' }, teamPick),
+      h('button', { class: 'appbar-icon', 'aria-label': 'Search everything', onclick: () => App.searchWindow && App.searchWindow() }, icon('search')),
       local ? null : h('a', { href: '#/notifications', class: 'appbar-icon' + (navOn('#/notifications') ? ' on' : ''), 'aria-label': 'Notifications' }, icon('bell'), App.unread ? h('span', { class: 'badge' }, App.unread > 99 ? '99+' : String(App.unread)) : null),
       h('a', { href: '#/settings', class: 'appbar-icon', 'aria-label': 'Settings and account' }, App.avatar(App.me.image, App.me.name || App.me.email, 30))),
     h('main', { class: 'main' }, content),
@@ -374,6 +376,8 @@ function route() {
   // on a phone the tab rows scroll sideways: keep the chosen tab in view
   app.querySelectorAll('.tabs').forEach((t) => { const on = t.querySelector('.on'); if (on && t.scrollWidth > t.clientWidth) t.scrollLeft = on.offsetLeft - t.offsetLeft - 16; });
   if (page.keepScroll) window.scrollTo(0, y); else window.scrollTo(0, 0);
+  if (App.pageFinder) App.pageFinder(page.el);
+  if (window.RFPHelp) { RFPHelp.mount(); document.body.classList.toggle('has-tabbar', !!ANDROID); }
   if (!offerApp.done) { offerApp.done = true; setTimeout(offerApp, 1200); }
 }
 // an Admin on an Android phone's browser (not in the app): offer the app once, again after 14 days if they said Not now
@@ -493,8 +497,34 @@ function imageField(value, onChange, kind) {
 }
 
 // One input for one schema field. ctx.form is the record being edited (for filters and inherited values).
+// 1.4.0: choose from a list wherever we can – the field's own choices plus what was typed on other records – with
+// "Something else…" to type a new one (it is in the list from then on)
+const REUSE = new Set(['position', 'publisher', 'sponsor', 'preacher', 'series', 'town', 'city', 'country', 'nationality', 'paidBy', 'role', 'organisation', 'category', 'condition', 'unit', 'ageGroup', 'season', 'kind', 'source', 'composers', 'author']);
+function usedValues(k, type) {
+  const out = new Set();
+  for (const d of App.docs.values()) { if (d.deleted || (type && d.type !== type)) continue; const v = d.data && d.data[k]; if (typeof v === 'string' && v.trim() && v.length < 80) out.add(v.trim()); }
+  return [...out];
+}
+function pickOrType(options, value, onChange, ph) {
+  const opts = [...new Set(options.map((o) => String(o)).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const wrap = h('div', { class: 'pick-or-type' });
+  const typeIt = (v) => {
+    const i = h('input', { value: v || '', placeholder: ph || 'Type it', oninput: (e) => onChange(e.target.value) });
+    wrap.replaceChildren(h('div', { class: 'row', style: { flexWrap: 'nowrap', gap: '6px' } }, i, opts.length ? h('button', { type: 'button', class: 'sm ghost', title: 'Choose from the list instead', onclick: () => { onChange(''); choose(''); } }, '☰ List') : null));
+    setTimeout(() => i.focus(), 0);
+  };
+  const choose = (v) => {
+    const all = v && !opts.includes(v) ? [v, ...opts] : opts;
+    const sel = h('select', { onchange: (e) => { if (e.target.value === '\u0000other') { typeIt(''); return; } onChange(e.target.value); } },
+      h('option', { value: '' }, ph ? '— ' + ph + ' —' : '— choose —'), all.map((o) => h('option', { value: o, selected: o === v }, o)), h('option', { value: '\u0000other' }, '✎ Something else…'));
+    wrap.replaceChildren(sel);
+  };
+  if (!opts.length && !value) typeIt(''); else choose(value || '');
+  return wrap;
+}
 function fieldInput(f, value, onChange, ctx = {}) {
   const ph = ctx.placeholder || f.ph || '';
+  if (f.t === 'text' && REUSE.has(f.k) && !f.noPick && typeof App !== 'undefined' && App.docs) { const used = usedValues(f.k, ctx.type); if (used.length) return pickOrType(used, value, onChange, ph); }
   switch (f.t) {
     case 'textarea': return h('textarea', { placeholder: ph, rows: f.rows || null, style: f.rows ? { fontFamily: 'ui-monospace, Consolas, monospace', fontSize: '13px' } : null, oninput: (e) => onChange(e.target.value) }, value || '');
     case 'number': case 'money': return h('input', { type: 'number', step: 'any', value: value === undefined || value === null ? '' : value, placeholder: ph, oninput: (e) => onChange(e.target.value === '' ? '' : Number(e.target.value)) });
@@ -514,10 +544,7 @@ function fieldInput(f, value, onChange, ctx = {}) {
       return h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, pick, text);
     }
     case 'select': return h('select', { onchange: (e) => onChange(e.target.value) }, optionsFor(f).map((o) => h('option', { value: o, selected: (value || f.def) === o }, o)));
-    case 'combo': {
-      const id = 'dl_' + Math.random().toString(36).slice(2);
-      return h('div', {}, h('input', { list: id, value: value || '', placeholder: ph, oninput: (e) => onChange(e.target.value) }), h('datalist', { id }, optionsFor(f, ctx.form).map((o) => h('option', { value: o }))));
-    }
+    case 'combo': return pickOrType([...optionsFor(f, ctx.form), ...usedValues(f.k, ctx.type)], value, onChange, ph);
     case 'multi': {
       let cur = Array.isArray(value) ? value.slice() : [];
       const box = h('div', { class: 'chips' });
@@ -638,7 +665,7 @@ function buildForm(type, initial, { fields, onChange } = {}) {
     const club = type === 'squad' && data.club ? App.get(data.club) : null;
     {
       const inherited = f.inherit && club && club[f.inherit] && f.t !== 'image' ? `${club[f.inherit]} (from club)` : '';
-      const input = fieldInput(f, data[f.k], (v) => { data[f.k] = v; if (onChange) onChange(f.k, v); if ((REPAINT[type] || []).includes(f.k) && f.t !== 'combo') paint(); }, { form: data, placeholder: inherited });
+      const input = fieldInput(f, data[f.k], (v) => { data[f.k] = v; if (onChange) onChange(f.k, v); if ((REPAINT[type] || []).includes(f.k) && f.t !== 'combo') paint(); }, { form: data, placeholder: inherited, type });
       // a typed field (combo) repaints when the typing stops, not on every key
       if ((REPAINT[type] || []).includes(f.k) && f.t === 'combo') input.addEventListener('change', () => paint());
       widgets[f.k] = input;
