@@ -18,6 +18,14 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+### 1.5.0
+
+Software on the website (Settings → Website → Software on the website, and /software):
+
+- **Icons from GitHub:** an app with no icon of its own shows its repository's icon: `icon.png` / `logo.png` (or `assets/`, `build/`, `resources/`, `.github/` …, or the path you give in Edit), else the owner's GitHub picture. An icon uploaded here still wins.
+- **Screenshots and videos** on every app page: a strip to flick through, tap one to see it full screen (arrows, swipe, Esc). They come from the repository's `screenshots/` (or `docs/screenshots`, `media/` …) folder and the pictures in its README (badges left out), copied with each Sync; and you can add your own with **Screenshots** (pictures and MP4/WebM videos, with captions). GitHub ones can be hidden. The first screenshot is the app's card on /software.
+- **Load apps straight to the website:** **Versions → ⬆ Upload a version** – pick the version (a drop-down of the next numbers, or type one), add the installers, what's new, beta or not. Sent in 32 MB pieces (carries on where it stopped), served like the GitHub ones and in the apps' update check. A GitHub repository is now optional; versions uploaded here stay when GitHub syncs and can be removed again.
+
 ### 1.4.0
 
 Easy to use for anyone, everywhere (the File Sharing approach across the Studio, the website and the live screens):
