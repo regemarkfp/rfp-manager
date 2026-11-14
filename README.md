@@ -18,6 +18,21 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 - The two stay in step. Changes go across within a moment while online and catch up after an outage.
   The newest change to a record wins, so score a match from one place (normally the production PC).
 
+## Screenshots
+
+<table>
+<tr><td width="50%"><img src="screenshots/01-dashboard.png" alt="Dashboard: today, what is coming up, upcoming productions"><br><sub>Dashboard: today, what is coming up, upcoming productions</sub></td><td width="50%"><img src="screenshots/02-search-everything.png" alt="Search everything (Ctrl+K): every record, grouped by kind"><br><sub>Search everything (Ctrl+K): every record, grouped by kind</sub></td></tr>
+<tr><td width="50%"><img src="screenshots/03-productions.png" alt="Productions: filters, sorting, select many to change at once"><br><sub>Productions: filters, sorting, select many to change at once</sub></td><td width="50%"><img src="screenshots/04-production.png" alt="A production: details, crew, kit, music, report and live stream"><br><sub>A production: details, crew, kit, music, report and live stream</sub></td></tr>
+<tr><td width="50%"><img src="screenshots/05-calendar.png" alt="Calendar of productions and matches"><br><sub>Calendar of productions and matches</sub></td><td width="50%"><img src="screenshots/06-fixtures.png" alt="Fixtures & results, with rundowns"><br><sub>Fixtures & results, with rundowns</sub></td></tr>
+<tr><td width="50%"><img src="screenshots/07-equipment.png" alt="Equipment and the rest of the kit lists"><br><sub>Equipment and the rest of the kit lists</sub></td><td width="50%"><img src="screenshots/08-help.png" alt="Help on every page (the green ?)"><br><sub>Help on every page (the green ?)</sub></td></tr>
+<tr><td width="50%"><img src="screenshots/09-graphics-control.png" alt="Graphics control: preview, take, update, out (CasparCG and browser outputs)"><br><sub>Graphics control: preview, take, update, out (CasparCG and browser outputs)</sub></td><td width="50%"><img src="screenshots/10-file-sharing.png" alt="File Sharing (sharing.your-site): send files, folders, tag people"><br><sub>File Sharing (sharing.your-site): send files, folders, tag people</sub></td></tr>
+<tr><td width="50%"><img src="screenshots/11-website.png" alt="The public website"><br><sub>The public website</sub></td><td width="50%"><img src="screenshots/12-software.png" alt="Software pages: downloads, screenshots, what is new"><br><sub>Software pages: downloads, screenshots, what is new</sub></td></tr>
+<tr><td width="50%"><img src="screenshots/13-software-admin.png" alt="Managing the software: GitHub sync, upload a version, screenshots"><br><sub>Managing the software: GitHub sync, upload a version, screenshots</sub></td></tr>
+<tr><td width="50%"><img src="screenshots/14-phone-studio.png" width="48%" alt="The Studio on a phone"> <img src="screenshots/15-phone-sharing.png" width="48%" alt="File Sharing on a phone"><br><sub>On a phone: the Studio and File Sharing</sub></td><td></td></tr>
+</table>
+
+## What's new
+
 ### 1.5.0
 
 Software on the website (Settings → Website → Software on the website, and /software):
