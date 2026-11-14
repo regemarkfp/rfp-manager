@@ -472,3 +472,12 @@ table.t tr.picked td { background: rgba(0, 255, 130, .07); }
 button.appbar-icon { background: transparent; border: 0; clip-path: none; padding: 6px; color: inherit; }
 .gs input.gs-in { padding-left: 34px !important; }
 .big-empty .em-title { font-size: 19px; font-weight: 700; margin-bottom: 6px; color: var(--text); }
+
+/* Settings → Website → Software (1.5.0): upload progress, screenshots */
+.sw-bar { height: 8px; background: var(--panel2, #2a2a2a); border-radius: 4px; overflow: hidden; margin: 10px 0 4px; }
+.sw-bar-fill { height: 100%; width: 0; background: var(--accent, #00ff82); transition: width .2s; }
+.sw-media { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 12px; }
+.sw-m { display: flex; flex-direction: column; gap: 6px; background: var(--panel2, #222); padding: 8px; border-radius: 8px; }
+.sw-m img, .sw-m video { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #000; border-radius: 4px; }
+.sw-m.off img, .sw-m.off video { opacity: .35; }
+.sw-m input { width: 100%; }
