@@ -246,10 +246,36 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   const myOs = () => { const u = navigator.userAgent; return /Windows/.test(u) ? 'windows' : /Mac OS X|Macintosh/.test(u) && !/iPhone|iPad/.test(u) ? 'mac' : /Linux|X11/.test(u) && !/Android/.test(u) ? 'linux' : ''; };
   const OS = { windows: 'Windows', mac: 'macOS', linux: 'Linux', other: 'Other' };
   const mb = (n) => (n >= 1073741824 ? (n / 1073741824).toFixed(1) + ' GB' : Math.max(0.1, n / 1048576).toFixed(1) + ' MB');
+  // the app's icon: uploaded here, else from GitHub (the repo's icon file or its owner's picture), else its first letter
+  const appIcon = (p, big) => (p.icon ? el('img', { class: 'tlogo' + (big ? ' big' : ''), src: p.icon, alt: '', loading: 'lazy' }) : el('span', { class: 'tlogo ph' + (big ? ' big' : ''), style: { background: 'var(--accent)', color: '#111' } }, p.name.slice(0, 1)));
   function appCard(p) {
-    const r = p.releases[0];
-    return el('a', { class: 'tcard app', href: '/software/' + p.slug, 'data-nav': '' }, p.logo ? el('img', { class: 'tlogo', src: img(p.logo), alt: '' }) : el('span', { class: 'tlogo ph', style: { background: 'var(--accent)', color: '#111' } }, p.name.slice(0, 1)),
-      el('div', { class: 'grow' }, el('b', {}, p.name), el('div', { class: 'sub' }, p.tagline || ''), el('div', { class: 'sub' }, [r ? 'Version ' + r.version : 'Coming soon', r ? [...new Set(r.assets.map((a) => OS[a.platform]))].join(' · ') : '', p.price ? 'R ' + p.price : 'Free'].filter(Boolean).join(' · '))));
+    const r = p.releases[0], shot = (p.media || []).find((m) => m.kind === 'image');
+    return el('a', { class: 'tcard app has-shot', href: '/software/' + p.slug, 'data-nav': '' },
+      el('div', { class: 'app-shot' + (shot ? '' : ' blank') }, shot ? el('img', { src: shot.url, alt: '', loading: 'lazy' }) : appIcon(p, true)),
+      el('div', { class: 'app-row' }, appIcon(p),
+        el('div', { class: 'grow' }, el('b', {}, p.name), el('div', { class: 'sub' }, p.tagline || p.ghDescription || ''), el('div', { class: 'sub' }, [r ? 'Version ' + r.version : 'Coming soon', r ? [...new Set(r.assets.map((a) => OS[a.platform]))].join(' · ') : '', p.price ? 'R ' + p.price : 'Free'].filter(Boolean).join(' · ')))));
+  }
+  // screenshots and videos: a strip to scroll, tap one to see it big (arrows, swipe, Esc)
+  function gallery(media) {
+    if (!media.length) return null;
+    const viewer = (at) => {
+      const stage = el('div', { class: 'lb-stage' }), cap = el('div', { class: 'lb-cap' });
+      const show = () => { const m = media[at]; stage.replaceChildren(m.kind === 'video' ? el('video', { src: m.url, controls: true, autoplay: true, playsinline: true }) : el('img', { src: m.url, alt: m.caption || '' })); cap.textContent = `${m.caption ? m.caption + ' · ' : ''}${at + 1} of ${media.length}`; };
+      const go = (d) => { at = (at + d + media.length) % media.length; show(); };
+      const close = () => { lb.remove(); document.removeEventListener('keydown', key); };
+      const key = (e) => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowRight') go(1); else if (e.key === 'ArrowLeft') go(-1); };
+      let x0 = null;
+      const lb = el('div', { class: 'lb', onclick: (e) => { if (e.target === lb || e.target === stage) close(); } },
+        el('button', { class: 'lb-x', 'aria-label': 'Close', onclick: close }, '✕'),
+        media.length > 1 ? el('button', { class: 'lb-arrow l', 'aria-label': 'Previous', onclick: () => go(-1) }, '‹') : null, stage, media.length > 1 ? el('button', { class: 'lb-arrow r', 'aria-label': 'Next', onclick: () => go(1) }, '›') : null, cap);
+      lb.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+      lb.addEventListener('touchend', (e) => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1); });
+      document.addEventListener('keydown', key);
+      document.body.append(lb); show();
+    };
+    return el('div', { class: 'shots' }, media.map((m, i) => el('button', { class: 'shot', title: m.caption || 'Open', onclick: () => viewer(i) },
+      m.kind === 'video' ? [el('video', { src: m.url + '#t=0.5', muted: true, preload: 'metadata', playsinline: true }), el('span', { class: 'play' }, '▶')] : el('img', { src: m.url, alt: m.caption || '', loading: 'lazy' }),
+      m.caption ? el('span', { class: 'cap' }, m.caption) : null)));
   }
   function softwarePage() {
     const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
@@ -265,13 +291,14 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       const dl = (a, primary) => p.canDownload ? el('a', { class: 'dl' + (primary ? ' primary' : ''), href: a.url }, `⬇ ${OS[a.platform]}${a.arch ? ' (' + a.arch + ')' : ''} · .${a.kind}`, el('span', { class: 'sub' }, ' ' + mb(a.size)))
         : el('span', { class: 'dl off' }, `${OS[a.platform]} · .${a.kind}`);
       box.replaceChildren(paidNotice(() => render()) || '',
-        el('div', { class: 'thead' }, p.logo ? el('img', { class: 'tlogo big', src: img(p.logo), alt: '' }) : el('span', { class: 'tlogo big ph', style: { background: 'var(--accent)', color: '#111' } }, p.name.slice(0, 1)),
-          el('div', { class: 'grow' }, el('h1', {}, p.name), el('div', { class: 'sub' }, [p.tagline, r ? `Version ${r.version} · ${new Date(r.publishedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : '', p.price ? 'R ' + p.price : 'Free'].filter(Boolean).join(' · ')))),
+        el('div', { class: 'thead' }, appIcon(p, true),
+          el('div', { class: 'grow' }, el('h1', {}, p.name), el('div', { class: 'sub' }, [p.tagline || p.ghDescription, r ? `Version ${r.version} · ${new Date(r.publishedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : '', p.price ? 'R ' + p.price : 'Free'].filter(Boolean).join(' · ')))),
         !r ? el('div', { class: 'empty' }, 'The first release is coming soon.') : [
           !p.canDownload ? el('div', { class: 'push-inline' }, el('span', {}, `${p.name} costs R ${Number(p.price).toFixed(2)}. Buy it once and download it on your account any time.`),
             p.payments ? el('button', { class: 'primary', onclick: async (e) => { if (!D.me) return signIn(`Sign in to buy ${p.name}: it is kept on your account.`); e.target.disabled = true; try { await payGo(`/api/public/software/${encodeURIComponent(slug)}/buy`); } catch (x) { say(x.message); e.target.disabled = false; } } }, `Buy · R ${Number(p.price).toFixed(2)}`) : el('span', { class: 'sub' }, ' Buying it here is coming soon.')) : null,
           el('div', { class: 'dls' }, mine.length ? mine.map((a, i) => dl(a, i === 0)) : null, r.assets.filter((a) => a.platform !== os).map((a) => dl(a, !mine.length && false))),
           os && !mine.length ? el('p', { class: 'sub' }, `No ${OS[os]} version yet.`) : null],
+        gallery(p.media || []),
         p.description ? el('div', { class: 'desc-box' }, p.description) : null,
         r && r.notes ? [el('h2', { class: 'sec' }, `What's new in ${r.version}`), el('div', { class: 'desc-box' }, r.notes)] : null,
         p.releases.length > 1 ? [el('h2', { class: 'sec' }, 'Earlier versions'), el('div', {}, p.releases.slice(1).map((x) => el('details', { class: 'rel' }, el('summary', {}, `${x.version} · ${new Date(x.publishedAt).toLocaleDateString('en-GB')}`),

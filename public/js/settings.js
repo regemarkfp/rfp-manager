@@ -295,29 +295,119 @@
   function softwareCard() {
     const box = h('div', { class: 'card' }, h('h2', {}, 'Software on the website'), h('p', { class: 'dim' }, 'Loading…'));
     const when = (t) => (t ? new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'never');
+    const mbs = (n) => (n >= 1073741824 ? (n / 1073741824).toFixed(1) + ' GB' : Math.max(0.1, n / 1048576).toFixed(1) + ' MB');
+    const iconOf = (p, size = 40) => (p.icon ? h('img', { src: p.icon, alt: '', style: { width: size + 'px', height: size + 'px', borderRadius: '9px', objectFit: 'contain', display: 'block', background: 'var(--panel2)' } })
+      : h('span', { style: { width: size + 'px', height: size + 'px', borderRadius: '9px', background: 'var(--accent)', color: '#111', display: 'grid', placeItems: 'center', fontWeight: 700 } }, String(p.name || '?').slice(0, 1)));
+    // send files to the website in 32 MB pieces (Cloudflare stops anything over 100 MB); returns the upload ids
+    async function sendFiles(slug, files, bar) {
+      const total = files.reduce((a, f) => a + f.size, 0) || 1; let done = 0; const ids = [];
+      for (const file of files) {
+        const st = await api('POST', `/api/software/${slug}/upload`, { name: file.name, size: file.size });
+        let at = st.received;
+        while (at < file.size) {
+          const part = file.slice(at, at + st.chunk);
+          const r = await fetch(`/api/software/${slug}/upload/${st.upload}?offset=${at}`, { method: 'PUT', headers: { 'x-rfp': '1', 'content-type': 'application/octet-stream' }, body: part, credentials: 'same-origin' });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.error || 'The upload stopped: try again (it carries on where it stopped)');
+          done += j.received - at; at = j.received;
+          if (bar) bar(done / total, file.name);
+        }
+        ids.push(st.upload);
+      }
+      return ids;
+    }
+    const progress = () => { const fill = h('div', { class: 'sw-bar-fill' }), txt = h('div', { class: 'dim small' }), wrap = h('div', { hidden: true }, h('div', { class: 'sw-bar' }, fill), txt); return { el: wrap, set: (f, name) => { wrap.hidden = false; fill.style.width = Math.round(f * 100) + '%'; txt.textContent = `${Math.round(f * 100)}% · ${name}`; } }; };
+    const picker = (accept, multiple, onPick, label) => { const inp = h('input', { type: 'file', accept, multiple, hidden: true, onchange: () => { onPick([...inp.files]); inp.value = ''; } }); return h('span', {}, inp, h('button', { class: 'sm', type: 'button', onclick: () => inp.click() }, label)); };
+
     function edit(p) {
-      const f = { name: '', slug: '', tagline: '', repo: '', description: '', price: 0, visible: true, prerelease: false, access: [], ...(p || {}) };
+      const f = { name: '', slug: '', tagline: '', repo: '', iconPath: '', description: '', price: 0, visible: true, prerelease: false, access: [], ...(p || {}) };
+      const PRICES = [0, 99, 199, 299, 499, 999, 1499, 2499];
+      const priceSel = pickOrType(PRICES.map(String), String(Number(f.price) || 0), (v) => { f.price = Math.max(0, Number(String(v).replace(/[^\d.]/g, '')) || 0); }, 'rand, 0 = free');
       const form = h('div', { class: 'form' },
-        ...[['name', 'Name', 'Regemark Replay'], ['slug', 'Web address (/software/…)', 'regemark-replay'], ['tagline', 'One line', 'Replay and ISO recording for live sport'], ['repo', 'GitHub repository (owner/name)', 'regemarkfp/regemark-replay']]
+        ...[['name', 'Name', 'Regemark Replay'], ['slug', 'Web address (/software/…)', 'regemark-replay'], ['tagline', 'One line (empty = the GitHub description)', 'Replay and ISO recording for live sport'], ['repo', 'GitHub repository (owner/name) – optional', 'regemarkfp/regemark-replay']]
           .map(([k, l, ph]) => h('label', { class: 'f' }, h('span', {}, l), h('input', { value: f[k] || '', placeholder: ph, oninput: (e) => { f[k] = e.target.value; } }))),
-        h('div', { class: 'f' }, h('div', { class: 'flabel' }, 'App icon'), imageField(f.logo || '', (v) => { f.logo = v; }, 'logo'), h('div', { class: 'help' }, 'Square PNG, SVG or WebP, 256×256 or larger. Shows on /software and the app\'s page; empty = its first letter.')),
+        h('div', { class: 'f' }, h('div', { class: 'flabel' }, 'App icon'), p && p.iconFrom === 'github' ? h('div', { class: 'row', style: { gap: '8px', margin: '4px 0' } }, iconOf(p, 32), h('span', { class: 'dim small' }, 'Now: from GitHub. Upload one here to use that instead.')) : null,
+          imageField(f.logo || '', (v) => { f.logo = v; }, 'logo'), h('div', { class: 'help' }, 'Empty = taken from GitHub: the repository\'s icon.png / logo.png (or the path below), else the owner\'s picture.')),
+        h('label', { class: 'f' }, h('span', {}, 'Icon file in the repository (optional)'), h('input', { value: f.iconPath || '', placeholder: 'e.g. assets/icon.png', oninput: (e) => { f.iconPath = e.target.value; } })),
         h('label', { class: 'f wide' }, h('span', {}, 'Description'), h('textarea', { rows: 5, oninput: (e) => { f.description = e.target.value; } }, f.description || '')),
-        h('label', { class: 'f' }, h('span', {}, 'Price (ZAR, 0 = free)'), h('input', { type: 'number', min: 0, value: f.price || 0, oninput: (e) => { f.price = Number(e.target.value) || 0; } }), h('div', { class: 'help' }, 'Paid apps cannot be downloaded until buying is switched on, except by the emails below.')),
+        h('label', { class: 'f' }, h('span', {}, 'Price (rand, 0 = free)'), priceSel, h('div', { class: 'help' }, 'Paid apps cannot be downloaded until buying is switched on, except by the emails below.')),
         h('label', { class: 'f' }, h('span', {}, 'Who may download a paid app now (emails)'), h('textarea', { rows: 2, oninput: (e) => { f.access = e.target.value.split(/[\s,;]+/).filter(Boolean); } }, (f.access || []).join('\n'))),
         h('label', { class: 'row', style: { gap: '8px' } }, h('input', { type: 'checkbox', checked: f.visible !== false, onchange: (e) => { f.visible = e.target.checked; } }), 'Show on the website'),
         h('label', { class: 'row', style: { gap: '8px' } }, h('input', { type: 'checkbox', checked: !!f.prerelease, onchange: (e) => { f.prerelease = e.target.checked; } }), 'Include pre-releases (betas)'));
-      UI.modal({ title: p ? 'Edit ' + p.name : 'Add an app', wide: true, body: form, actions: [{ label: 'Cancel' }, { label: 'Save', primary: true, onClick: async () => { await api('POST', '/api/software', f); toast('Saved: its GitHub releases are being copied'); paint(); } }] });
+      UI.modal({ title: p ? 'Edit ' + p.name : 'Add an app', wide: true, body: form, actions: [{ label: 'Cancel' }, { label: 'Save', primary: true, onClick: async () => { const b = { ...f }; delete b.releases; delete b.releasesAll; delete b.media; await api('POST', '/api/software', b); toast(f.repo ? 'Saved: its GitHub releases, icon and screenshots are being copied' : 'Saved'); paint(); } }] });
     }
+
+    // screenshots and videos: uploaded here, or found on GitHub (those can be hidden)
+    function mediaWin(p) {
+      const body = h('div', {});
+      const draw = async () => {
+        const r = await api('GET', '/api/software').catch(oops); if (!r) return;
+        const cur = r.list.find((x) => x.slug === p.slug) || p, list = cur.media || [];
+        const bar = progress();
+        body.replaceChildren(
+          h('p', { class: 'dim', style: { marginTop: 0 } }, 'Shown on the app\'s page as a strip to flick through. Pictures (PNG, JPG, WebP, GIF) and short videos (MP4, WebM). GitHub ones come from the repository\'s screenshots folder and the pictures in its README.'),
+          h('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } }, picker('image/*,video/mp4,video/webm', true, async (files) => {
+            if (!files.length) return; body.append(bar.el);
+            try { const ups = await sendFiles(p.slug, files, bar.set); await api('POST', `/api/software/${p.slug}/media`, { uploads: ups }); toast(`${files.length} added`); draw(); paint(); } catch (e) { oops(e); }
+          }, '+ Add screenshots or videos'), cur.repo ? h('button', { class: 'sm', onclick: async (e) => { e.target.disabled = true; try { await api('POST', `/api/software/${p.slug}/sync`); toast('Fetched from GitHub'); draw(); paint(); } catch (x) { oops(x); e.target.disabled = false; } } }, '⟳ Fetch from GitHub again') : null),
+          list.length ? h('div', { class: 'sw-media' }, list.map((m) => h('div', { class: 'sw-m' + (m.hidden ? ' off' : '') },
+            m.kind === 'video' ? h('video', { src: m.url + '#t=0.5', muted: true, preload: 'metadata' }) : h('img', { src: m.url, alt: '' }),
+            h('div', { class: 'small' }, h('span', { class: 'pill' }, m.source === 'github' ? 'GitHub' : 'Uploaded'), m.hidden ? h('span', { class: 'pill', style: { marginLeft: '4px' } }, 'hidden') : null),
+            m.source === 'github' ? h('div', { class: 'dim small' }, m.caption || '') : h('input', { value: m.caption || '', placeholder: 'Caption (optional)', onchange: async (e) => { const media = (cur.media || []).filter((x) => x.source !== 'github').map((x) => (x.file === m.file ? { ...x, caption: e.target.value } : x)); const b = { ...cur, media }; delete b.releases; delete b.releasesAll; await api('POST', '/api/software', { ...b, id: cur.id }).catch(oops); toast('Caption saved'); } }),
+            m.source === 'github' ? h('button', { class: 'sm', onclick: async () => { await api('POST', `/api/software/${p.slug}/media-remove`, { file: m.file, hide: !m.hidden }).catch(oops); draw(); } }, m.hidden ? 'Show' : 'Hide')
+              : h('button', { class: 'sm ghost danger', onclick: async () => { if (await confirmBox('Remove this from the app\'s page?', 'Remove')) { await api('POST', `/api/software/${p.slug}/media-remove`, { file: m.file }).catch(oops); draw(); paint(); } } }, '✕ Remove')))) : h('p', { class: 'dim' }, 'Nothing yet.'));
+      };
+      UI.modal({ title: 'Screenshots & videos · ' + p.name, wide: true, body, actions: [{ label: 'Done' }] });
+      draw();
+    }
+
+    // versions: GitHub's (synced) and the ones loaded straight here
+    function versionsWin(p) {
+      const body = h('div', {});
+      const draw = async () => {
+        const r = await api('GET', '/api/software').catch(oops); if (!r) return;
+        const cur = r.list.find((x) => x.slug === p.slug) || p, list = cur.releasesAll || [];
+        body.replaceChildren(h('div', { class: 'spread' }, h('p', { class: 'dim', style: { margin: 0 } }, cur.repo ? 'GitHub releases arrive by themselves; you can also load a version straight here.' : 'No GitHub repository: load each version here.'), h('button', { class: 'primary', onclick: () => uploadWin(cur, draw) }, '⬆ Upload a version')),
+          list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {}, list.map((x) => h('tr', {},
+            h('td', {}, h('b', {}, 'v' + x.version), x.prerelease ? h('span', { class: 'pill', style: { marginLeft: '6px' } }, 'beta') : null, h('div', { class: 'dim small' }, new Date(x.publishedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }))),
+            h('td', { class: 'small' }, x.assets.map((a) => h('div', {}, `${a.name} · ${mbs(a.size)}`))),
+            h('td', { class: 'small' }, h('span', { class: 'pill' }, x.manual ? 'Uploaded here' : 'GitHub')),
+            h('td', { class: 'right' }, x.manual ? h('button', { class: 'sm ghost danger', onclick: async () => { if (await confirmBox(`Remove version ${x.version} and its files from the website?`, 'Remove')) { await api('DELETE', `/api/software/${p.slug}/release/${encodeURIComponent(x.tag)}`).catch(oops); draw(); paint(); } } }, '✕') : null)))))) : h('p', { class: 'dim' }, 'No versions yet.'));
+      };
+      UI.modal({ title: 'Versions · ' + p.name, wide: true, body, actions: [{ label: 'Done' }] });
+      draw();
+    }
+    function uploadWin(p, after) {
+      const last = (p.releasesAll || [])[0], bump = last ? String(last.version).replace(/(\d+)(?!.*\d)/, (n) => String(Number(n) + 1)) : '1.0.0';
+      const f = { version: bump, notes: '', prerelease: false, files: [] };
+      const list = h('div', { class: 'small' }), bar = progress();
+      const showFiles = () => list.replaceChildren(...(f.files.length ? f.files.map((x, i) => h('div', { class: 'row', style: { gap: '8px' } }, `📦 ${x.name} · ${mbs(x.size)}`, h('button', { class: 'sm ghost', type: 'button', onclick: () => { f.files.splice(i, 1); showFiles(); } }, '✕'))) : [h('span', { class: 'dim' }, 'No files yet: add the installer for each system (.exe, .msi, .dmg, .pkg, .AppImage, .deb, .zip …).')]));
+      const verSel = pickOrType([bump, last ? String(last.version).replace(/(\d+)\.(\d+)\.\d+.*$|(\d+)\.(\d+)$/, (m, a, b, c, d) => `${a || c}.${Number(b || d) + 1}${a ? '.0' : ''}`) : '', last ? `${Number(String(last.version).split('.')[0]) + 1}.0.0` : ''].filter((v) => v && v !== String(last && last.version)), bump, (v) => { f.version = String(v).trim().replace(/^v/i, ''); }, 'version');
+      const form = h('div', { class: 'form' },
+        h('label', { class: 'f' }, h('span', {}, 'Version'), verSel, last ? h('div', { class: 'help' }, `The last one is v${last.version}.`) : null),
+        h('div', { class: 'f wide' }, h('div', { class: 'flabel' }, 'Installer files'), list, picker('', true, (files) => { f.files.push(...files); showFiles(); }, '+ Add files')),
+        h('label', { class: 'f wide' }, h('span', {}, "What's new (optional)"), h('textarea', { rows: 4, placeholder: '· Faster start-up\n· Fixed …', oninput: (e) => { f.notes = e.target.value; } })),
+        h('label', { class: 'row', style: { gap: '8px', gridColumn: '1 / -1' } }, h('input', { type: 'checkbox', onchange: (e) => { f.prerelease = e.target.checked; } }), 'This is a beta (only shown when betas are included)'), h('div', { style: { gridColumn: '1 / -1' } }, bar.el));
+      showFiles();
+      UI.modal({ title: 'Upload a version · ' + p.name, wide: true, body: form, actions: [{ label: 'Cancel' }, { label: 'Upload', primary: true, onClick: async () => {
+        if (!f.files.length) throw new Error('Add the installer file(s) first');
+        const ups = await sendFiles(p.slug, f.files, bar.set);
+        await api('POST', `/api/software/${p.slug}/release`, { version: f.version, notes: f.notes, prerelease: f.prerelease, uploads: ups });
+        toast(`v${f.version} is on the website`); if (after) after(); paint();
+      } }] });
+    }
+
     async function paint() {
       let r; try { r = await api('GET', '/api/software'); } catch (e) { box.replaceChildren(h('h2', {}, 'Software on the website'), h('p', { class: 'dim' }, e.message)); return; }
       box.replaceChildren(h('div', { class: 'spread' }, h('h2', {}, 'Software on the website'), h('button', { class: 'primary', onclick: () => edit(null) }, '+ Add an app')),
-        h('p', { class: 'dim', style: { marginTop: 0 } }, `Publish a release on GitHub as usual: the website copies its installers (.exe, .msi, .dmg, .pkg, .AppImage, .deb, .rpm …) to ${r.folder} every 6 hours (or now, with Sync) and serves them at /software.`),
-        r.list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {}, r.list.map((p) => { const rel = p.releases[0]; return h('tr', {},
-          h('td', { style: { width: '48px' } }, p.logo ? h('img', { src: '/media/' + p.logo, alt: '', style: { width: '40px', height: '40px', borderRadius: '9px', objectFit: 'cover', display: 'block' } }) : h('span', { style: { width: '40px', height: '40px', borderRadius: '9px', background: 'var(--accent)', color: '#111', display: 'grid', placeItems: 'center', fontWeight: 700 } }, String(p.name || '?').slice(0, 1))),
-          h('td', {}, h('b', {}, p.name), p.visible === false ? h('span', { class: 'pill', style: { marginLeft: '6px' } }, 'hidden') : null, h('div', { class: 'dim small' }, p.repo || 'no repository'), h('div', { class: 'dim small' }, `/software/${p.slug}`)),
-          h('td', { class: 'small' }, rel ? `v${rel.version} · ${rel.assets.length} file${rel.assets.length === 1 ? '' : 's'}` : 'no release yet', h('div', { class: 'dim small' }, `synced ${when(p.synced)} · ${p.downloads} download${p.downloads === 1 ? '' : 's'}`)),
+        h('p', { class: 'dim', style: { marginTop: 0 } }, `Publish a release on GitHub as usual: the website copies its installers (.exe, .msi, .dmg, .pkg, .AppImage, .deb, .rpm …), the app's icon and its screenshots to ${r.folder} every 6 hours (or now, with Sync). Or upload a version straight here with Versions.`),
+        r.list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {}, r.list.map((p) => { const rel = (p.releasesAll || p.releases)[0], nm = (p.media || []).length; return h('tr', {},
+          h('td', { style: { width: '48px' } }, iconOf(p)),
+          h('td', {}, h('b', {}, p.name), p.visible === false ? h('span', { class: 'pill', style: { marginLeft: '6px' } }, 'hidden') : null, h('div', { class: 'dim small' }, p.repo || 'no GitHub repository'), h('div', { class: 'dim small' }, `/software/${p.slug}`)),
+          h('td', { class: 'small' }, rel ? `v${rel.version} · ${rel.assets.length} file${rel.assets.length === 1 ? '' : 's'}${rel.manual ? ' · uploaded' : ''}` : 'no version yet', h('div', { class: 'dim small' }, `${p.repo ? 'synced ' + when(p.synced) + ' · ' : ''}${p.downloads} download${p.downloads === 1 ? '' : 's'} · ${nm} screenshot${nm === 1 ? '' : 's'}`)),
           h('td', { class: 'small' }, p.price ? 'R ' + p.price : 'Free'),
-          h('td', { class: 'right nowrap' }, h('button', { class: 'sm', onclick: async (e) => { e.target.disabled = true; try { const x = await api('POST', `/api/software/${p.slug}/sync`); toast(`${x.releases} release${x.releases === 1 ? '' : 's'}, ${x.copied} new file${x.copied === 1 ? '' : 's'}`); paint(); } catch (err) { oops(err); e.target.disabled = false; } } }, 'Sync'),
+          h('td', { class: 'right nowrap' }, p.repo ? h('button', { class: 'sm', title: 'Copy the newest releases, icon and screenshots from GitHub now', onclick: async (e) => { e.target.disabled = true; try { const x = await api('POST', `/api/software/${p.slug}/sync`); toast(`${x.releases} release${x.releases === 1 ? '' : 's'}, ${x.copied} new file${x.copied === 1 ? '' : 's'}`); paint(); } catch (err) { oops(err); e.target.disabled = false; } } }, 'Sync') : null,
+            ' ', h('button', { class: 'sm', onclick: () => versionsWin(p) }, 'Versions'), ' ', h('button', { class: 'sm', onclick: () => mediaWin(p) }, 'Screenshots'),
             ' ', h('button', { class: 'sm', onclick: () => edit(p) }, 'Edit'), ' ', h('a', { class: 'btn sm', href: (App.cfg.siteUrl || '') + '/software/' + p.slug, target: '_blank', rel: 'noopener' }, 'View ↗'),
             ' ', h('button', { class: 'sm ghost danger', onclick: async () => { if (await confirmBox(`Take ${p.name} off the website? The copied files stay until the next clean-up.`, 'Remove')) { await api('DELETE', '/api/software/' + p.id).catch(oops); paint(); } } }, '✕'))); })))) : h('p', { class: 'dim' }, 'No apps yet.'));
     }
