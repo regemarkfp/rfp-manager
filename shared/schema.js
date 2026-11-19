@@ -12,6 +12,8 @@
   const ROLE_SEES = {
     Coach: ['org', 'member', 'club', 'squad', 'player', 'competition', 'venue', 'fixture', 'image', 'theme'],
     Official: ['org', 'member', 'club', 'squad', 'player', 'competition', 'venue', 'fixture', 'image', 'theme'],
+    // an external producer (1.7.0): not a team member; one production and the lists they book from (lib/hub.js guestView)
+    Guest: ['org', 'production', 'venue', 'crewRole', 'crewMember', 'equipment', 'channel', 'image'],
   };
   const EXPENSE_CATS = ['Travel', 'Fuel', 'Accommodation', 'Meals', 'Equipment hire', 'Consumables', 'Parking & tolls', 'Crew', 'Other'];
   const BOOKING_STATUS = ['New', 'Assigned', 'Accepted', 'Declined by producer', 'Quoted', 'Booked', 'Not going ahead'];
@@ -322,9 +324,10 @@
     // when something happens in a game (a try, a six, a red card …) run actions: an advert, a graphic, a macro, set a variable
     gametrigger: { label: 'Game trigger', plural: 'Game triggers', group: 'Live', hidden: true, title: (d) => d.name, cols: ['name', 'when'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'notes', l: 'Notes', t: 'textarea' }] },
-    channel: { label: 'Channel', plural: 'Channels', group: 'Streaming', title: (d) => d.name, cols: ['logo', 'name', 'owner', 'access'], fields: [
+    channel: { label: 'Channel', plural: 'Channels', group: 'Streaming', title: (d) => d.name, cols: ['logo', 'name', 'category', 'owner', 'access'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true, ph: 'RegemarkFP TV, Cheetahs Rugby …' },
       { k: 'slug', l: 'Web address', t: 'text', ph: 'Made from the name', help: 'The channel page is at /c/<this>. Letters, numbers and dashes.' },
+      { k: 'category', l: 'Category', t: 'combo', opts: ['Church', 'Sport', 'Schools', 'Events', 'Music', 'Corporate', 'News', 'Entertainment'], help: 'Viewers filter channels by it on the website (Channels, Browse).' },
       { k: 'owner', l: 'Channel of', t: 'select', opts: ['Production company', 'Club', 'Team', 'Production'], def: 'Production company', help: 'Whose channel this is. A club or team channel takes its logo and colours unless you set them here.' },
       { k: 'club', l: 'Club', t: 'ref', ref: 'club' }, { k: 'squad', l: 'Team', t: 'ref', ref: 'squad' }, { k: 'production', l: 'Production', t: 'ref', ref: 'production' },
       { k: 'logo', l: 'Logo', t: 'image' }, { k: 'banner', l: 'Banner (wide picture at the top of the channel)', t: 'image' },
