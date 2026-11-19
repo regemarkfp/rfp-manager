@@ -321,6 +321,56 @@
     return [status, notes, plan, check, logCard];
   }
 
+  // ---- channels: every channel with its numbers; click one for its days, streams and subscribers
+  let chDays = 30, chOpen = '', chQ = '';
+  try { chDays = Number(localStorage.getItem('su-ch-days')) || 30; } catch (e) { /* private window */ }
+  const whenD = (t) => (t ? new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+  const dayText = (d) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+  function channelsCards(r, reload) {
+    const t = r.totals;
+    const tiles = el('div', { class: 'tiles' }, [[t.channels, 'channels'], [t.subscribers, 'subscriptions'], [t.people, 'people subscribed'], [t.live ? `${t.live} live` : '–', t.live ? `${t.watchingNow} watching now` : 'nothing live now'],
+      [t.viewers, `viewers, last ${r.days} days`], [t.watchHours + ' h', `watched, last ${r.days} days`]].map(([v, l]) => el('div', { class: 'tile' }, el('b', {}, String(v)), el('span', {}, l))));
+    const period = el('select', { class: 'sel', onchange: (e) => { chDays = Number(e.target.value); try { localStorage.setItem('su-ch-days', String(chDays)); } catch (x) { /* private */ } reload(); } },
+      [[7, 'Last 7 days'], [30, 'Last 30 days'], [90, 'Last 90 days'], [365, 'Last year']].map(([v, l]) => el('option', { value: v, selected: v === r.days ? '' : null }, l)));
+    const filter = el('input', { type: 'search', placeholder: 'Filter channels', style: 'max-width:240px;margin:0', value: chQ });
+    const body = el('tbody');
+    const detail = el('div');
+    const paint = () => {
+      const q = filter.value.trim().toLowerCase();
+      body.replaceChildren(...r.list.filter((c) => !q || [c.name, c.company, c.category, c.owner].join(' ').toLowerCase().includes(q)).map((c) => el('tr', { style: 'cursor:pointer' + (c.id === chOpen ? ';background:#00ff8214' : ''), onclick: () => { chOpen = chOpen === c.id ? '' : c.id; paint(); openDetail(); } },
+        el('td', {}, el('div', { class: 'co' }, c.logo ? el('img', { class: 'logo', src: c.logo, alt: '', loading: 'lazy', style: 'border-radius:50%' }) : el('span', { class: 'logo ph', style: `border-radius:50%;${c.color ? 'background:' + c.color : ''}` }, c.name.slice(0, 1).toUpperCase()),
+          el('div', {}, el('b', {}, c.name), el('div', { class: 'small dim' }, [c.company, c.category, c.owner !== 'Production company' ? c.owner : ''].filter(Boolean).join(' · ')),
+            el('div', {}, c.access !== 'Public' ? el('span', { class: 'pill' }, c.access) : null, c.disabled ? el('span', { class: 'pill bad' }, 'Switched off') : null, c.slug ? el('a', { class: 'small', href: '/c/' + c.slug, target: '_blank', rel: 'noopener', onclick: (e) => e.stopPropagation() }, '/c/' + c.slug + ' ↗') : null)))),
+        el('td', { class: 'n' }, el('b', {}, String(c.subscribers)), c.newSubscribers ? el('div', { class: 'small ok' }, `+${c.newSubscribers} new`) : null),
+        el('td', { class: 'n' }, c.live ? [el('span', { class: 'bad' }, '● LIVE'), el('div', { class: 'small dim' }, `${c.watchingNow} watching`)] : el('span', { class: 'dim' }, '–')),
+        el('td', { class: 'n' }, String(c.streams), el('div', { class: 'small dim' }, c.nextStream ? 'next ' + dayText(c.nextStream) : c.lastStream ? 'last ' + dayText(c.lastStream) : '')),
+        el('td', { class: 'n' }, String(c.viewers)), el('td', { class: 'n' }, c.watchHours + ' h'), el('td', { class: 'n' }, String(c.peak)),
+        el('td', { class: 'n' }, String(c.vods), el('div', { class: 'small dim' }, `${c.vodPlays} plays`)))));
+    };
+    async function openDetail() {
+      if (!chOpen) { detail.replaceChildren(); return; }
+      detail.replaceChildren(el('div', { class: 'card dim' }, 'Loading…'));
+      let d; try { d = await api('GET', `/api/super/channels/${encodeURIComponent(chOpen)}?days=${r.days}`); } catch (e) { detail.replaceChildren(el('div', { class: 'card bad' }, e.message)); return; }
+      const max = Math.max(1, ...d.perDay.map((x) => x.viewers));
+      const chart = el('div', { style: 'display:flex;align-items:flex-end;gap:2px;height:120px;margin:6px 0 4px' }, d.perDay.map((x) => el('div', { title: `${dayText(x.day)}: ${x.viewers} viewers, ${Math.round(x.seconds / 360) / 10} h`, style: `flex:1;min-width:2px;background:${x.viewers ? 'var(--acc)' : '#2a2a2a'};height:${Math.max(2, Math.round((x.viewers / max) * 120))}px` })));
+      detail.replaceChildren(el('div', { class: 'card' },
+        el('div', { class: 'row', style: 'justify-content:space-between' }, el('h2', { style: 'margin:0' }, d.name), el('button', { class: 'ghost sm', onclick: () => { chOpen = ''; paint(); openDetail(); } }, 'Close')),
+        el('h3', {}, `Viewers per day, last ${d.days} days`), chart, el('div', { class: 'row small dim', style: 'justify-content:space-between' }, el('span', {}, dayText(d.perDay[0].day)), el('span', {}, dayText(d.perDay[d.perDay.length - 1].day))),
+        el('h3', {}, `Subscribers (${d.subscribers.length})`),
+        d.subscribers.length ? [el('div', { class: 'scroll', style: 'max-height:360px;overflow-y:auto' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'Email'), el('th', { class: 'n' }, 'Subscribed'))),
+          el('tbody', {}, d.subscribers.map((x) => el('tr', {}, el('td', {}, x.name || el('span', { class: 'dim' }, '(no name)')), el('td', {}, el('a', { href: 'mailto:' + x.email }, x.email)), el('td', { class: 'n small dim' }, x.since ? whenD(x.since) : 'before 1.8.0')))))),
+          el('p', {}, el('a', { class: 'btn ghost sm', href: `/api/super/channels/${encodeURIComponent(d.id)}/subscribers.csv` }, 'Subscribers (CSV)'))] : el('p', { class: 'dim' }, 'Nobody has subscribed yet.'),
+        el('h3', {}, `Streams (${d.streams.length})`),
+        d.streams.length ? el('div', { class: 'scroll' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Date'), el('th', {}, 'Stream'), el('th', {}, 'Company'), el('th', { class: 'n' }, `Viewers (${d.days} d)`))),
+          el('tbody', {}, d.streams.map((x) => el('tr', {}, el('td', { class: 'small' }, dayText(x.date)), el('td', {}, x.live ? el('span', { class: 'bad' }, '● ') : null, x.slug ? el('a', { href: '/watch/' + x.slug, target: '_blank', rel: 'noopener' }, x.title) : x.title), el('td', { class: 'small dim' }, x.company), el('td', { class: 'n' }, String(x.viewers))))))) : el('p', { class: 'dim' }, 'No streams on this channel yet.')));
+    }
+    filter.addEventListener('input', () => { chQ = filter.value; paint(); }); paint(); openDetail();
+    return [el('div', { class: 'card' }, el('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:10px' }, el('h2', { style: 'margin:0' }, 'All channels'), el('div', { class: 'row' }, filter, period)), tiles),
+      el('div', { class: 'card' }, el('p', { class: 'small dim', style: 'margin-top:0' }, `Viewers are different people watching each stream (counted per stream), from ${dayText(r.from)}. Click a channel for its days, streams and subscribers.`),
+        r.list.length ? el('div', { class: 'scroll' }, el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, 'Channel'), el('th', { class: 'n' }, 'Subscribers'), el('th', { class: 'n' }, 'Now'), el('th', { class: 'n' }, 'Streams'), el('th', { class: 'n' }, 'Viewers'), el('th', { class: 'n' }, 'Watched'), el('th', { class: 'n' }, 'Peak'), el('th', { class: 'n' }, 'Videos'))), body))
+          : el('p', { class: 'dim' }, 'No channels yet.')), detail];
+  }
+
   async function load(quiet) {
     clearTimeout(timer); timer = null;
     const y = window.scrollY;
@@ -328,14 +378,15 @@
     const me = await api('GET', '/api/super/me').catch(() => ({}));
     if (!me.email) { $('who').replaceChildren(); if (quiet) return; return loginForm(); }
     $('who').replaceChildren(me.email + ' · ', el('a', { href: '#', onclick: async (e) => { e.preventDefault(); await api('POST', '/api/super/logout'); load(); } }, 'Sign out'));
-    const tab = location.hash === '#nas' ? 'nas' : location.hash === '#updates' ? 'updates' : location.hash.startsWith('#files') ? 'files' : 'overview';
+    const tab = location.hash === '#nas' ? 'nas' : location.hash === '#channels' ? 'channels' : location.hash === '#updates' ? 'updates' : location.hash.startsWith('#files') ? 'files' : 'overview';
     if (tab === 'files' && !quiet) filesPath = decodeURIComponent(location.hash.slice(7).replace(/^\//, ''));
-    const tabs = el('div', { class: 'tabs' }, [['overview', 'Overview'], ['nas', 'NAS'], ['files', 'Files'], ['updates', 'Updates']].map(([k, label]) => el('a', { href: k === 'overview' ? '#' : '#' + k, class: k === tab ? 'on' : '', onclick: (e) => { e.preventDefault(); history.replaceState(null, '', k === 'overview' ? location.pathname : '#' + k); load(); } }, label)));
+    const tabs = el('div', { class: 'tabs' }, [['overview', 'Overview'], ['channels', 'Channels'], ['nas', 'NAS'], ['files', 'Files'], ['updates', 'Updates']].map(([k, label]) => el('a', { href: k === 'overview' ? '#' : '#' + k, class: k === tab ? 'on' : '', onclick: (e) => { e.preventDefault(); history.replaceState(null, '', k === 'overview' ? location.pathname : '#' + k); load(); } }, label)));
     const stamp = el('span', { class: 'small dim' }, `Updated ${new Date().toLocaleTimeString('en-GB')}`);
     const autoBox = el('label', { class: 'small dim', style: 'display:flex;gap:6px;align-items:center;cursor:pointer' }, el('input', { type: 'checkbox', checked: auto ? '' : null, style: 'width:auto;margin:0', onchange: (e) => { auto = e.target.checked; try { localStorage.setItem('su-auto', auto ? '1' : '0'); } catch (x) { /* ignore */ } later(); } }), 'Auto refresh (30 s)');
     const head = (title) => el('div', { class: 'row', style: 'justify-content:space-between' }, el('h1', {}, title), el('div', { class: 'row' }, stamp, autoBox, el('button', { class: 'ghost', onclick: () => load() }, 'Refresh')));
     try {
       if (tab === 'updates') { const u = await api('GET', '/api/super/updates'); if (quiet && document.querySelector('#main pre.code.open')) return later(); show(tabs, head('Updates'), updatesCards(u, () => load(true))); if (u.server && u.server.running) setTimeout(() => { if (location.hash === '#updates') load(true); }, 5000); }
+      else if (tab === 'channels') { if (quiet && document.activeElement && document.activeElement.tagName === 'SELECT') return later(); const r = await api('GET', '/api/super/channels?days=' + chDays); show(tabs, head('Channels'), channelsCards(r, () => load(true))); }
       else if (tab === 'files') { if (uploading && quiet) return later(); show(tabs, head('Files'), await filesCard()); }
       else if (tab === 'nas') { const [n, u] = await Promise.all([api('GET', '/api/super/nas'), api('GET', '/api/super/nas/users').catch((e) => ({ ready: false, users: [], info: { error: e.message } }))]); show(tabs, head('NAS'), nasCards(n), usersCard(u)); if (n.measuring) setTimeout(() => { if (location.hash === '#nas') load(true); }, 8000); }
       else { const o = await api('GET', '/api/super/overview'); show(tabs, head('RegemarkFP overview'), healthCard(o.health), companiesCard(o.companies)); }
