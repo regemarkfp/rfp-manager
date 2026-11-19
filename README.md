@@ -33,6 +33,20 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 
 ## What's new
 
+### 1.7.1
+
+- **Channel categories:** a channel has a Category (Church, Sport, Schools, Events, Music, Corporate, News, Entertainment, or type your own). The website's Channels page has a chip per category (All · Church · Sport …, also as /channels?category=Church), and Browse / search find channels by their category.
+
+### 1.7.0
+
+**External producers** – give someone outside your team one production for a one-time event:
+
+- On a production, **External producers → + Add an external producer**: their email, name, and until when (a week after the event unless you choose another day). They get an email with a link to the production.
+- They sign in with Google (or a password) with that email and see **My productions**: only the productions they were given, nothing else of your team.
+- They manage the **live stream** (channel, title, web address, who can watch, picture, recording, audio tracks, restreams, the stream key, ending / reopening it, master control) and **book crew & kit** from your lists – crew, roles and equipment by name, **without rates, costs, quotes or invoices**. Contacts, notes and hospitals too. The rest of the production (name, date, status, costs, rider) stays as you set it; rates and "paid" ticks are kept.
+- **Change** their end date or **✕** take access away any time; access also ends by itself on the day (an hourly check tidies up).
+- Saving a production in the Studio no longer overwrites what the server keeps on it (external producers, the venue's rider answers, when the rider / call sheet was sent), even if the page was open for a while.
+
 ### 1.6.1
 
 - **Clearer pages:** larger headings in the accent colour everywhere (the Studio, the website, File Sharing, Universe, the watch page and the live screens), and more room between cards, fields and tabs. Printed pages keep black headings.
