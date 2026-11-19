@@ -342,3 +342,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
   .mods { grid-template-columns: repeat(3, 1fr); }
   .pad { gap: 6px; }
 }
+
+/* 1.6.1: headings in the accent colour (operator screens keep their compact sizes) */
+h1, h2, h3, .modal h3 { color: var(--accent); }
+.landing h1 { font-size: 34px; } .landing a.card h2 { font-size: 22px; }
