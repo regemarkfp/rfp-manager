@@ -258,3 +258,9 @@ table.files tr:not(:hover):not(.sel) .acts .ico:first-child { opacity: .45; }
   .xfer .plus-big { padding: 2px 0 0; } .xfer .plus-big .plus { width: 92px; height: 60px; font-size: 38px; }
   .xfer h2.ctr { font-size: 18px; margin-top: 6px; } .xfer { padding-top: 16px; padding-bottom: 14px; }
 }
+
+/* 1.6.1: bigger headings in the accent colour */
+h1 { font-size: 30px; color: var(--accent, #00ff82); } h2 { font-size: 21px; color: var(--accent, #00ff82); }
+.xfer h2.ctr { font-size: 24px; } .dlg h2 { font-size: 22px; } .pv-side h3 { color: var(--accent, #00ff82); font-size: 16px; }
+h3.team { color: var(--accent, #00ff82); font-size: 14px; }
+@media (max-width: 700px) { h1 { font-size: 24px; } h2 { font-size: 19px; } }
