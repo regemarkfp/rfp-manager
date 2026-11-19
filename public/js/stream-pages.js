@@ -138,9 +138,9 @@
   const prodPanel = App.panels.production;
   App.panels.production = (doc, form) => {
     const base = prodPanel(doc, form);
-    const stream = App.docs.has(doc.id) && App.can('edit') && !App.cfg.bridge ? streamCard(doc) : null;
+    const stream = App.docs.has(doc.id) && (App.can('edit') || App.role === 'Guest') && !App.cfg.bridge ? streamCard(doc) : null;
     const matches = stream ? matchesCard(doc) : null;
-    const recs = stream && App.recordingsCard && App.cfg.mode === 'cloud' ? App.recordingsCard(doc) : null;
+    const recs = stream && App.role !== 'Guest' && App.recordingsCard && App.cfg.mode === 'cloud' ? App.recordingsCard(doc) : null;
     const box = h('div', {}, stream, matches, recs, base);
     box.repaint = () => { if (base && base.repaint) base.repaint(); if (stream) stream.repaint(); if (matches) matches.repaint(); if (recs) recs.repaint(); };
     return box;

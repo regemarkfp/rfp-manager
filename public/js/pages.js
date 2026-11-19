@@ -405,7 +405,7 @@
       holder.repaint = () => holder.replaceChildren(PANELS[type](App.docs.get(doc.id) || doc, form));
       panel = holder;
     }
-    const back = type === 'fixture' ? '#/fixtures' : type === 'vodvideo' ? '#/vod' : type === 'vodseries' ? '#/vod/series' : type === 'vodplaylist' ? '#/playlists/' + id : '#/list/' + type;
+    const back = App.role === 'Guest' ? '#/' : type === 'fixture' ? '#/fixtures' : type === 'vodvideo' ? '#/vod' : type === 'vodseries' ? '#/vod/series' : type === 'vodplaylist' ? '#/playlists/' + id : '#/list/' + type;
     const save = async () => {
       try {
         const keep = isNew ? {} : Object.fromEntries(Object.entries((App.docs.get(doc.id) || doc).data).filter(([k]) => !(k in form.data)));   // fields this form does not show (rundown, live score…)
@@ -415,12 +415,12 @@
         if (isNew) location.hash = `#/edit/${type}/${doc.id}`; else if (panel && panel.repaint) panel.repaint();
       } catch (err) { oops(err); }
     };
-    const el = h('div', {}, pageHead(h('div', {}, h('a', { class: 'small', href: back }, '← ' + e.plural), h('h1', {}, isNew ? 'New ' + e.label.toLowerCase() : e.title(doc.data, (x) => App.get(x)) || e.label)),
-      !isNew && canEdit ? h('button', { class: 'danger no-print', onclick: async () => { if (await confirmBox(deleteText(type, [doc.id]))) { try { const r = await App.remove(type, doc.id); toast((r && r.removed && r.removed.length) ? `Deleted, with ${r.removed.length} team${r.removed.length === 1 ? '' : 's'}` : 'Deleted'); location.hash = back; } catch (err) { oops(err); } } } }, 'Delete') : null,
+    const el = h('div', {}, pageHead(h('div', {}, h('a', { class: 'small', href: back }, '← ' + (App.role === 'Guest' ? 'My productions' : e.plural)), h('h1', {}, isNew ? 'New ' + e.label.toLowerCase() : e.title(doc.data, (x) => App.get(x)) || e.label)),
+      !isNew && canEdit && App.role !== 'Guest' ? h('button', { class: 'danger no-print', onclick: async () => { if (await confirmBox(deleteText(type, [doc.id]))) { try { const r = await App.remove(type, doc.id); toast((r && r.removed && r.removed.length) ? `Deleted, with ${r.removed.length} team${r.removed.length === 1 ? '' : 's'}` : 'Deleted'); location.hash = back; } catch (err) { oops(err); } } } }, 'Delete') : null,
       canEdit ? h('button', { class: 'primary no-print', onclick: save }, 'Save') : null),
-    type !== 'production' || !canEdit ? panel : null,
+    type !== 'production' || !canEdit || App.role === 'Guest' ? panel : null,
     App.limited() && type === 'fixture' ? null : h('div', { class: 'card' }, canEdit ? null : online ? h('div', { class: 'spread', style: { marginBottom: '10px' } }, h('p', { class: 'dim', style: { margin: 0 } }, `${e.plural} are managed on the website. This PC shows them and keeps a copy for when the internet is down.`), App.can('edit') && !isNew ? h('a', { class: 'btn sm', href: App.onlineUrl(`#/edit/${type}/${doc.id}`), target: '_blank', rel: 'noopener' }, 'Edit on the website ↗') : null) : h('p', { class: 'dim' }, 'You can view this but your role cannot change it.'), form.el),
-    type === 'production' && canEdit ? panel : null);
+    type === 'production' && canEdit && App.role !== 'Guest' ? panel : null);
     if (!canEdit) {
       el.querySelectorAll('.form input, .form select, .form textarea').forEach((x) => { x.disabled = true; });
       el.querySelectorAll('.form button').forEach((x) => { x.style.display = 'none'; });     // upload, add row … mean nothing when it cannot be saved

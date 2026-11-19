@@ -174,7 +174,7 @@
   const productionPanel = App.panels.production;
   App.panels.production = (doc, form) => {
     const base = App.can('edit') ? productionPanel(doc, form) : null;           // costing: Producers and Admins
-    const exp = App.docs.has(doc.id) && !App.cfg.bridge ? expensesCard(doc) : null;
+    const exp = App.docs.has(doc.id) && !App.cfg.bridge && App.role !== 'Guest' ? expensesCard(doc) : null;
     const box = h('div', {}, exp, base);
     box.repaint = () => { if (base && base.repaint) base.repaint(); if (exp) exp.repaint(); };
     return box;

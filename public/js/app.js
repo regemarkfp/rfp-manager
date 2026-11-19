@@ -23,8 +23,8 @@ const App = {
   // scoring is done on the production PC (or a device on its network), not on the website
   // on the production PC (the CasparCG bridge) most records are managed on the website and only shown here
   editable(type) { return !(this.cfg && this.cfg.bridge) || (this.cfg.pcEdit || []).includes(type); },
-  canEdit(type) { return this.editable(type) && (this.can('edit') || (this.role === 'Coach' && ['club', 'squad', 'player'].includes(type)) || (type === 'expense' && !Schema.ROLE_SEES[this.role])); },
-  canCreate(type) { return this.canEdit(type) && !(this.role === 'Coach' && type === 'club'); },
+  canEdit(type) { return this.editable(type) && ((this.role === 'Guest' && type === 'production') || this.can('edit') || (this.role === 'Coach' && ['club', 'squad', 'player'].includes(type)) || (type === 'expense' && !Schema.ROLE_SEES[this.role])); },
+  canCreate(type) { return this.canEdit(type) && !(this.role === 'Coach' && type === 'club') && this.role !== 'Guest'; },
   // coaches and officials: their member record, a coach's clubs, and whether a coach may change this record
   myMember() { return this.list('member').find((m) => m.data.email === (this.me && this.me.email)) || null; },
   coachClubs() { const m = this.myMember(); return new Set((m && m.data.role === 'Coach' && m.data.clubs) || []); },
@@ -191,6 +191,7 @@ function navFor() {
   const c = App.cfg || {};
   if (App.role === 'Coach') return [['', [['#/', 'My teams'], ['#/fixtures', 'Fixtures & Results'], ['#/list/club', 'My clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/settings', 'Settings']]]];
   if (App.role === 'Crew' && !c.bridge) return [['', [['#/', 'My gigs'], ['#/calendar', 'Calendar'], ['#/list/expense', 'My expenses'], ['#/settings', 'Settings']]]];
+  if (App.role === 'Guest') return [['', [['#/', 'My productions']]]];
   if (App.role === 'Official') return [['', [['#/', 'My matches'], ['#/fixtures', 'Fixtures & Results'], ['#/settings', 'Settings']]]];
   if (c.bridge) {
     return [
@@ -238,7 +239,7 @@ function shell(content) {
         if (e.target.value === '+') { e.target.value = App.team; return newTeam(); }
         await App.selectTeam(e.target.value); location.hash = '#/'; route();
       } }, App.teams.map((t) => h('option', { value: t.id, selected: t.id === App.team }, t.name)), h('option', { value: '+' }, '+ New production team…')),
-      App.pcs ? h('div', { id: 'pc-picker' }, pcPicker()) : null,
+      App.pcs && App.role !== 'Guest' ? h('div', { id: 'pc-picker' }, pcPicker()) : null,
       App.searchBox ? App.searchBox() : null,
       (() => {
         const NAV = navFor();
@@ -342,7 +343,7 @@ App.pages.more = () => {
   const groups = navFor().map(([g, links]) => [g, links.filter(([href]) => !tabs.has(href))]).filter(([, links]) => links.length);
   return { el: h('div', { class: 'more' },
     h('a', { class: 'more-me', href: '#/settings' }, App.avatar(App.me.image, App.me.name || App.me.email, 44), h('div', { class: 'grow' }, h('b', {}, App.me.name || App.me.email), h('div', { class: 'dim small' }, [App.me.email, App.role].filter(Boolean).join(' · '))), icon('chevron')),
-    App.pcs ? h('div', { class: 'more-pc', id: 'pc-picker' }, pcPicker()) : null,
+    App.pcs && App.role !== 'Guest' ? h('div', { class: 'more-pc', id: 'pc-picker' }, pcPicker()) : null,
     groups.map(([g, links]) => h('div', { class: 'more-group' }, g ? h('div', { class: 'more-head' }, g) : null,
       h('div', { class: 'more-list' }, links.map(([href, label]) => h('a', { href }, h('span', { class: 'more-ico' }, icon(window.RFPIcons.forLink(href, g), 22)), h('span', { class: 'grow' }, label), icon('chevron', 20)))))),
     h('div', { class: 'more-foot' },
@@ -625,7 +626,7 @@ App.formSport = formSport;
 // so nothing gets lost further down a long page. Fields limited to some sports (f.sports) only show for those.
 const formTabMemo = {};
 const formPhaseMemo = {};
-function buildForm(type, initial, { fields, onChange, phaseTop, tabExtras } = {}) {
+function buildForm(type, initial, { fields, onChange, phaseTop, tabExtras, noPhases } = {}) {
   const data = JSON.parse(JSON.stringify(initial || {}));
   const all = fields || Schema.fieldsFor(type, App.org()).filter((f) => !f.hidden);
   for (const f of all) if (data[f.k] === undefined && f.def !== undefined) data[f.k] = f.def;
@@ -636,7 +637,7 @@ function buildForm(type, initial, { fields, onChange, phaseTop, tabExtras } = {}
   const groupOf = (f, i) => f.group || (all.slice(0, i).some((x) => x.group) ? 'More' : 'Details');
   // 1.6.0: records with phases (a production: pre-production, production, post-production) show a phase bar; the
   // tabs under it are the groups of that phase
-  const PH = (Schema.ENTITIES[type] || {}).phases || null;
+  const PH = noPhases ? null : (Schema.ENTITIES[type] || {}).phases || null;
   const phaseNames = PH ? Object.keys(PH) : [];
   const phaseOf = (g) => phaseNames.find((n) => PH[n].includes(g)) || phaseNames[0];
   let phase = PH ? (formPhaseMemo[type] && phaseNames.includes(formPhaseMemo[type]) ? formPhaseMemo[type] : phaseNames[0]) : '';

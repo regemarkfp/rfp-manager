@@ -862,9 +862,15 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     return L.length + U.length + R.length ? [section('Live', L.length ? el('div', { class: 'matches' }, L.map(matchCard)) : null), section('Fixtures', U.length ? el('div', { class: 'matches' }, U.map(matchCard)) : null), section('Results', R.length ? el('div', { class: 'matches' }, R.map(matchCard)) : null)]
       : el('div', { class: 'empty' }, 'No matches to show.');
   }
+  // the channels, with a chip per category (Church, Sport …): /channels?category=Church
   function channelsPage() {
-    const c = D.channels.filter((x) => match(query, x.name, x.company));
-    return [el('h2', { class: 'sec' }, 'Channels'), c.length ? el('div', { class: 'chans', style: { flexWrap: 'wrap' } }, c.map(chanChip)) : el('div', { class: 'empty' }, 'No channels yet.')];
+    const want = new URLSearchParams(location.search).get('category') || '';
+    const all = D.channels.filter((x) => match(query, x.name, x.company, x.category));
+    const cats = [...new Set(all.map((x) => x.category).filter(Boolean))].sort();
+    const c = all.filter((x) => !want || x.category === want);
+    const chip = (v, label) => el('a', { class: 'chip' + (v === want ? ' on' : ''), style: { textDecoration: 'none' }, href: '/channels' + (v ? '?category=' + encodeURIComponent(v) : ''), 'data-nav': '' }, label);
+    return [el('h2', { class: 'sec' }, 'Channels'), cats.length ? el('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap', margin: '0 0 16px' } }, chip('', 'All'), cats.map((x) => chip(x, x))) : null,
+      c.length ? el('div', { class: 'chans', style: { flexWrap: 'wrap' } }, c.map(chanChip)) : el('div', { class: 'empty' }, want ? `No ${want} channels yet.` : 'No channels yet.')];
   }
   function subscriptionsPage() {
     if (!D.me) return el('div', { class: 'signin-box' }, el('h2', {}, 'Your subscriptions'), el('p', {}, 'Sign in to subscribe to channels and see their streams and videos here. Channels email you when they go live.'), signInButton());

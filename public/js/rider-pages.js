@@ -136,8 +136,77 @@
       (p.riderLog || []).filter((l) => l.note).slice(-3).map((l) => h('p', { class: 'dim small', style: { margin: '6px 0 0' } }, `💬 ${l.by}, ${when(l.at)}: ${l.note}`)));
   }
 
-  // the production form: phases with steps, and the rider box on its tab
-  App.productionFormOpts = (doc, form, markDirty) => ({
+  // ---- external producers (1.7.0): someone outside the team manages one production's live stream and its crew & kit
+  const GUEST_FIELDS = ['contacts', 'crew', 'crewNotes', 'hospitals', 'equipment', 'streamChannel', 'streamTitle', 'streamSlug', 'streamVisibility', 'streamPublicDays', 'streamPoster', 'streamRecord', 'streamVod', 'streamAudio', 'streamPerMatch', 'streamRestream'];
+  const guestFields = () => Schema.fieldsFor('production', App.org()).filter((f) => GUEST_FIELDS.includes(f.k) && !f.hidden)
+    .map((f) => (f.k === 'crew' ? { ...f, fields: f.fields.filter((x) => !['rate', 'paid'].includes(x.k)) } : f));
+  const dayText = (iso) => (iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '');
+  const myGrant = (d) => ((d && d.guests) || []).find((g) => String(g.email).toLowerCase() === String(App.me.email || '').toLowerCase()) || null;
+
+  // what the external producer sees first: their productions
+  const homeBefore = App.pages.dashboard;
+  App.pages.dashboard = () => {
+    if (App.role !== 'Guest') return homeBefore();
+    const list = App.list('production').sort((a, b) => String(a.data.date || '').localeCompare(String(b.data.date || '')));
+    return { el: h('div', {}, pageHead('My productions'),
+      h('p', { class: 'dim', style: { marginTop: '-10px' } }, `${App.org().name || 'This production team'} gave you access as an external producer: manage the live stream and book the crew and equipment.`),
+      list.length ? list.map((d) => { const g = myGrant(d.data); return h('a', { class: 'card', href: '#/edit/production/' + d.id, style: { display: 'block', color: 'inherit', textDecoration: 'none' } },
+        h('div', { class: 'spread' }, h('div', {}, h('h2', { style: { margin: '0 0 4px' } }, d.data.name || 'Production'),
+          h('div', { class: 'dim' }, [dayText(d.data.date), d.data.txTime && 'TX ' + d.data.txTime, d.data.venue && App.title('venue', d.data.venue)].filter(Boolean).join(' · '))),
+          h('div', { style: { textAlign: 'right' } }, h('span', { class: 'btn primary' }, 'Open'), g && g.until ? h('div', { class: 'dim small', style: { marginTop: '6px' } }, 'Access until ' + dayText(g.until)) : null))); })
+        : h('div', { class: 'card big-empty' }, h('div', { class: 'em-title' }, 'Nothing here now'), h('p', { class: 'dim' }, 'Your access has ended, or the production was removed. Ask the production team if you still need it.'))) };
+  };
+
+  // on the production: a summary for the external producer; the list of external producers for the team
+  const panelBefore = App.panels.production;
+  App.panels.production = (doc, form) => {
+    const inner = panelBefore(doc, form);
+    if (App.role === 'Guest') {
+      const d = (App.docs.get(doc.id) || doc).data, g = myGrant(d), v = d.venue ? App.docs.get(d.venue) : null;
+      const card = h('div', { class: 'card' }, h('h2', {}, 'The event'),
+        h('div', { class: 'cards' }, [['Date', dayText(d.date) + (Number(d.days) > 1 ? ` (${d.days} days)` : '')], ['TX / start', d.txTime], ['Venue', v ? [v.data.name, v.data.city].filter(Boolean).join(', ') : ''], ['Your access until', g ? dayText(g.until) : '']]
+          .filter((x) => x[1]).map(([k, val]) => h('div', { class: 'tile' }, h('b', { style: { fontSize: '16px' } }, val), h('span', {}, k)))),
+        d.description ? h('p', { style: { whiteSpace: 'pre-wrap', margin: '12px 0 0' } }, d.description) : null,
+        h('p', { class: 'dim small', style: { margin: '10px 0 0' } }, 'You can change the crew & kit and the live stream below. Press Save to keep changes.'));
+      const box = h('div', {}, card, inner);
+      box.repaint = () => { if (inner && inner.repaint) inner.repaint(); };
+      return box;
+    }
+    if (!App.docs.has(doc.id) || !App.can('edit') || App.cfg.mode !== 'cloud' || App.cfg.bridge) return inner;
+    const card = h('div', { class: 'card' });
+    const paint = () => {
+      const d = (App.docs.get(doc.id) || doc).data, list = d.guests || [], today = UI.today();
+      card.replaceChildren(h('div', { class: 'spread' }, h('h2', { style: { margin: 0 } }, 'External producers'), h('button', { class: 'sm', onclick: () => addGuest(d) }, '+ Add an external producer')),
+        h('p', { class: 'dim small', style: { margin: '8px 0 10px', whiteSpace: 'normal' } }, 'People outside your team who manage this production\'s live stream and book its crew and kit (from your lists, without rates). They see only this production; their access ends by itself.'),
+        list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 't' }, h('tbody', {}, list.map((g) => h('tr', {},
+          h('td', {}, h('b', {}, g.name || g.email), g.name ? h('div', { class: 'dim small' }, g.email) : null),
+          h('td', { class: 'small' }, g.until < today ? h('span', { class: 'pill' }, 'Ended') : 'Until ' + dayText(g.until)),
+          h('td', { class: 'right nowrap' }, h('button', { class: 'sm', onclick: () => addGuest(d, g) }, 'Change'), ' ',
+            h('button', { class: 'sm ghost danger', onclick: async () => { if (!(await confirmBox(`Take ${g.name || g.email}'s access away now?`, 'Remove'))) return; try { await api('DELETE', `${base(doc.id)}/guests/${enc(g.email)}?team=${App.team}`); toast('Access removed'); } catch (e) { oops(e); } } }, '✕'))))))) : null);
+    };
+    const addGuest = (d, g) => {
+      const last = d.date ? (() => { const t = new Date(d.date + 'T12:00:00'); t.setDate(t.getDate() + Math.max(0, (Number(d.days) || 1) - 1) + 7); return t.toISOString().slice(0, 10); })() : '';
+      const f = { email: g ? g.email : '', name: g ? g.name : '', until: g ? g.until : last, note: '', notify: true };
+      const body = h('div', { class: 'form' },
+        h('label', { class: 'f' }, h('span', {}, 'Email *'), h('input', { type: 'email', value: f.email, disabled: !!g, placeholder: 'producer@example.com', oninput: (e) => { f.email = e.target.value; } })),
+        h('label', { class: 'f' }, h('span', {}, 'Name'), h('input', { value: f.name, oninput: (e) => { f.name = e.target.value; } })),
+        h('label', { class: 'f' }, h('span', {}, 'Access until'), h('input', { type: 'date', value: f.until, min: UI.today(), oninput: (e) => { f.until = e.target.value; } }), h('div', { class: 'help' }, 'A week after the event unless you choose another day. You can end it any time.')),
+        h('label', { class: 'f wide' }, h('span', {}, 'Note in the email'), h('textarea', { rows: 2, oninput: (e) => { f.note = e.target.value; } })),
+        h('label', { class: 'row', style: { gap: '8px', gridColumn: '1 / -1' } }, h('input', { type: 'checkbox', checked: true, onchange: (e) => { f.notify = e.target.checked; } }), g ? 'Email them about the change' : 'Email them the invitation'),
+        h('p', { class: 'wide help', style: { margin: 0, whiteSpace: 'normal' } }, 'They sign in with Google (or a password) using this email, and see only this production: its live stream (channel, key, title, audio, restreams, master control) and its crew & kit. No costs, quotes or invoices.'));
+      UI.modal({ title: g ? 'Change access' : 'Add an external producer', wide: true, body, actions: [{ label: 'Cancel' }, { label: g ? 'Save' : 'Give access', primary: true, onClick: async () => {
+        const r = await api('POST', `${base(doc.id)}/guests?team=${App.team}`, f);
+        toast(`${r.guest.name || r.guest.email} can manage it until ${dayText(r.guest.until)}${r.mailed ? ' (emailed)' : ''}`);
+      } }] });
+    };
+    paint();
+    const box = h('div', {}, inner, card);
+    box.repaint = () => { if (inner && inner.repaint) inner.repaint(); paint(); };
+    return box;
+  };
+
+  // the production form: phases with steps and the rider box on its tab; for an external producer just their fields
+  App.productionFormOpts = (doc, form, markDirty) => (App.role === 'Guest' ? { noPhases: true, fields: guestFields() } : {
     phaseTop: (phase, goPhase, goGroup, data) => phaseTop(doc, phase, goPhase, goGroup, data),
     tabExtras: { 'Tech rider': () => (App.can('edit') ? riderBox(doc, form, markDirty) : null) },
   });
