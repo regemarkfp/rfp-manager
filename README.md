@@ -33,6 +33,10 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 
 ## What's new
 
+### 1.7.2
+
+- **Channel of: Church.** A channel can now be a church's channel (Channel of → Church), next to Production company, Club, Team and Production. The website shows "Church" under the channel's name.
+
 ### 1.7.1
 
 - **Channel categories:** a channel has a Category (Church, Sport, Schools, Events, Music, Corporate, News, Entertainment, or type your own). The website's Channels page has a chip per category (All · Church · Sport …, also as /channels?category=Church), and Browse / search find channels by their category.
