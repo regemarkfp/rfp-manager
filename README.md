@@ -33,6 +33,14 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 
 ## What's new
 
+### 1.8.0
+
+**Universe → Channels:** every channel on the website, whichever production company it belongs to.
+
+- Totals: channels, subscriptions, people subscribed, what is live now (and how many are watching), viewers and hours watched in the period (7 days, 30 days, 90 days or a year).
+- Per channel: company, category, whose channel, public / password / switched off, its page link; **subscribers** (and how many are new in the period), live now, streams (last / next), viewers, hours watched, peak, and videos with their plays. Most subscribers first; filter by name, company or category.
+- Click a channel: viewers per day, its **subscribers** (name, email, when they subscribed – from now on; earlier ones show "before 1.8.0") with a CSV download, and its streams with their viewers.
+
 ### 1.7.2
 
 - **Channel of: Church.** A channel can now be a church's channel (Channel of → Church), next to Production company, Club, Team and Production. The website shows "Church" under the channel's name.
