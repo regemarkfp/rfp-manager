@@ -33,6 +33,23 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 
 ## What's new
 
+### 1.6.1
+
+- **Clearer pages:** larger headings in the accent colour everywhere (the Studio, the website, File Sharing, Universe, the watch page and the live screens), and more room between cards, fields and tabs. Printed pages keep black headings.
+
+### 1.6.0
+
+Productions in three phases, and tech riders:
+
+- **Pre-production → Production → Post-production:** a production opens on three big phase buttons. Each phase shows its steps with a tick when done (half-done in yellow): Details, Quote, Crew (confirmed), Equipment, Tech rider (sent and answered), Call sheet (sent), Live stream · Confirmed, Rundown, Matches, Issues on the day · Report, Music cue sheet, Invoice (paid), Crew paid. Click a step to go where it is done. The tabs under a phase are only that phase's fields (Details, Crew & kit, Tech rider, Music, Live stream · On the day, Sermon · Report); "All" still shows everything.
+- **Tech riders** (Pre-production → Tech rider): what we bring (our setup, plus the crew and kit booked, added by themselves), what we deliver, and what we need from the venue or client – power, internet, positions, space, cabling, access & parking, sound, lighting, comms, catering, safety – each a must or nice to have.
+  - **Start from a template:** ready-made riders for a sport OB, a church livestream, a conference and a concert, or your own (**Save as a template**; Productions → Tech riders).
+  - **Fill from the venue:** venues now have a **Technical** tab (technical contact, what the venue has, notes); the rider shows "Venue has" next to each need.
+  - **Preview PDF**, **Copy the link**, **Send to venue / client** (the venue's technical contact and the client are ticked; type more): an email with the PDF and a link.
+  - **The venue answers on the link** (/rider/…, no sign-in, works on a phone): each item Sorted, Problem or Not needed with a note, their name and a note for you. You get an email and a push notification (with the problems), the answers show on the Tech rider tab, and what they mark Sorted is saved on the venue for next time.
+  - **The client page** (and so the client portal) shows the rider with how many items are sorted.
+- The call sheet step ticks itself when the call sheet is emailed.
+
 ### 1.5.0
 
 Software on the website (Settings → Website → Software on the website, and /software):
