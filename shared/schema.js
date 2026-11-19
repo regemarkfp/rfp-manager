@@ -96,7 +96,12 @@
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'graphicName', l: 'Graphic name', t: 'text', ph: 'The name' }, { k: 'address', l: 'Address', t: 'text' }, { k: 'city', l: 'City', t: 'text' }, { k: 'country', l: 'Country', t: 'text' },
       { k: 'homeClub', l: 'Home ground of', t: 'ref', ref: 'club' }, { k: 'areas', l: 'Areas / fields', t: 'list', fields: [{ k: 'name', l: 'Name', t: 'text', ph: 'Field 2, Court A …' }] },
       { k: 'sports', l: 'Used for', t: 'multi', opts: 'sports' }, { k: 'capacity', l: 'Capacity', t: 'number' },
-      { k: 'turf', l: 'Surface', t: 'combo', opts: ['Natural Grass', 'Artificial Turf', 'Hard Court', 'Clay', 'Indoor', 'Stage', 'Auditorium'] }, { k: 'image', l: 'Image', t: 'image' }] },
+      { k: 'turf', l: 'Surface', t: 'combo', opts: ['Natural Grass', 'Artificial Turf', 'Hard Court', 'Clay', 'Indoor', 'Stage', 'Auditorium'] }, { k: 'image', l: 'Image', t: 'image' },
+      { k: 'techContact', l: 'Technical contact', t: 'text', group: 'Technical', ph: 'Stadium / facilities manager' }, { k: 'techPhone', l: 'Phone', t: 'phone', group: 'Technical' }, { k: 'techEmail', l: 'Email', t: 'text', group: 'Technical', help: 'Tech riders for productions here go to this address.' },
+      { k: 'tech', l: 'What the venue has', t: 'list', group: 'Technical', help: 'Power, internet, camera positions, parking … Tech riders at this venue fill in from here, and what the venue confirms on a rider is saved here for next time.', fields: [
+        { k: 'category', l: 'Kind', t: 'select', opts: ['Power', 'Internet', 'Positions', 'Space', 'Cabling', 'Access & parking', 'Sound', 'Lighting', 'Comms', 'Catering', 'Safety', 'Other'], w: 150 },
+        { k: 'item', l: 'What', t: 'text', ph: 'Wired connection for the stream' }, { k: 'detail', l: 'Detail', t: 'text', ph: '50 Mbps fibre, Ethernet in the media room' }, { k: 'updated', l: 'Confirmed', t: 'date', w: 130 }] },
+      { k: 'techNotes', l: 'Technical notes', t: 'textarea', group: 'Technical' }] },
 
     club: { label: 'Club', plural: 'Clubs', group: 'Assets', title: (d) => d.name, cols: ['image', 'name', 'graphicName', 'abbreviation', 'primaryColor'], fields: [
       { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'fullGraphicName', l: 'Full graphic name', t: 'text', ph: 'Vodacom Blue Bulls', help: 'Long name on full-frame graphics.' },
@@ -137,41 +142,50 @@
       ...MATCH_SETTINGS('Match settings (empty = from the competition)').map((f) => Object.assign({}, f, { def: undefined, opts: f.t === 'select' ? ['', ...f.opts] : f.opts, t: f.t === 'bool' ? 'select' : f.t }, f.t === 'bool' ? { opts: ['', 'Yes', 'No'] } : {})),
       RUNDOWN] },
 
-    production: { label: 'Production', plural: 'Productions', group: 'Productions', title: (d) => (d.number ? d.number + ' · ' : '') + (d.name || ''), cols: ['number', 'date', 'name', 'type', 'status', 'venue', 'client'], fields: [
-      { k: 'number', l: 'Production no.', t: 'text', readonly: true, ph: 'Given when saved', w: 130, help: 'Given by the website in order (P + year + number) and never reused, so every production can be told apart and found again.' },
-      { k: 'name', l: 'Name', t: 'text', req: true }, { k: 'type', l: 'Type', t: 'combo', opts: PRODUCTION_TYPES, def: 'Sport' },
-      { k: 'status', l: 'Status', t: 'select', opts: PRODUCTION_STATUS, def: 'Planned', help: 'Complete a production with the "Complete production" button: it asks for the report (ratings and issues).' },
-      { k: 'date', l: 'Date', t: 'date' }, { k: 'days', l: 'Days', t: 'number', ph: '1' }, { k: 'venue', l: 'Venue', t: 'ref', ref: 'venue' },
-      { k: 'event', l: 'Event', t: 'text', ph: 'From the competition unless you type one', help: 'Shown on the call sheet and rundown.' },
-      { k: 'txTime', l: 'TX / kick-off time', t: 'time', help: 'Default TX time for the crew and the start line of the rundown.' },
-      { k: 'clientRef', l: 'Client', t: 'ref', ref: 'client', help: 'From Clients: quotes and invoices use their details, discount and portal.' },
-      { k: 'client', l: 'Client name (not in Clients)', t: 'text' }, { k: 'clientEmail', l: 'Client email', t: 'text', help: 'Quotes, invoices and the client page go here (the client\'s own email if empty).' }, { k: 'producer', l: 'Producer', t: 'member', roles: ['Producer', 'Admin'] }, { k: 'description', l: 'Description', t: 'textarea' },
-      { k: 'booking', l: 'Booking request', t: 'ref', ref: 'booking', hidden: true },
-      { k: 'remoteStudio', l: 'Remote studio / gallery', t: 'text', ph: 'OB van, studio name…' }, { k: 'remoteStudioAddress', l: 'Remote studio address', t: 'text' },
-      { k: 'contacts', l: 'Key contacts', t: 'list', help: 'Stadium manager, production coordinator, technical manager… Pick a crew member or type a name and number.', fields: [
+    production: { label: 'Production', plural: 'Productions', group: 'Productions', phases: { 'Pre-production': ['Details', 'Crew & kit', 'Tech rider', 'Music', 'Live stream'], 'Production': ['On the day', 'Sermon (church services)'], 'Post-production': ['Report'] }, title: (d) => (d.number ? d.number + ' · ' : '') + (d.name || ''), cols: ['number', 'date', 'name', 'type', 'status', 'venue', 'client'], fields: [
+      { k: 'number', group: 'Details', l: 'Production no.', t: 'text', readonly: true, ph: 'Given when saved', w: 130, help: 'Given by the website in order (P + year + number) and never reused, so every production can be told apart and found again.' },
+      { k: 'name', group: 'Details', l: 'Name', t: 'text', req: true }, { k: 'type', group: 'Details', l: 'Type', t: 'combo', opts: PRODUCTION_TYPES, def: 'Sport' },
+      { k: 'status', group: 'Details', l: 'Status', t: 'select', opts: PRODUCTION_STATUS, def: 'Planned', help: 'Complete a production with the "Complete production" button: it asks for the report (ratings and issues).' },
+      { k: 'date', group: 'Details', l: 'Date', t: 'date' }, { k: 'days', group: 'Details', l: 'Days', t: 'number', ph: '1' }, { k: 'venue', group: 'Details', l: 'Venue', t: 'ref', ref: 'venue' },
+      { k: 'event', group: 'Details', l: 'Event', t: 'text', ph: 'From the competition unless you type one', help: 'Shown on the call sheet and rundown.' },
+      { k: 'txTime', group: 'Details', l: 'TX / kick-off time', t: 'time', help: 'Default TX time for the crew and the start line of the rundown.' },
+      { k: 'clientRef', group: 'Details', l: 'Client', t: 'ref', ref: 'client', help: 'From Clients: quotes and invoices use their details, discount and portal.' },
+      { k: 'client', group: 'Details', l: 'Client name (not in Clients)', t: 'text' }, { k: 'clientEmail', group: 'Details', l: 'Client email', t: 'text', help: 'Quotes, invoices and the client page go here (the client\'s own email if empty).' }, { k: 'producer', group: 'Details', l: 'Producer', t: 'member', roles: ['Producer', 'Admin'] }, { k: 'description', group: 'Details', l: 'Description', t: 'textarea' },
+      { k: 'booking', group: 'Details', l: 'Booking request', t: 'ref', ref: 'booking', hidden: true },
+      { k: 'remoteStudio', group: 'Details', l: 'Remote studio / gallery', t: 'text', ph: 'OB van, studio name…' }, { k: 'remoteStudioAddress', group: 'Details', l: 'Remote studio address', t: 'text' },
+      { k: 'contacts', group: 'Crew & kit', l: 'Key contacts', t: 'list', help: 'Stadium manager, production coordinator, technical manager… Pick a crew member or type a name and number.', fields: [
         { k: 'title', l: 'Title', t: 'combo', opts: ['Stadium Manager', 'Production Coordinator', 'Technical Manager', 'Producer', 'Client Contact', 'Safety Officer'] },
         { k: 'crewMember', l: 'Crew member', t: 'ref', ref: 'crewMember' }, { k: 'name', l: 'or name', t: 'text' }, { k: 'phone', l: 'Phone', t: 'phone' }] },
-      { k: 'crew', l: 'Crew', t: 'list', fields: [{ k: 'location', l: 'Location', t: 'combo', opts: ['Gallery', 'Venue', 'Studio', 'OB Van', 'Remote'], w: 150 }, { k: 'role', l: 'Role', t: 'ref', ref: 'crewRole' },
+      { k: 'crew', group: 'Crew & kit', l: 'Crew', t: 'list', fields: [{ k: 'location', l: 'Location', t: 'combo', opts: ['Gallery', 'Venue', 'Studio', 'OB Van', 'Remote'], w: 150 }, { k: 'role', l: 'Role', t: 'ref', ref: 'crewRole' },
         { k: 'crewMember', l: 'Crew member', t: 'ref', ref: 'crewMember' }, { k: 'callTime', l: 'Call time', t: 'time' }, { k: 'productionTime', l: 'TX time', t: 'time' },
         { k: 'confirmed', l: 'Confirmed', t: 'bool', w: 90, help: 'Tick when this person has said yes: they get an email that they are hired, with the call sheet.' },
         { k: 'rate', l: 'Day rate', t: 'money', w: 110, ph: 'role rate', help: 'Only if this person is paid differently from the role.' }, { k: 'paid', l: 'Paid', t: 'bool', w: 70 }] },
-      { k: 'crewNotes', l: 'Additional information', t: 'textarea', ph: 'Entrance: please use the bottom gate. Bring a set of headphones for comms.', help: 'One point per line. Start a line with "Label:" to print the label in bold.' },
-      { k: 'hospitals', l: 'Emergency: nearest hospitals', t: 'list', fields: [{ k: 'name', l: 'Hospital', t: 'text' }, { k: 'area', l: 'Area', t: 'text' }, { k: 'phone', l: 'Phone', t: 'phone' }] },
-      { k: 'equipment', l: 'Equipment', t: 'list', fields: [{ k: 'item', l: 'Item', t: 'ref', ref: 'equipment' }, { k: 'quantity', l: 'Qty', t: 'number', w: 80 }, { k: 'notes', l: 'Notes', t: 'text' }] },
-      { k: 'extras', l: 'Other costs', t: 'list', fields: [{ k: 'description', l: 'Description', t: 'text' }, { k: 'cost', l: 'Cost', t: 'money' }, { k: 'invoice', l: 'Invoice', t: 'money' }] },
+      { k: 'crewNotes', group: 'Crew & kit', l: 'Additional information', t: 'textarea', ph: 'Entrance: please use the bottom gate. Bring a set of headphones for comms.', help: 'One point per line. Start a line with "Label:" to print the label in bold.' },
+      { k: 'hospitals', group: 'Crew & kit', l: 'Emergency: nearest hospitals', t: 'list', fields: [{ k: 'name', l: 'Hospital', t: 'text' }, { k: 'area', l: 'Area', t: 'text' }, { k: 'phone', l: 'Phone', t: 'phone' }] },
+      { k: 'equipment', group: 'Crew & kit', l: 'Equipment', t: 'list', fields: [{ k: 'item', l: 'Item', t: 'ref', ref: 'equipment' }, { k: 'quantity', l: 'Qty', t: 'number', w: 80 }, { k: 'notes', l: 'Notes', t: 'text' }] },
+      { k: 'extras', group: 'Crew & kit', l: 'Other costs', t: 'list', fields: [{ k: 'description', l: 'Description', t: 'text' }, { k: 'cost', l: 'Cost', t: 'money' }, { k: 'invoice', l: 'Invoice', t: 'money' }] },
+      { k: 'riderTemplate', l: 'Start from', t: 'text', hidden: true },
+      { k: 'riderSetup', l: 'What we bring', t: 'textarea', group: 'Tech rider', ph: 'Multi-camera outside broadcast: cameras on the field, vision mixer and graphics in the gallery …', help: 'Our setup in a few lines. The crew and equipment above are added to the rider by themselves.' },
+      { k: 'riderDeliverables', l: 'What we deliver', t: 'list', group: 'Tech rider', fields: [{ k: 'item', l: 'Deliverable', t: 'combo', opts: ['Programme feed', 'Live stream', 'Recording', 'Highlights', 'ISO recordings', 'Screens in the room', 'Lyrics & lower thirds', 'Photos'] }, { k: 'detail', l: 'Detail', t: 'text', ph: '1080p50, to the broadcaster' }] },
+      { k: 'riderNeeds', l: 'What we need from the venue / client', t: 'list', group: 'Tech rider', help: 'One row per thing the venue or client must provide. "Venue has" is filled from the venue\'s technical profile; their answers on the rider link show next to the rider below.', fields: [
+        { k: 'category', l: 'Kind', t: 'select', opts: ['Power', 'Internet', 'Positions', 'Space', 'Cabling', 'Access & parking', 'Sound', 'Lighting', 'Comms', 'Catering', 'Safety', 'Other'], w: 150 },
+        { k: 'item', l: 'What', t: 'text', ph: 'Wired internet for the stream' }, { k: 'detail', l: 'Detail we need', t: 'text', ph: '20 Mbps up, Ethernet at the gallery' },
+        { k: 'venueHas', l: 'Venue has', t: 'text', ph: 'From the venue' }, { k: 'required', l: 'Must', t: 'bool', def: true, w: 70 }] },
+      { k: 'riderNotes', l: 'Notes for the venue / client', t: 'textarea', group: 'Tech rider', ph: 'Anything else: rain plan, how to reach us on the day …' },
+      { k: 'riderContact', l: 'Venue technical contact', t: 'text', group: 'Tech rider', ph: 'From the venue if empty' }, { k: 'riderEmail', l: 'Their email', t: 'text', group: 'Tech rider', ph: 'From the venue if empty' },
       { k: 'fixtures', l: 'Matches', t: 'list', hidden: true, fields: [{ k: 'fixture', l: 'Match', t: 'ref', ref: 'fixture' }] },
-      { k: 'music', l: 'Music (theme for this production)', t: 'list', group: 'Music & report', help: 'Extra or replacement theme music for this production; the competition\'s theme music is used as well.', fields: [
+      { k: 'music', l: 'Music (theme for this production)', t: 'list', group: 'Music', help: 'Extra or replacement theme music for this production; the competition\'s theme music is used as well.', fields: [
         { k: 'track', l: 'Track', t: 'ref', ref: 'track' }, { k: 'usage', l: 'Used as', t: 'combo', opts: MUSIC_USAGE, w: 170 }] },
-      { k: 'broadcaster', l: 'Broadcaster / channel', t: 'text', ph: 'SuperSport, YouTube …', group: 'Music & report', help: 'Printed on the music cue sheet and the report.' },
-      { k: 'programmeTitle', l: 'Programme title', t: 'text', ph: 'The production name', group: 'Music & report' },
-      { k: 'incidents', l: 'Issues & incidents', t: 'list', group: 'Music & report', help: 'Faults, delays and anything else for the post-production report.', fields: [
+      { k: 'broadcaster', l: 'Broadcaster / channel', t: 'text', ph: 'SuperSport, YouTube …', group: 'Music', help: 'Printed on the music cue sheet and the report.' },
+      { k: 'programmeTitle', l: 'Programme title', t: 'text', ph: 'The production name', group: 'Music' },
+      { k: 'incidents', l: 'Issues & incidents', t: 'list', group: 'On the day', help: 'Faults, delays and anything else for the post-production report.', fields: [
         { k: 'time', l: 'Time', t: 'time', w: 100 }, { k: 'category', l: 'Kind', t: 'combo', opts: ['Technical', 'Delay', 'Graphics', 'Audio', 'Vision', 'Stream', 'Crew', 'Equipment', 'Client', 'Weather', 'Other'], w: 130 },
         { k: 'severity', l: 'Severity', t: 'select', opts: ISSUE_SEVERITY, def: 'Minor', w: 120 }, { k: 'text', l: 'What happened', t: 'text' }, { k: 'action', l: 'What was done / to do', t: 'text' }, { k: 'resolved', l: 'Resolved', t: 'bool', w: 80 }] },
-      { k: 'reportNotes', l: 'Report summary', t: 'textarea', group: 'Music & report' },
+      { k: 'reportNotes', l: 'Report summary', t: 'textarea', group: 'Report' },
       { k: 'sermonTitle', l: 'Sermon / message title', t: 'text', group: 'Sermon (church services)', help: 'Church services: shown in the channel\'s sermon archive with the recording.' },
       { k: 'preacher', l: 'Preacher / speaker', t: 'text', group: 'Sermon (church services)' }, { k: 'scripture', l: 'Scripture', t: 'text', ph: 'John 3:16-21; Ps 23', group: 'Sermon (church services)' },
       { k: 'series', l: 'Series', t: 'text', group: 'Sermon (church services)' }, { k: 'sermonNotes', l: 'Notes for viewers', t: 'textarea', group: 'Sermon (church services)' },
-      { k: 'musicLog', l: 'Music used (added by hand)', t: 'list', group: 'Music & report', help: 'Music that was not played from RFP Manager (a DJ, the stadium PA, a band, a vMix input without a track). Pick a track from the library, or type the title and its writers. Plays from CasparCG, vMix and stream slates are logged by themselves.', fields: [
+      { k: 'musicLog', l: 'Music used (added by hand)', t: 'list', group: 'On the day', help: 'Music that was not played from RFP Manager (a DJ, the stadium PA, a band, a vMix input without a track). Pick a track from the library, or type the title and its writers. Plays from CasparCG, vMix and stream slates are logged by themselves.', fields: [
         { k: 'track', l: 'Track', t: 'ref', ref: 'track' }, { k: 'title', l: 'or title', t: 'text' }, { k: 'composers', l: 'Composer(s)', t: 'text' }, { k: 'publisher', l: 'Publisher', t: 'text' },
         { k: 'usage', l: 'Used as', t: 'combo', opts: MUSIC_USAGE, w: 150 }, { k: 'at', l: 'Time', t: 'time', w: 100 }, { k: 'duration', l: 'Duration', t: 'text', ph: '0:30', w: 90 },
         { k: 'source', l: 'Played from', t: 'combo', opts: ['Manual', 'DJ / PA', 'Live band', 'vMix', 'ATEM', 'CasparCG', 'Other'], w: 130 }] },
@@ -233,6 +247,14 @@
       { k: 'phone', l: 'Phone', t: 'phone' }, { k: 'email', l: 'Email', t: 'text' }, { k: 'image', l: 'Photo', t: 'image' },
       { k: 'roles', l: 'Roles', t: 'multi', opts: 'crewRoles' }, { k: 'notes', l: 'Notes', t: 'textarea' },
       { k: 'unavailable', l: 'Not available', t: 'list', help: 'Days this person cannot work. Crew set these themselves on their home page; booking them then shows a clash.', fields: [{ k: 'from', l: 'From', t: 'date' }, { k: 'to', l: 'To', t: 'date' }, { k: 'note', l: 'Note', t: 'text' }] }] },
+
+    riderTemplate: { label: 'Tech rider template', plural: 'Tech rider templates', group: 'Productions', title: (d) => d.name, cols: ['name', 'productionType'], fields: [
+      { k: 'name', l: 'Name', t: 'text', req: true, ph: 'Sport OB (multi-camera)' }, { k: 'productionType', l: 'For productions of type', t: 'combo', opts: PRODUCTION_TYPES },
+      { k: 'setup', l: 'What we bring', t: 'textarea' },
+      { k: 'deliverables', l: 'What we deliver', t: 'list', fields: [{ k: 'item', l: 'Deliverable', t: 'text' }, { k: 'detail', l: 'Detail', t: 'text' }] },
+      { k: 'needs', l: 'What we need from the venue / client', t: 'list', fields: [
+        { k: 'category', l: 'Kind', t: 'select', opts: ['Power', 'Internet', 'Positions', 'Space', 'Cabling', 'Access & parking', 'Sound', 'Lighting', 'Comms', 'Catering', 'Safety', 'Other'], w: 150 },
+        { k: 'item', l: 'What', t: 'text' }, { k: 'detail', l: 'Detail we need', t: 'text' }, { k: 'required', l: 'Must', t: 'bool', def: true, w: 70 }] }] },
 
     crewRole: { label: 'Crew role', plural: 'Crew roles', group: 'Productions', title: (d) => d.name, cols: ['name', 'maxQuantity', 'rate', 'invoiceRate'], fields: [
       { k: 'name', l: 'Role', t: 'text', req: true }, { k: 'maxQuantity', l: 'Maximum per production', t: 'number' },
