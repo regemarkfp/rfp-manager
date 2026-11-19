@@ -309,6 +309,64 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
   }
 
   // ---- a client's page (/client/<key>): one production, shared by the production company
+  // ---- a tech rider (/rider/<key>): what the production team brings, and what it needs from the venue; the venue
+  // answers each item (Sorted / Problem / Not needed, with a note) without signing in
+  function riderPage(key) {
+    const box = el('div', { class: 'rider' }, el('div', { class: 'empty' }, 'Loading…'));
+    const LABEL = { ok: '✓ Sorted', issue: '⚠ Problem', na: 'Not needed' };
+    let me = ''; try { me = localStorage.getItem('rfp-rider-name') || ''; } catch { me = ''; }
+    const load = () => get('/api/rider/' + encodeURIComponent(key)).then((r) => {
+      document.title = `Tech rider – ${r.name}`;
+      const answers = Object.fromEntries(r.needs.map((x) => [x.key, { status: x.status, note: x.note }]));
+      let dirty = false;
+      const nameIn = el('input', { value: me, placeholder: 'Your name', oninput: () => { dirty = true; } }), noteIn = el('textarea', { rows: 3, placeholder: 'Anything else for the production team (optional)', oninput: () => { dirty = true; } });
+      const bar = el('div', { class: 'rd-bar' }), barTxt = el('div', { class: 'sub' });
+      const paintBar = () => { const n = r.needs.length, done = r.needs.filter((x) => answers[x.key].status).length; bar.replaceChildren(el('i', { style: { width: (n ? (100 * done) / n : 0) + '%' } })); barTxt.textContent = n ? `${done} of ${n} answered` : ''; };
+      const item = (x) => {
+        const a = answers[x.key], btns = el('div', { class: 'rd-btns' });
+        const note = el('input', { value: a.note || '', placeholder: x.status === 'issue' || a.status === 'issue' ? 'What is the problem?' : 'Note (optional): where, how much, who …', oninput: (e) => { a.note = e.target.value; dirty = true; } });
+        const paint = () => btns.replaceChildren(...['ok', 'issue', 'na'].map((s) => el('button', { type: 'button', class: 'rd-b ' + s + (a.status === s ? ' on' : ''), onclick: () => { a.status = a.status === s ? '' : s; dirty = true; paint(); paintBar(); row.className = 'rd-item ' + (a.status || 'open'); } }, LABEL[s])));
+        const row = el('div', { class: 'rd-item ' + (a.status || 'open') },
+          el('div', { class: 'rd-what' }, el('b', {}, x.item), x.required ? el('span', { class: 'rd-must' }, 'Must') : el('span', { class: 'rd-nice' }, 'Nice to have'), x.detail ? el('div', {}, x.detail) : null,
+            x.venueHas && !a.status ? el('div', { class: 'sub' }, 'Last time: ' + x.venueHas) : null, x.by && x.at ? el('div', { class: 'sub' }, `Answered by ${x.by}, ${new Date(x.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`) : null),
+          btns, note);
+        paint();
+        return row;
+      };
+      const cats = [...new Set(r.needs.map((x) => x.category))];
+      const save = async (btn) => {
+        const name = nameIn.value.trim();
+        if (!name) { nameIn.focus(); say('Add your name first, so the team knows who answered'); return; }
+        try { localStorage.setItem('rfp-rider-name', name); } catch { /* private window */ }
+        me = name; btn.disabled = true;
+        try {
+          const res = await post('/api/rider/' + encodeURIComponent(key) + '/reply', { name, note: noteIn.value, items: r.needs.map((x) => ({ key: x.key, status: answers[x.key].status || '', note: answers[x.key].note || '' })) });
+          dirty = false;
+          say(res.changed || noteIn.value.trim() ? 'Thank you: your answers are with the production team.' : 'Nothing changed.');
+          load();
+        } catch (e) { say(e.message); btn.disabled = false; }
+      };
+      window.onbeforeunload = () => (dirty ? true : undefined);
+      box.replaceChildren(
+        el('div', { class: 'thead' }, r.logo ? el('img', { class: 'tlogo big', src: img(r.logo), alt: '' }) : null, el('div', { class: 'grow' }, el('div', { class: 'sub' }, `${r.orgName} · Tech rider`), el('h1', {}, r.name),
+          el('div', { class: 'sub' }, [r.number, r.dateText, r.txTime && 'TX ' + r.txTime, [r.venue.name, r.venue.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ')))),
+        el('div', { class: 'dls' }, el('a', { class: 'dl', href: r.pdf, target: '_blank', rel: 'noopener' }, '⬇ PDF'), r.producer && r.producer.email ? el('a', { class: 'dl', href: 'mailto:' + r.producer.email }, '✉ ' + (r.producer.name || 'Email the producer')) : null),
+        r.needs.length ? el('div', { class: 'push-inline' }, el('span', {}, 'Please go through what we need below and answer each item: ', el('b', {}, 'Sorted'), ', ', el('b', {}, 'Problem'), ' or ', el('b', {}, 'Not needed'), ', with a note if it helps. Then press ', el('b', {}, 'Send my answers'), ' at the bottom. You can come back and change them.')) : null,
+        r.setup || r.crew.length || r.equipment.length ? section('What we bring', el('div', { class: 'desc-box' }, r.setup ? el('div', {}, r.setup) : null,
+          r.crew.length ? el('div', { style: { marginTop: '8px' } }, el('b', {}, 'Crew: '), r.crew.map((c) => `${c.n} × ${c.role}`).join(', ')) : null,
+          r.equipment.map(([c, items]) => el('div', {}, el('b', {}, c + ': '), items.join(', '))))) : [],
+        r.deliverables.length ? section('What we deliver', el('div', { class: 'desc-box' }, r.deliverables.map((x) => el('div', { style: { margin: '2px 0' } }, el('b', {}, x.item), x.detail ? ' – ' + x.detail : '')))) : [],
+        r.needs.length ? [el('h2', { class: 'sec' }, 'What we need from you'), el('div', { class: 'rd-prog' }, bar, barTxt),
+          cats.map((c) => el('div', { class: 'rd-cat' }, el('h3', {}, c), r.needs.filter((x) => x.category === c).map(item)))] : [],
+        r.notes ? section('Notes', el('div', { class: 'desc-box' }, r.notes)) : [],
+        r.needs.length ? el('div', { class: 'rd-send' }, el('label', {}, el('span', { class: 'sub' }, 'Your name'), nameIn), el('label', {}, el('span', { class: 'sub' }, 'Note'), noteIn),
+          el('button', { class: 'primary big', onclick: (e) => save(e.target) }, 'Send my answers')) : null);
+      paintBar();
+    }).catch((e) => box.replaceChildren(el('div', { class: 'empty' }, e.message)));
+    load();
+    return box;
+  }
+
   function clientPage(key) {
     const box = el('div', {}, el('div', { class: 'empty' }, 'Loading…'));
     const zar = (n) => 'R ' + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
@@ -324,6 +382,7 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
       box.replaceChildren(paidNotice(() => render()) || '',el('div', { class: 'thead' }, c.logo ? el('img', { class: 'tlogo big', src: img(c.logo), alt: '' }) : null, el('div', { class: 'grow' }, el('div', { class: 'sub' }, c.company), el('h1', {}, c.name),
         el('div', { class: 'sub' }, [c.number, c.date + (c.days > 1 ? ` (${c.days} days)` : ''), c.txTime && 'TX ' + c.txTime, c.venue, c.status].filter(Boolean).join(' · ')))),
         c.description ? el('div', { class: 'desc-box' }, c.description) : null,
+        c.rider ? el('div', { class: 'push-inline' }, el('span', {}, el('b', {}, 'Tech rider: '), c.rider.progress.total ? `${c.rider.progress.ok} of ${c.rider.progress.total} items sorted${c.rider.progress.issues ? `, ${c.rider.progress.issues} problem${c.rider.progress.issues === 1 ? '' : 's'}` : ''}. ` : '', 'What we bring and what we need from you.'), el('a', { href: c.rider.url, 'data-nav': '' }, el('button', { class: 'primary' }, c.rider.progress.total ? 'Open and answer' : 'Open'))) : null,
         el('div', { class: 'dls' }, el('a', { class: 'dl', href: c.callsheet, target: '_blank', rel: 'noopener' }, 'Call sheet (PDF)'), c.report ? el('a', { class: 'dl', href: c.report, target: '_blank', rel: 'noopener' }, 'Production report (PDF)') : null, c.watch ? el('a', { class: 'dl primary', href: c.watch }, '● Live stream') : null),
         c.matches.length ? section('Matches', el('div', { class: 'up-list' }, c.matches.map((m) => el('a', { class: 'up-row', href: '/match/' + m.id }, el('div', { class: 'what' }, el('b', {}, m.name), el('span', { class: 'sub' }, [m.date, m.status].filter(Boolean).join(' · '))))))) : null,
         c.videos.length ? section('Recordings', el('div', { class: 'up-list' }, c.videos.map((v) => el('a', { class: 'up-row', href: v.url }, el('div', { class: 'what' }, el('b', {}, new Date(v.start).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })), el('span', { class: 'sub' }, dur(v.duration))), el('span', { class: 'go' }, '▶'))))) : null,
@@ -1441,8 +1500,10 @@ try { const t = new URLSearchParams(location.search).get('ticket'); if (/^tk_/.t
     document.body.classList.toggle('landing', p === '/' || p === '');
     document.title = D.site || 'RegemarkFP';
     let view;
+    window.onbeforeunload = null;
     if (centre && !p.startsWith('/match/')) { centre.stop(); centre = null; }
     if (p.startsWith('/client/')) view = clientPage(decodeURIComponent(p.slice(8).replace(/\/$/, '')));
+    else if (p.startsWith('/rider/')) view = riderPage(decodeURIComponent(p.slice(7).replace(/\/$/, '')));
     else if (p.startsWith('/portal/')) view = portalPage(decodeURIComponent(p.slice(8).replace(/\/$/, '')));
     else if (p.startsWith('/release/')) view = releasePage(decodeURIComponent(p.slice(9).replace(/\/$/, '')));
     else if (p.startsWith('/track/')) view = trackPage(decodeURIComponent(p.slice(7).replace(/\/$/, '')));

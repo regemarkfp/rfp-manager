@@ -209,7 +209,7 @@ function navFor() {
   return [
     ['', ifs(['#/', 'Dashboard'], web && ['#/notifications', 'Notifications' + n(App.unread)])],
     money ? ['Clients & sales', [['#/list/booking', 'Booking requests' + n(App.waitingBookings && App.waitingBookings().length)], ['#/list/client', 'Clients'], ['#/money', 'Quotes & invoices'], ['#/list/service', 'Products & services'], ['#/ratings', 'Ratings']]] : null,
-    ['Productions', ifs(['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], web && [(c.sharingUrl || '/sharing') + '/', 'Shared folders'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment'], money && ['#/list/releaseForm', 'Release forms'], ['#/list/expense', ed ? 'Expenses' : 'My expenses'], web && ['#/availability', 'My availability'])],
+    ['Productions', ifs(['#/list/production', 'Productions'], ['#/calendar', 'Calendar'], web && [(c.sharingUrl || '/sharing') + '/', 'Shared folders'], ['#/list/crewMember', 'Crew'], ['#/list/crewRole', 'Crew roles'], ['#/list/equipment', 'Equipment'], ['#/list/riderTemplate', 'Tech riders'], ['#/list/venue', 'Venues'], money && ['#/list/releaseForm', 'Release forms'], ['#/list/expense', ed ? 'Expenses' : 'My expenses'], web && ['#/availability', 'My availability'])],
     ['Sport', [['#/fixtures', 'Fixtures & Results'], ['#/list/competition', 'Competitions'], ['#/list/club', 'Clubs'], ['#/list/squad', 'Teams'], ['#/list/player', 'Players'], ['#/list/venue', 'Venues']]],
     ['Live & graphics', ifs(App.pcs && ['#/pcs', 'Production PCs'], pc && ['#/monitors', 'Monitors'], pc && ['#/templates', 'Templates'], ['#/list/theme', 'Themes'], pc && ['#/adverts', 'Advert playout'], ['#/list/dashboard', 'Dashboards'], ['#/list/timeline', 'Timelines'], ['#/automation', 'Variables & triggers'], pc && ['#/variables', 'Variables by sport'], pc && ['/rl/control', 'Rocket League'])],
     web ? ['Streaming', ifs(['#/list/channel', 'Channels'], ed && ['#/content', 'Content'], ed && ['#/youtube', 'YouTube Live'], ed && ['#/analytics', 'Analytics'], ed && ['#/sales', 'Ticket sales'], ['#/streamads', 'Stream adverts'])] : null,
@@ -624,7 +624,8 @@ App.formSport = formSport;
 // Forms with several groups show them as sub-tabs (all fields stay in the form, the other groups are just hidden),
 // so nothing gets lost further down a long page. Fields limited to some sports (f.sports) only show for those.
 const formTabMemo = {};
-function buildForm(type, initial, { fields, onChange } = {}) {
+const formPhaseMemo = {};
+function buildForm(type, initial, { fields, onChange, phaseTop, tabExtras } = {}) {
   const data = JSON.parse(JSON.stringify(initial || {}));
   const all = fields || Schema.fieldsFor(type, App.org()).filter((f) => !f.hidden);
   for (const f of all) if (data[f.k] === undefined && f.def !== undefined) data[f.k] = f.def;
@@ -633,14 +634,26 @@ function buildForm(type, initial, { fields, onChange } = {}) {
   let active = formTabMemo[type] || '';
   const REPAINT = { squad: ['club'], fixture: ['sport', 'competition'], competition: ['sport'] };
   const groupOf = (f, i) => f.group || (all.slice(0, i).some((x) => x.group) ? 'More' : 'Details');
+  // 1.6.0: records with phases (a production: pre-production, production, post-production) show a phase bar; the
+  // tabs under it are the groups of that phase
+  const PH = (Schema.ENTITIES[type] || {}).phases || null;
+  const phaseNames = PH ? Object.keys(PH) : [];
+  const phaseOf = (g) => phaseNames.find((n) => PH[n].includes(g)) || phaseNames[0];
+  let phase = PH ? (formPhaseMemo[type] && phaseNames.includes(formPhaseMemo[type]) ? formPhaseMemo[type] : phaseNames[0]) : '';
   const paint = () => {
     const sport = formSport(type, data);
-    const shown = all.map((f, i) => ({ f, g: groupOf(f, i) })).filter(({ f }) => (!f.sports || (sport && f.sports.includes(sport))) && (!f.when || f.when(data)));
-    const groups = [...new Set(shown.map((x) => x.g))];
-    const tabbed = groups.length >= 3 || (groups.length === 2 && shown.length >= 10);
+    const shownAll = all.map((f, i) => ({ f, g: groupOf(f, i) })).filter(({ f }) => (!f.sports || (sport && f.sports.includes(sport))) && (!f.when || f.when(data)));
+    const shown = PH && active !== '*' ? shownAll.map((x) => ({ ...x, out: phaseOf(x.g) !== phase })) : shownAll;
+    const groups = [...new Set(shown.filter((x) => !x.out).map((x) => x.g))];
+    const tabbed = PH || groups.length >= 3 || (groups.length === 2 && shown.length >= 10);
     if (tabbed && active !== '*' && !groups.includes(active)) active = groups[0];
     const empty = (v) => v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length);
     const kids = [];
+    if (PH) {
+      kids.push(h('div', { class: 'wide phases', role: 'tablist' }, phaseNames.map((n, i) => h('button', { type: 'button', class: 'phase' + (n === phase && active !== '*' ? ' on' : ''), onclick: () => {
+        phase = n; formPhaseMemo[type] = n; active = PH[n].find((g) => shownAll.some((x) => x.g === g)) || ''; paint(); } }, h('span', { class: 'ph-n' }, String(i + 1)), h('span', {}, n)))));
+      if (phaseTop) { const t = phaseTop(active === '*' ? '' : phase, (n) => { phase = n; formPhaseMemo[type] = n; active = ''; paint(); }, (g) => { phase = phaseOf(g); formPhaseMemo[type] = phase; active = g; paint(); }, data); if (t) kids.push(h('div', { class: 'wide' }, t)); }
+    }
     if (tabbed) {
       kids.push(h('div', { class: 'wide ftabs', role: 'tablist' }, [...groups, '*'].map((g) => {
         const need = g !== '*' && shown.some((x) => x.g === g && x.f.req && empty(data[x.f.k]));
@@ -650,10 +663,12 @@ function buildForm(type, initial, { fields, onChange } = {}) {
       })));
       if (active !== '*') { const g = shown.find((x) => x.g === active); if (g && g.f.group && /\(/.test(g.f.group)) kids.push(h('p', { class: 'wide help', style: { margin: 0 } }, g.f.group.replace(/^.*\((.*)\)$/, '$1').replace(/^./, (c) => c.toUpperCase()) + '.')); }
     }
+    // extra blocks for a tab (the tech rider's send / answers box), at the top of that tab
+    if (tabExtras) for (const [g, make] of Object.entries(tabExtras)) { if (active === '*' || g !== active) continue; const x = make(data); if (x) kids.push(h('div', { class: 'wide' }, x)); }
     let lastGroup;
-    for (const { f, g } of shown) {
+    for (const { f, g, out } of shown) {
       const el = one(f);
-      if (tabbed) { if (active !== '*' && g !== active) el.classList.add('fhide'); }
+      if (tabbed) { if (out || (active !== '*' && g !== active)) el.classList.add('fhide'); }
       else if (f.group && f.group !== lastGroup) kids.push(h('h4', { class: 'wide fgroup' }, f.group));
       if (tabbed && active === '*' && g !== lastGroup) kids.push(h('h4', { class: 'wide fgroup' }, g));
       lastGroup = g;
@@ -678,7 +693,7 @@ function buildForm(type, initial, { fields, onChange } = {}) {
     }
   };
   paint();
-  return { el: grid, data, widgets, repaint: paint };
+  return { el: grid, data, widgets, repaint: paint, show: (g) => { if (PH) { phase = phaseOf(g); formPhaseMemo[type] = phase; } active = g; paint(); } };
 }
 
 App.editModal = (type, onSaved, initial) => {

@@ -395,7 +395,9 @@
     if (isNew && type === 'fixture') pre.startDate = UI.today();
     if (isNew && type === 'production') pre.date = UI.today();
     let panel = null, dirty = false;
-    const form = buildForm(type, isNew ? pre : doc.data, { onChange: () => { dirty = true; if (panel && panel.repaint) panel.repaint(); } });
+    let form = null;
+    const extra = type === 'production' && App.productionFormOpts ? App.productionFormOpts(doc, () => form, () => { dirty = true; }) : {};
+    form = buildForm(type, isNew ? pre : doc.data, { ...extra, onChange: () => { dirty = true; if (panel && panel.repaint) panel.repaint(); } });
     panel = !isNew && PANELS[type] ? PANELS[type](doc, form) : (type === 'production' ? PANELS.production(doc, form) : null);
     // Panels built from other records (statistics, log, live score) follow those records as they change.
     if (panel && ['player', 'competition', 'fixture'].includes(type)) {

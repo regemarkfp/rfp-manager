@@ -18,6 +18,7 @@
     '#/list/crewMember': { t: 'Crew', d: 'The people who work on your productions, with their roles, rates and contact details.', s: ['+ New crew member to add someone.', 'Book them on a production in the production\'s Crew section.'] },
     '#/list/crewRole': { t: 'Crew roles', d: 'The jobs on a production (camera operator, director, sound …) and what each one is paid.', s: [] },
     '#/list/equipment': { t: 'Equipment', d: 'Your kit: cameras, lenses, audio, cables … with how many you have and when it needs a service.', s: ['Add it to a production so you know what goes along.'] },
+    '#/list/riderTemplate': { t: 'Tech riders', d: 'Tech rider templates: what you bring and deliver, and what you need from the venue or client (power, internet, positions, parking …). Ready-made ones are built in; save your own from a production.', s: ['On a production, open Pre-production → Tech rider and choose Start from a template.', 'Fill from the venue adds what the venue already has (Venues → Technical).', 'Send it: the venue gets the PDF and a link to answer each item; what they confirm is saved on the venue for next time.'] },
     '#/list/releaseForm': { t: 'Release forms', d: 'Forms people sign on their phone to agree to be filmed (with a parent for children).', s: ['+ New release form, then share its link or QR code at the event.'] },
     '#/list/expense': { t: 'Expenses', d: 'Money spent on a production (fuel, food, gear hire) to be approved and paid back.', s: ['+ New expense, add the slip, and choose the production.'] },
     '#/availability': { t: 'My availability', d: 'Tell the team which days you can (or cannot) work.', s: ['Click days to mark them.'] },
@@ -75,6 +76,7 @@
   function topic(hash) {
     hash = String(hash || location.hash || '#/').replace(/\?.*$/, '');
     const m = /^#\/edit\/([\w]+)\//.exec(hash);
+    if (m && m[1] === 'production') return { t: 'A production', d: 'A production in three phases. Pre-production: details, quote, crew and kit, the tech rider, the call sheet and the stream. Production: the day itself (rundown, matches, issues). Post-production: the report, music cue sheet, invoice and paying the crew.', s: ['The steps under each phase tick off as you go: click one to go to where it is done.', 'Tech rider: start from a template, fill from the venue, then Send to venue / client. Their answers show on that tab.', 'Press Save (or Ctrl+S) to keep changes.'] };
     if (m) { const base = T['#/list/' + m[1]]; return base ? { ...base, t: base.t + ': editing', s: ['Fill in the fields and press Save. Fields with * are needed.', ...(base.s || [])] } : null; }
     const keys = Object.keys(T).sort((a, b) => b.length - a.length);
     if (T[hash]) return T[hash];
