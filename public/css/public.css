@@ -448,3 +448,34 @@ button.danger-solid { background: #ff4d4d; color: #fff; }
 .lb-arrow.l { left: 6px; } .lb-arrow.r { right: 6px; }
 .lb-cap { position: absolute; bottom: 12px; left: 0; right: 0; text-align: center; color: var(--dim); font-size: 13px; }
 @media (max-width: 640px) { .lb-stage { inset: 48px 6px 44px; } .lb-arrow { display: none; } }
+
+/* tech rider (1.6.0): the venue answers each item */
+.rd-prog { display: flex; align-items: center; gap: 12px; margin: -4px 0 12px; }
+.rd-bar { flex: 1; height: 8px; background: var(--panel2); overflow: hidden; clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%); }
+.rd-bar i { display: block; height: 100%; background: var(--accent); transition: width .2s; }
+.rd-cat h3 { margin: 18px 0 8px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.rd-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; background: var(--panel); padding: 12px 18px; margin-bottom: 8px; border-left: 4px solid var(--line); }
+.rd-item.ok { border-left-color: var(--accent); } .rd-item.issue { border-left-color: #ff5c5c; } .rd-item.na { border-left-color: #777; opacity: .8; }
+.rd-item input { grid-column: 1 / -1; width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--text); padding: 8px 10px; font: inherit; }
+.rd-what b { margin-right: 8px; }
+.rd-must, .rd-nice { font-size: 11px; padding: 1px 8px; background: var(--panel2); color: var(--dim); text-transform: uppercase; letter-spacing: .05em; }
+.rd-must { color: #111; background: #ffc531; }
+.rd-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.rd-b { background: var(--panel2); color: var(--text); border: 0; padding: 8px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+.rd-b.ok.on { background: var(--accent); color: #111; } .rd-b.issue.on { background: #ff5c5c; color: #111; } .rd-b.na.on { background: #888; color: #111; }
+.rd-send { display: grid; gap: 10px; background: var(--panel); padding: 16px 18px; margin: 18px 0; }
+.rd-send label { display: grid; gap: 4px; }
+.rd-send input, .rd-send textarea { background: var(--bg); border: 1px solid var(--line); color: var(--text); padding: 9px 10px; font: inherit; }
+.rd-send button.big { justify-self: start; padding: 12px 26px; font-size: 16px; }
+@media (max-width: 640px) { .rd-item { grid-template-columns: 1fr; } .rd-btns { justify-content: flex-start; } .rd-b { flex: 1; } }
+
+/* 1.6.1: bigger headings in the accent colour, more room */
+h1, .thead h1, .chead h1, .book h1 { color: var(--accent); }
+.thead h1 { font-size: 30px; } .chead h1 { font-size: 34px; }
+h2.sec { font-size: 24px; color: var(--accent); margin: 34px 0 14px; }
+h2 { color: var(--accent); }
+.book-sec h2 { font-size: 20px; } .rate-card h2 { font-size: 21px; }
+.rd-cat h3 { color: var(--accent); font-size: 14px; margin-top: 24px; }
+.land-hero h1 { color: var(--text); }
+@media (max-width: 700px) { .thead h1 { font-size: 24px; } h2.sec { font-size: 20px; margin-top: 26px; } }
+@media print { h1, h2, h3 { color: #000 !important; } }

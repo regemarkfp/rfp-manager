@@ -481,3 +481,39 @@ button.appbar-icon { background: transparent; border: 0; clip-path: none; paddin
 .sw-m img, .sw-m video { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #000; border-radius: 4px; }
 .sw-m.off img, .sw-m.off video { opacity: .35; }
 .sw-m input { width: 100%; }
+
+/* Productions in phases and the tech rider (1.6.0) */
+.phases { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 4px; }
+.phases .phase { display: flex; align-items: center; gap: 10px; justify-content: flex-start; padding: 10px 16px; font-size: 15px; font-weight: 600; background: rgba(255,255,255,.04); border: 1px solid var(--line); color: var(--dim); }
+.phases .phase .ph-n { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,.08); font-size: 12px; flex: none; }
+.phases .phase.on { background: var(--accent); border-color: var(--accent); color: #000; }
+.phases .phase.on .ph-n { background: rgba(0,0,0,.18); }
+.ph-steps { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 6px; }
+.ph-step { display: flex; align-items: center; gap: 8px; text-align: left; padding: 6px 14px 6px 10px; background: rgba(255,255,255,.03); border: 1px solid var(--line); color: var(--text); font-size: 13px; min-width: 0; }
+.ph-step b { display: block; font-size: 13px; }
+.ph-step .dim.small { display: block; font-size: 11px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-step .ph-tick { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; flex: none; font-size: 12px; background: rgba(255,255,255,.08); color: var(--dim); }
+.ph-step.done .ph-tick { background: var(--accent); color: #000; font-weight: 700; }
+.ph-step.half .ph-tick { background: var(--warn); color: #000; }
+.ph-step:hover { border-color: var(--accent); }
+.rider-box { margin: 6px 0 0; background: rgba(255,255,255,.02); }
+.rider-box select { max-width: 280px; }
+@media (max-width: 700px) { .phases { grid-template-columns: 1fr 1fr 1fr; } .phases .phase { padding: 8px; font-size: 12px; gap: 6px; flex-direction: column; } .ph-step { flex: 1 1 46%; } }
+
+/* ================= 1.6.1: bigger headings in the accent colour, more room between things ================= */
+h1, .page-head h1 { font-size: 30px; line-height: 1.15; color: var(--accent); letter-spacing: -.01em; }
+h2 { font-size: 21px; color: var(--accent); margin-bottom: 14px; }
+.card h2 { font-size: 21px; }
+h3 { font-size: 14px; color: var(--accent); letter-spacing: .08em; }
+.form h4.fgroup { font-size: 15px; color: var(--accent); padding-top: 16px; margin-top: 14px; }
+.big-empty .em-title, .rider-box .em-title { color: var(--accent); font-size: 21px; }
+.page-head { margin-bottom: 24px; }
+.card { padding-top: 22px; padding-bottom: 22px; }
+.card + .card, .card + div > .card:first-child { margin-top: 22px; }
+.form { gap: 18px 20px; }
+label.f > span, .flabel { font-size: 12.5px; margin-bottom: 6px; }
+.ftabs { padding-bottom: 12px; margin-bottom: 4px; }
+.phases { margin-bottom: 10px; } .ph-steps { margin: 6px 0 12px; gap: 8px; }
+.modal h2, .modal-box h2 { font-size: 22px; }
+@media (max-width: 700px) { h1, .page-head h1 { font-size: 24px; } h2, .card h2 { font-size: 19px; } }
+@media print { h1, h2, h3, .page-head h1, .form h4.fgroup { color: #000 !important; } }
