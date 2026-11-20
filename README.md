@@ -33,6 +33,11 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 
 ## What's new
 
+### 1.8.1
+
+- **Audio tracks moved to the stream settings:** Content → Live streams → **Settings** now has three tabs: **Stream**, **Audio tracks** and **Restream**. On a production, the **Live stream** card has an **Audio tracks** box with **+ Set up audio tracks / Change**, which opens the stream settings on that tab. The production's own Live stream tab no longer lists them, and saving the production never overwrites tracks changed in the stream settings.
+- **Recording fix:** a production whose "Record the stream" was switched off and then on again stayed unrecorded on the streaming server until it restarted; it now records again by itself (when recording is on for the server).
+
 ### 1.8.0
 
 **Universe → Channels:** every channel on the website, whichever production company it belongs to.
