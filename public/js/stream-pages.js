@@ -46,10 +46,12 @@
           h('h3', { style: { marginTop: '16px' } }, 'SRT (vMix, OBS, encoders, Larix on a phone)'),
           field('Host', ing.srtHost), field('Port', String(ing.srtPort)), field('Stream ID', ing.srtStreamId, true), field('Full SRT URL', ing.srtUrl, true),
           h('p', { class: 'dim small' }, 'vMix: Settings → Outputs/NDI/SRT (or Streaming → SRT), type Caller, then the host, port and stream ID above. OBS: Settings → Stream → Custom, paste the full SRT URL as the server and leave the key empty. SRT copes better with poor internet than RTMP. Video H.264, audio AAC; 2–6 Mb/s, keyframe every 2 seconds.'),
-          (cur.data.streamAudio || []).length ? h('div', { class: 'card', style: { background: 'var(--panel2)', margin: '12px 0' } },
-            h('h3', { style: { marginTop: 0 } }, `Audio tracks (${cur.data.streamAudio.length})`),
+          h('div', { class: 'card', style: { background: 'var(--panel2)', margin: '12px 0' } },
+            h('div', { class: 'spread' }, h('h3', { style: { margin: 0 } }, (cur.data.streamAudio || []).length ? `Audio tracks (${cur.data.streamAudio.length})` : 'Audio tracks'),
+              App.canEdit('production') ? h('button', { class: 'sm', onclick: () => App.streamSetup(doc.id, () => paint(), 'Audio tracks') }, (cur.data.streamAudio || []).length ? 'Change' : '+ Set up audio tracks') : null),
+            !(cur.data.streamAudio || []).length ? h('p', { class: 'dim small', style: { margin: '6px 0 0' } }, 'One normal sound now. Add tracks to send several languages or mixes (one per stereo pair); viewers pick one under the video.') : [
             h('p', { class: 'small', style: { margin: '0 0 6px' } }, cur.data.streamAudio.map((r, i) => `${r.channels || ''} ${r.name || 'Track ' + (i + 1)}${r.audience && r.audience !== 'Everyone' ? ' (' + r.audience.toLowerCase() + ')' : ''}`).join('  ·  ')),
-            h('div', { class: 'dim small', style: { margin: 0, whiteSpace: 'normal', lineHeight: 1.5 } }, 'Send them over SRT (RTMP carries one track only). OBS: Settings → Output → Output Mode Advanced → Recording → Type "Custom Output (FFmpeg)" → "Output to URL", paste the Full SRT URL above, Container format mpegts, video H.264, audio AAC, and tick audio tracks 1–', String(Math.min(6, cur.data.streamAudio.length)), ' (track 1 = 1+2, track 2 = 3+4 …). Then press Start Recording. vMix and hardware encoders: send an 8-channel (or multi-track) SRT stream; the pairs are split on the server. Viewers pick the track under the video, about 10 seconds after you start.')) : null,
+            h('div', { class: 'dim small', style: { margin: 0, whiteSpace: 'normal', lineHeight: 1.5 } }, 'Send them over SRT (RTMP carries one track only). OBS: Settings → Output → Output Mode Advanced → Recording → Type "Custom Output (FFmpeg)" → "Output to URL", paste the Full SRT URL above, Container format mpegts, video H.264, audio AAC, and tick audio tracks 1–', String(Math.min(6, cur.data.streamAudio.length)), ' (track 1 = 1+2, track 2 = 3+4 …). Then press Start Recording. vMix and hardware encoders: send an 8-channel (or multi-track) SRT stream; the pairs are split on the server. Viewers pick the track under the video, about 10 seconds after you start.')]),
           cur.data.streamClosed ? h('p', { class: 'pill warn', style: { marginTop: '12px' } }, 'This stream was ended and its key is closed: nothing can stream on it until you open it again.') : null,
           App.canEdit('production') ? h('div', { class: 'row', style: { gap: '8px', margin: '8px 0' } },
             cur.data.streamClosed ? h('button', { class: 'sm primary', onclick: async () => { if (await reopenStream(doc.id)) paint(); } }, 'Open the stream key again')
@@ -479,10 +481,12 @@
   App.endStream = endStream; App.reopenStream = reopenStream;
   // ---- setting up a stream: on an existing production, or a new production made for it (with a match if picked).
   // The stream lives on the production, so whatever is set here shows on the production and the other way round.
-  const streamFields = () => Schema.fieldsFor('production', App.org()).filter((f) => f.group === 'Live stream' && !f.hidden);
+  // the stream settings, in three tabs: the stream itself, its audio tracks, and restreams (1.8.1)
+  const STREAM_TAB = { streamAudio: 'Audio tracks', streamRestream: 'Restream' };
+  const streamFields = () => Schema.fieldsFor('production', App.org()).filter((f) => f.group === 'Live stream' && !f.hidden).map((f) => ({ ...f, group: STREAM_TAB[f.k] || 'Stream' }));
   const todayIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   const showKeys = (doc) => UI.modal({ title: `Stream key: ${doc.data.streamTitle || doc.data.name}`, wide: true, body: streamCard(doc), actions: [{ label: 'Done' }] });
-  App.streamSetup = (prodId, onDone) => {
+  App.streamSetup = (prodId, onDone, openTab) => {
     const cur = prodId ? App.docs.get(prodId) : null;
     const prods = App.list('production').filter((d) => !d.data.streamChannel).sort((a, b) => String(b.data.date || '').localeCompare(String(a.data.date || '')));
     const fixtures = App.list('fixture').filter((d) => !d.data.startDate || d.data.startDate >= todayIso()).sort((a, b) => String(a.data.startDate || '').localeCompare(String(b.data.startDate || '')));
@@ -496,7 +500,8 @@
       const init = mode === 'edit' ? cur.data : mode === 'existing' && target ? App.docs.get(target).data : {};
       const start = { ...init };
       if (!start.streamChannel && channels.length === 1) start.streamChannel = channels[0].id;
-      form = buildForm('production', start, { fields });
+      form = buildForm('production', start, { fields, noPhases: true });
+      if (openTab && mode === 'edit') form.show(openTab);
       formBox.replaceChildren(form.el);
     };
     const pick = (m) => { mode = m; paintTop(); build(); };

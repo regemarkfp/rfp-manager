@@ -206,7 +206,10 @@
   };
 
   // the production form: phases with steps and the rider box on its tab; for an external producer just their fields
-  App.productionFormOpts = (doc, form, markDirty) => (App.role === 'Guest' ? { noPhases: true, fields: guestFields() } : {
+  // the audio tracks live in the stream settings (the Live stream card → Audio tracks), not in this form (1.8.1)
+  const noAudio = (list) => list.filter((f) => f.k !== 'streamAudio');
+  App.productionFormOpts = (doc, form, markDirty) => (App.role === 'Guest' ? { noPhases: true, fields: noAudio(guestFields()) } : {
+    fields: noAudio(Schema.fieldsFor('production', App.org()).filter((f) => !f.hidden)),
     phaseTop: (phase, goPhase, goGroup, data) => phaseTop(doc, phase, goPhase, goGroup, data),
     tabExtras: { 'Tech rider': () => (App.can('edit') ? riderBox(doc, form, markDirty) : null) },
   });

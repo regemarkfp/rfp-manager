@@ -409,6 +409,8 @@
     const save = async () => {
       try {
         const keep = isNew ? {} : Object.fromEntries(Object.entries((App.docs.get(doc.id) || doc).data).filter(([k]) => !(k in form.data)));   // fields this form does not show (rundown, live score…)
+        // a production: what is changed elsewhere while this page is open (the stream's audio tracks in the stream settings) is not overwritten
+        if (type === 'production' && !isNew) { const now = (App.docs.get(doc.id) || doc).data; if ('streamAudio' in now) keep.streamAudio = now.streamAudio; delete form.data.streamAudio; }
         await App.save(type, doc.id, { ...keep, ...form.data });
         dirty = false;
         toast(e.label + ' saved');
