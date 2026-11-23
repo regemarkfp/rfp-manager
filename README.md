@@ -33,6 +33,11 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 
 ## What's new
 
+### 1.9.5
+
+- **Universe → NAS** shows the storage map too (RFP slants: a shade per NAS folder, free space dark, files lighting up while written and read), with the used / total space above the Space, Mirror and folder cards.
+- **No "RFP" next to the logo** – the logo says it already: the Studio's menu reads "Manager", and the Universe, File Sharing and Scopes headers just "Universe", "File Sharing" and "Scopes" (RFP Scopes 1.0.1).
+
 ### 1.9.4 (includes 1.9.3)
 
 - **RFP Scopes – its own Windows app and its own release** (tag `scopes-v1.0.0` on this repo: `RFPScopes-Setup.exe` or the portable `RFPScopes-Windows.zip`; its version is in `tools/scopes/VERSION`, built by `.github/workflows/scopes.yml`). A broadcast monitor: pick an **NDI source** on the network (needs the free NDI Tools from ndi.video/tools) or a capture card / camera, choose full quality or low bandwidth and which audio channel pair to meter. `+ Window` (Ctrl+N) opens more monitors; F11 / double-click for the picture alone. The tally goes back to the NDI source too.
