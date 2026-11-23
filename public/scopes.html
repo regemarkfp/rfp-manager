@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>RFP Scopes</title>
+<link rel="icon" type="image/png" href="/icons/favicon-64.png">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/sharing/cloudstore.css">
+<style>
+  /* RFP Scopes (1.9.3 / Scopes 1.0.0): a big monitor with the scopes below. The same page is RFP Manager's /scopes and
+     the RFP Scopes app (which adds NDI sources). */
+  :root { --bg: #0b0b0b; --acc: #00ff82; --line: #2a2a2a; --dim: #8f8f8f; --bad: #ff4d4d; --warn: #ffb648; --in: #33d6ff; --out: #ffc83d; }
+  * { box-sizing: border-box; } [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #eee; font: 14px/1.4 var(--font-body); }
+  body { display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: linear-gradient(#1f1f1f, #141414); border-bottom: 1px solid #000; box-shadow: 0 1px 0 #2a2a2a; flex-wrap: wrap; }
+  header img { height: 24px; }
+  header .t { font-weight: 300; font-size: 19px; margin-right: 6px; } header .t b { font-weight: 700; font-style: italic; color: var(--acc); margin-right: 5px; }
+  header .grow { flex: 1; }
+  select, button, input { font: inherit; color: #eee; background: #1e1e1e; border: 1px solid #333; padding: 5px 9px; }
+  button { cursor: pointer; font-weight: 600; clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%); border: 0; background: #2a2a2a; padding: 6px 14px; white-space: nowrap; }
+  button.on { background: var(--acc); color: #062b17; } button.sm { padding: 4px 10px; font-size: 12.5px; }
+  .tools { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--dim); }
+  #status { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 6px 12px; background: #121212; border-bottom: 1px solid #1d1d1d; }
+  #verdict { font-family: var(--font-head); font-weight: 800; font-size: 16px; letter-spacing: .02em; padding: 4px 16px; clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%); background: #333; white-space: nowrap; }
+  #verdict.ok { background: var(--acc); color: #062b17; } #verdict.warn { background: var(--warn); color: #241600; } #verdict.bad { background: var(--bad); color: #fff; }
+  .chk { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; background: #181818; border: 1px solid #262626; border-radius: 3px; font-size: 12px; white-space: nowrap; }
+  .chk i { width: 8px; height: 10px; clip-path: polygon(35% 0, 100% 0, 65% 100%, 0 100%); background: #555; }
+  .chk.ok i { background: var(--acc); } .chk.warn i { background: var(--warn); } .chk.bad i { background: var(--bad); }
+  .chk small { color: var(--dim); }
+  main { flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 8px; padding: 8px; }
+  /* the monitor: the picture as big as it fits, the audio meters beside it */
+  #mon { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 8px; }
+  #picbox { position: relative; min-height: 0; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #1d1d1d; }
+  #frame { position: relative; flex: none; width: 320px; height: 180px; }   /* sized to the picture by scopes.js (fit) */
+  #frame > video, #frame > canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+  #frame.tally-pgm::after, #frame.tally-pvw::after { content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none; border: 6px solid #ff2020; } #frame.tally-pvw::after { border-color: #00d060; }
+  #frame > #ovl { pointer-events: none; background: transparent; z-index: 2; }
+  #name { position: absolute; left: 10px; top: 10px; z-index: 3; background: rgba(0,0,0,.65); padding: 3px 10px; font-size: 13px; pointer-events: none; }
+  #name b { font-family: var(--font-head); } #name small { color: #aaa; margin-left: 8px; }
+  #tallyTag { position: absolute; right: 10px; top: 10px; z-index: 3; font-family: var(--font-head); font-weight: 800; padding: 2px 12px; clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%); }
+  #tallyTag.pgm { background: #ff2020; color: #fff; } #tallyTag.pvw { background: #00d060; color: #04210f; }
+  #idle { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--dim); padding: 20px; }
+  #side { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .meters { flex: 1; min-height: 120px; display: grid; grid-template-columns: 22px 22px 1fr; gap: 6px; background: #141414; border: 1px solid #242424; padding: 6px; }
+  .mtr { position: relative; background: #0a0a0a; border: 1px solid #262626; overflow: hidden; }
+  .mtr span { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(0deg, #00c86a 0 70%, #ffc83d 82%, #ff4d4d 95%); }
+  .mtr b { position: absolute; left: 0; right: 0; height: 2px; background: #fff; }
+  .mtr em { position: absolute; bottom: 2px; width: 100%; text-align: center; font-size: 10px; font-style: normal; color: #ddd; }
+  .scale { position: relative; font-size: 9.5px; color: #777; } .scale span { position: absolute; left: 0; transform: translateY(50%); }
+  .nums { display: grid; gap: 6px; }
+  .nums > div { background: #141414; border: 1px solid #242424; padding: 5px 8px; }
+  .nums small { display: block; color: var(--dim); font-size: 10.5px; } .nums .v { font-family: var(--font-head); font-size: 19px; font-variant-numeric: tabular-nums; }
+  .nums .vs { font-size: 10.5px; color: var(--dim); }
+  /* the scopes under it */
+  #scopes { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.2fr); gap: 8px; height: var(--sh, 290px); }
+  #scopes .cs-panel { margin: 0; display: flex; flex-direction: column; min-height: 0; padding: 6px 8px 8px; }
+  #scopes .cs-panel > h4 { margin-bottom: 5px; }
+  .scope { position: relative; flex: 1; min-height: 0; background: #050505; border: 1px solid #222; }
+  .scope canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #vec { aspect-ratio: 1; flex: 1; align-self: center; height: 100%; max-width: 100%; }
+  .prow { flex: 1; min-height: 0; display: flex; gap: 8px; }
+  #gonio { aspect-ratio: 1; height: 100%; flex: none; max-width: 58%; }
+  .corr { flex: 1; display: flex; flex-direction: column; gap: 6px; justify-content: center; min-width: 0; }
+  .corr .bar { position: relative; height: 14px; background: linear-gradient(90deg, #4a1515 0 50%, #10301f 50%); border: 1px solid #333; }
+  .corr .bar span { position: absolute; top: -3px; bottom: -3px; width: 6px; margin-left: -3px; background: #fff; }
+  .corr .ax { display: flex; justify-content: space-between; font-size: 10px; color: var(--dim); }
+  .big { font-family: var(--font-head); font-size: 22px; font-variant-numeric: tabular-nums; }
+  /* the picture alone (double-click it; again or Esc to come back) */
+  body.pic-full header, body.pic-full #status, body.pic-full #scopes, body.pic-full #side { display: none !important; }
+  body.pic-full main { padding: 0; } body.pic-full #mon { grid-template-columns: 1fr; } body.pic-full #picbox { border: 0; }
+  body.no-scopes #scopes { display: none; }
+  .pop { position: fixed; z-index: 50; right: 12px; top: 54px; width: 330px; background: #181818; border: 1px solid #333; padding: 12px; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+  .pop label { display: grid; gap: 3px; margin-bottom: 8px; font-size: 12px; color: var(--dim); } .pop input, .pop select { width: 100%; }
+  @media (max-width: 900px) { #mon { grid-template-columns: 1fr; } #side { flex-direction: row; } .meters { min-height: 150px; flex: 1; } #scopes { grid-template-columns: 1fr; height: auto; } #scopes .scope { height: 220px; flex: none; } #vec { height: 260px; } }
+</style>
+</head>
+<body>
+<header>
+  <img src="/brand/rfp-logo-sm.png" alt=""><div class="t"><b>RFP</b>Scopes</div>
+  <label class="tools">Watch <select id="src"></select></label>
+  <span id="devs" class="tools" hidden><select id="vdev"></select><select id="adev"></select></span>
+  <span id="ndiopt" class="tools" hidden><select id="ndibw" title="NDI quality"><option value="100">Full quality</option><option value="0">Low bandwidth</option></select><select id="ndipair" title="Audio channels"></select><select id="ndiref" title="NDI audio level"><option value="0">1.0 = 0 dBFS</option><option value="20">NDI +4 dBu (−20 dB)</option></select></span>
+  <select id="trk" hidden title="Audio track"></select>
+  <span class="grow"></span>
+  <span class="tools" id="ovbtns"></span>
+  <button id="tallyBtn" class="sm" title="Tally: on air / preview border">Tally…</button>
+  <button id="listen" class="sm" title="Hear the sound (off: scopes only)">🔈 Listen</button>
+  <button id="newwin" class="sm" hidden title="Another monitor window">+ Window</button>
+</header>
+<div id="status"><span id="verdict">WAITING</span><span id="checks" style="display:contents"></span></div>
+<main>
+  <div id="mon">
+    <div id="picbox" title="Double-click: the picture alone (full screen)">
+      <div id="frame"><video id="v" playsinline muted autoplay></video><canvas id="ndiC" hidden></canvas><canvas id="ovl"></canvas>
+        <div id="name" hidden><b id="nameT"></b><small id="nameF"></small></div><div id="tallyTag" hidden></div></div>
+      <div id="idle">Choose what to watch, then press Start.</div>
+    </div>
+    <div id="side">
+      <div class="meters"><div class="mtr" title="Left peak (dBFS)"><span id="pL"></span><b id="hL"></b><em>L</em></div><div class="mtr" title="Right peak (dBFS)"><span id="pR"></span><b id="hR"></b><em>R</em></div>
+        <div class="scale" id="scale"></div></div>
+      <div class="nums">
+        <div><small>Short-term LUFS</small><div class="v" id="lS">–</div><div class="vs" id="lSv"></div></div>
+        <div><small>Integrated</small><div class="v" id="lI">–</div><div class="vs" id="lIv"></div></div>
+        <div><small>Momentary · LRA</small><div class="v" style="font-size:15px"><span id="lM">–</span> · <span id="lra">–</span></div></div>
+        <div><small>Peak L / R</small><div class="v" style="font-size:15px"><span id="dL">–</span> / <span id="dR">–</span></div></div>
+        <div class="tools"><select id="target" title="Loudness target"><option value="-14">−14 LUFS web</option><option value="-16">−16 LUFS</option><option value="-23">−23 EBU R128</option><option value="-24">−24 ATSC</option></select><button id="reset" class="sm" title="Start the integrated loudness again">Reset</button></div>
+      </div>
+    </div>
+  </div>
+  <div id="scopes">
+    <div class="cs-panel"><h4>Waveform <span class="grow"></span><span class="tools"><button id="wl" class="sm on">Luma</button><button id="wp" class="sm">RGB parade</button></span></h4><div id="wave" class="scope"><canvas id="waveC"></canvas><canvas id="waveG"></canvas></div></div>
+    <div class="cs-panel"><h4>Vectorscope <span class="grow"></span><span class="tools"><button id="vz" class="sm">×2</button></span></h4><div id="vec" class="scope"><canvas id="vecC"></canvas><canvas id="vecG"></canvas></div></div>
+    <div class="cs-panel"><h4>Phase <span class="grow"></span><small id="chs"></small></h4><div class="prow"><div id="gonio" class="scope"><canvas id="gonC"></canvas></div>
+      <div class="corr"><div><small class="tools">Correlation</small><div class="big" id="corrN">–</div></div><div class="bar"><span id="corrB" style="left:50%"></span></div><div class="ax"><span>−1</span><span>0</span><span>+1</span></div><div id="phaseNote" class="tools"></div></div></div></div>
+  </div>
+</main>
+<script src="/js/vendor/hls.min.js"></script>
+<script src="/js/scopes.js"></script>
+</body>
+</html>
