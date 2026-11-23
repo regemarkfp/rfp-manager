@@ -1,0 +1,70 @@
+# RFP Scopes – its own Windows app and its own release (tag scopes-v<version>, version in tools/scopes/VERSION):
+# RFPScopes-Setup.exe (installer) and RFPScopes-Windows.zip (portable). Built when the scopes change (or by hand:
+# Actions → RFP Scopes → Run workflow). The same version again replaces that release's files.
+name: RFP Scopes
+
+on:
+  push:
+    branches: [main]
+    paths: ['tools/scopes/**', 'public/scopes.html', 'public/js/scopes.js', 'public/js/scopes-worklet.js', 'public/fonts/**', 'public/sharing/cloudstore.css', '.github/workflows/scopes.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rfp-scopes
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build RFP Scopes
+        id: build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ver = (Get-Content tools\scopes\VERSION -Raw).Trim()
+          $stage = Join-Path $env:RUNNER_TEMP 'RFP Scopes'
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools\scopes\build.ps1 -Stage $stage
+          if ($LASTEXITCODE -ne 0) { throw 'build failed' }
+          $zip = Join-Path $env:RUNNER_TEMP 'RFPScopes-Windows.zip'
+          Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
+          "version=$ver" >> $env:GITHUB_OUTPUT
+          "stage=$stage" >> $env:GITHUB_OUTPUT
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+
+      - name: Build the installer (RFPScopes-Setup.exe)
+        id: setup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { choco install innosetup -y --no-progress | Out-Null; $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc "/DStage=${{ steps.build.outputs.stage }}" "/DVersion=${{ steps.build.outputs.version }}" tools\scopes\rfp-scopes.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed ($LASTEXITCODE)" }
+          "exe=$((Resolve-Path dist\RFPScopes-Setup.exe).Path)" >> $env:GITHUB_OUTPUT
+
+      - name: Publish the release scopes-v${{ steps.build.outputs.version }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $tag = "scopes-v${{ steps.build.outputs.version }}"
+          gh release delete $tag --yes --cleanup-tag 2>$null
+          $global:LASTEXITCODE = 0
+          gh release create $tag "${{ steps.setup.outputs.exe }}" "${{ steps.build.outputs.zip }}" --target $env:GITHUB_SHA --latest=false `
+            --title "RFP Scopes ${{ steps.build.outputs.version }} for Windows" `
+            --notes "RFP Scopes: a broadcast monitor with scopes – NDI sources (needs NDI Tools from ndi.video/tools) or a capture card / camera, the picture big with safe areas and tally, audio meters and loudness, waveform, vectorscope and phase, and a verdict before going live. Download RFPScopes-Setup.exe and run it (no administrator needed), or unzip RFPScopes-Windows.zip and start RFP Scopes.exe. Built from $env:GITHUB_SHA."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RFPScopes-Windows-${{ steps.build.outputs.version }}
+          path: |
+            ${{ steps.build.outputs.zip }}
+            ${{ steps.setup.outputs.exe }}
