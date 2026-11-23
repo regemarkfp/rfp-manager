@@ -31,7 +31,7 @@ if (-not ((Test-Path (Join-Path $wv 'Microsoft.Web.WebView2.WinForms.dll')) -and
 if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $Stage | Out-Null
 $exe = Join-Path $Stage 'RFP Scopes.exe'
-$ico = Join-Path $root 'tools\launcher\rfp.ico'
+$ico = Join-Path $here 'scopes.ico'              # RFP Scopes' own icon (tools\scopes\scopes-icon.svg)
 Write-Host "Building $exe ..."
 & $csc /nologo /target:winexe /optimize+ /unsafe /platform:x64 "/out:$exe" "/win32icon:$ico" /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Web.Extensions.dll `
   ('/r:' + (Join-Path $wv 'Microsoft.Web.WebView2.Core.dll')) ('/r:' + (Join-Path $wv 'Microsoft.Web.WebView2.WinForms.dll')) (Join-Path $here 'RFPScopes.cs')
@@ -46,6 +46,7 @@ Copy-Item (Join-Path $here 'VERSION') $Stage
 $app = Join-Path $Stage 'app'
 $files = @('scopes.html', 'js\scopes.js', 'js\scopes-worklet.js', 'js\vendor\hls.min.js', 'sharing\cloudstore.css', 'brand\rfp-logo-sm.png', 'icons\favicon-64.png')
 foreach ($f in $files) { $d = Join-Path $app $f; New-Item -ItemType Directory -Force -Path (Split-Path $d) | Out-Null; Copy-Item (Join-Path $root "public\$f") $d }
+Copy-Item (Join-Path $here 'scopes-icon-64.png') (Join-Path $app 'icons\favicon-64.png') -Force   # the app's own icon
 New-Item -ItemType Directory -Force -Path (Join-Path $app 'fonts') | Out-Null
 Copy-Item (Join-Path $root 'public\fonts\*') (Join-Path $app 'fonts')
 Set-Content -Path (Join-Path $Stage 'README.txt') -Value @"
