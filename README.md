@@ -33,6 +33,15 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 
 ## What's new
 
+### 1.9.4 (includes 1.9.3)
+
+- **RFP Scopes – its own Windows app and its own release** (tag `scopes-v1.0.0` on this repo: `RFPScopes-Setup.exe` or the portable `RFPScopes-Windows.zip`; its version is in `tools/scopes/VERSION`, built by `.github/workflows/scopes.yml`). A broadcast monitor: pick an **NDI source** on the network (needs the free NDI Tools from ndi.video/tools) or a capture card / camera, choose full quality or low bandwidth and which audio channel pair to meter. `+ Window` (Ctrl+N) opens more monitors; F11 / double-click for the picture alone. The tally goes back to the NDI source too.
+- **Scopes: a big monitor with the scopes below** – the same screen in RFP Scopes and in RFP Manager (**Scopes ↗** on a production's Live stream card or on Live streams, or `/scopes`; on the production PC `http://localhost/scopes` for a capture input).
+  - **Picture** as big as it fits, at its own shape, with switchable overlays: **safe areas** (action 93 %, graphics 90 %), **centre cross**, **4:3 lines**, the **source name and format**, and **tally** – a red ON AIR / green PREVIEW border, by hand or from RFP Manager (the ATEM's program / preview input). Double-click: the picture alone, full screen.
+  - **Audio meters beside it**: peaks with hold, and loudness (ITU BS.1770 K-weighting) short-term, integrated (gated), momentary and loudness range against a target (−14 web, −16, −23 EBU R128, −24 ATSC).
+  - **Waveform** (luma 0–100 % or RGB parade), **vectorscope** (BT.709, 75 % targets, skin-tone line, ×2) and **phase** (goniometer, correlation −1 … +1, balance) below.
+  - A **verdict** at the top – READY TO GO LIVE, ALMOST or NOT READY – from the checks: signal, picture (black, frozen), video levels, sound, peaks, loudness and phase. Listen is off by default (scopes only). Everything runs on the computer itself.
+
 ### 1.9.2 (includes 1.9.0 and 1.9.1)
 
 - **New fonts everywhere:** headings in **Saira**, everything else in **Barlow** – squarer, broadcast-style (both from Google Fonts, kept on the server in `public/fonts` so production PCs and the apps work offline too) – the website, the Studio, File Sharing, the Universe, the watch page, the live operator pages and screens, and the Android app (which shows the website). On-air outputs and graphics templates keep their own fonts.
