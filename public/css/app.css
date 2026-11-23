@@ -1,8 +1,9 @@
 /* RFP Manager – background #262626, accent from the production team's settings. */
+@import url("/fonts/fonts.css");   /* Saira headings, Barlow text (1.9.1) */
 :root { --accent: #00ff82; --on-accent: #0b0b0b; --bg: #262626; --panel: #1d1d1d; --panel2: #303030; --line: #3d3d3d; --text: #f2f2f2; --dim: #a8a8a8; --danger: #ff5a5a; --warn: #ffc94d; --radius: 8px; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
-body { background: var(--bg); color: var(--text); font: 15px/1.45 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif; }
+body { background: var(--bg); color: var(--text); font: 15px/1.45 Barlow, 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif; }
 a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
 h1 { font-size: 24px; margin: 0; font-weight: 700; } h2 { font-size: 17px; margin: 0 0 12px; font-weight: 700; } h3 { font-size: 13px; margin: 0 0 8px; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
 .boot { padding: 60px; text-align: center; color: var(--dim); }
