@@ -88,7 +88,7 @@
 .rh-btn { position: fixed; right: 18px; bottom: 18px; z-index: 60; width: 46px; height: 40px; border: 0; cursor: pointer; font: 800 19px system-ui, sans-serif; color: #062b17; background: #00ff82; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); box-shadow: 0 6px 20px rgba(0,0,0,.4); padding: 0; }
 .rh-btn:hover { filter: brightness(1.1); }
 body.has-tabbar .rh-btn { bottom: 84px; }
-.rh-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); z-index: 90; background: #1b1b1b; color: #f1f1f1; overflow: auto; padding: 20px 22px 40px; box-shadow: -10px 0 40px rgba(0,0,0,.6); font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+.rh-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); z-index: 90; background: #1b1b1b; color: #f1f1f1; overflow: auto; padding: 20px 22px 40px; box-shadow: -10px 0 40px rgba(0,0,0,.6); font: 15px/1.5 Barlow, system-ui, -apple-system, 'Segoe UI', sans-serif; }
 .rh-panel h2 { margin: 0; font-size: 21px; } .rh-panel h3 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: #a8a8a8; margin: 22px 0 8px; }
 .rh-panel p { margin: 6px 0; } .rh-panel .rh-d { color: #ddd; }
 .rh-panel ol { margin: 6px 0; padding-left: 22px; } .rh-panel li { margin: 5px 0; }

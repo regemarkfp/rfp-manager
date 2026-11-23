@@ -14,7 +14,7 @@
   const css = document.createElement('style');
   css.textContent = `
   .rfp-pk-back { position: fixed; inset: 0; z-index: 100000; background: rgba(0,0,0,.55); display: flex; align-items: flex-end; justify-content: center; }
-  .rfp-pk { width: 100%; max-width: 440px; background: #1e1e1e; color: #f1f1f1; border-radius: 16px 16px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); font: 15px/1.4 "Segoe UI", system-ui, sans-serif; box-shadow: 0 -8px 30px rgba(0,0,0,.5); }
+  .rfp-pk { width: 100%; max-width: 440px; background: #1e1e1e; color: #f1f1f1; border-radius: 16px 16px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); font: 15px/1.4 Barlow, "Segoe UI", system-ui, sans-serif; box-shadow: 0 -8px 30px rgba(0,0,0,.5); }
   .rfp-pk .hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
   .rfp-pk .hd b { font-size: 17px; }
   .rfp-pk button { font: inherit; color: inherit; background: #2c2c2c; border: 0; border-radius: 10px; min-height: 44px; min-width: 44px; cursor: pointer; }

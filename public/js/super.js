@@ -371,16 +371,95 @@
           : el('p', { class: 'dim' }, 'No channels yet.')), detail];
   }
 
+  // ---- Live (1.9.0): the NAS as a map of cells, who is connected and how fast, the network ports and the machine,
+  // every 2 seconds while the page is open on this tab (after Blackmagic's Cloud Store screen)
+  let liveT = null, liveScr = null;
+  function liveScreen() {
+    const CS = window.RFPCS;
+    if (!CS) return el('div', { class: 'card bad' }, 'The live screen did not load (cloudstore.js).');
+    const big = el('div', { class: 'cs-big' }), bigSub = el('div', { class: 'small dim' }), bar = el('div', { class: 'cs-bar' }, el('span'));
+    const svc = el('div', { class: 'cs-kv' }), hwBox = el('div', { class: 'cs-kv' }), ppl = el('div', { class: 'cs-well' }), legend = el('div', { class: 'cs-legend' }), ports = el('div', { class: 'cs-ports' });
+    const mapBox = el('div', { class: 'cs-mapbox' }), stamp = el('small', {});
+    const map = CS.hexMap(mapBox);
+    const portEls = new Map();
+    const kv = (label, value, cls) => el('span', { class: cls || '' }, label, el('b', {}, value));
+    const root = el('div', { class: 'cs-screen' },
+      el('div', { class: 'cs-left' },
+        el('div', { class: 'cs-panel' }, big, bigSub, bar),
+        el('div', { class: 'cs-panel' }, el('h4', {}, 'Streaming & website'), svc),
+        el('div', { class: 'cs-panel' }, el('h4', {}, 'Connected', el('span', { class: 'grow' }), el('small', {}, el('span', { class: 'cs-in' }, '▼ in'), ' ', el('span', { class: 'cs-out' }, '▲ out'), ' MB/s')), ppl),
+        el('div', { class: 'cs-panel' }, el('h4', {}, 'Hardware', el('span', { class: 'grow' }), stamp), hwBox)),
+      el('div', { class: 'cs-right' }, el('div', { class: 'cs-panel cs-mappanel' }, mapBox, legend), ports));
+    const paint = (d) => {
+      const st = d.storage || {};
+      const TB = st.total >= 1e12;
+      const f = (n) => (TB ? (n / 1e12).toFixed(1) : (n / 1e9).toFixed(0));
+      big.replaceChildren(el('b', {}, f(st.used)), el('i', {}, '/'), f(st.total), el('sup', {}, TB ? 'TB' : 'GB'));
+      bigSub.textContent = st.exists ? `NAS ${st.path} · ${CS.bytes(st.free)} free` + (st.device ? ' · ' + st.device : '') : 'No NAS folder (' + (st.path || '') + ')';
+      bar.firstChild.style.width = (st.total ? Math.min(100, (100 * st.used) / st.total) : 0) + '%';
+      const known = (st.folders || []).reduce((a, x) => a + x.bytes, 0);
+      map.set({ total: st.total, used: st.used, segments: (st.folders || []).map((x) => ({ key: x.name, name: x.name, size: x.bytes })), hot: d.hot });
+      legend.replaceChildren(...(st.folders || []).slice(0, 8).map((x, i) => el('span', {}, el('i', { style: 'background:' + CS.colors.used[i % CS.colors.used.length] }), `${x.name} ${CS.bytes(x.bytes)}`)),
+        ...(st.used > known * 1.02 && known ? [el('span', {}, el('i', { style: 'background:#0d7a43' }), 'Other ' + CS.bytes(st.used - known))] : []),
+        el('span', {}, el('i', { style: 'background:#232323;outline:1px solid #333' }), 'Free ' + CS.bytes(st.free)),
+        el('span', {}, el('i', { style: 'background:' + CS.colors.in }), 'Writing'), el('span', {}, el('i', { style: 'background:' + CS.colors.out }), 'Reading'),
+        ...(st.measuring ? [el('span', { class: 'dim' }, 'measuring folders…')] : []));
+      svc.replaceChildren(kv('Live streams', String(d.streams.live), d.streams.live ? 'ok' : ''), kv('Watching', String(d.streams.watching)), kv('Version', d.version), kv('Running', dur(d.uptime)), kv('Database', d.db.ok ? d.db.ms + ' ms' : 'down', d.db.ok ? 'ok' : 'bad'));
+      const ps = d.people || [];
+      const tot = ps.reduce((a, x) => [a[0] + x.in, a[1] + x.out], [0, 0]);
+      const sumHist = ps.length ? ps[0].hist.map((_, i) => ps.reduce((a, x) => [a[0] + (x.hist[i] || [0, 0])[0], a[1] + (x.hist[i] || [0, 0])[1]], [0, 0])) : [];
+      ppl.replaceChildren(...(ps.length ? ps.map((x) => el('div', { class: 'cs-row' }, el('span', { class: 'ico' }, x.name && x.name.startsWith('Link:') ? '🔗' : x.name ? '👤' : '🖥'),
+        el('div', { class: 'who' }, el('b', { title: x.name || x.ip }, x.name || x.ip || 'Someone'), el('small', {}, el('span', { class: 'tag' }, x.area || 'Web'), x.name ? x.ip : '')),
+        el('span', { class: 'sp' }, el('span', { class: 'cs-in' }, CS.num(x.in)), ' ', el('span', { class: 'cs-out' }, CS.num(x.out))), CS.spark(x.hist)))
+        : [el('div', { class: 'cs-empty' }, 'Nobody is sending or downloading right now.')]),
+        el('div', { class: 'cs-row total' }, el('span', {}), el('div', { class: 'who' }, el('b', {}, 'Total'), el('small', {}, `${ps.length} connection${ps.length === 1 ? '' : 's'}`)), el('span', { class: 'sp' }, el('span', { class: 'cs-in' }, CS.num(tot[0])), ' ', el('span', { class: 'cs-out' }, CS.num(tot[1]))), CS.spark(sumHist)));
+      const h = d.hardware || {};
+      const raid = st.raid;
+      hwBox.replaceChildren(kv('Processor', (h.cpu || 0) + '%', h.cpu > 85 ? 'warn' : ''), kv('Memory', h.mem ? Math.round(100 * (1 - h.mem.free / h.mem.total)) + '% of ' + CS.bytes(h.mem.total) : '–'),
+        kv('Temperature', h.temp != null ? h.temp + '°C' : '–', h.temp > 80 ? 'bad' : h.temp > 70 ? 'warn' : ''), kv('Load', h.load ? h.load[0].toFixed(2) : '–'),
+        raid ? kv('RAID ' + (raid.level || '').replace('raid', ''), raid.progress ? `${raid.progress.kind} ${raid.progress.percent}%` : raid.healthy ? `OK ${raid.working}/${raid.wanted} disks` : `DEGRADED ${raid.working}/${raid.wanted}`, raid.healthy ? (raid.progress ? 'warn' : 'ok') : 'bad') : kv('RAID', 'none'),
+        kv('Machine', (h.host || '') + (h.uptime ? ' · up ' + dur(h.uptime) : '')));
+      stamp.textContent = new Date(d.at).toLocaleTimeString('en-GB');
+      // one graph per network port (bits per second, like the switch shows)
+      const seen = new Set();
+      for (const pt of d.ports || []) {
+        seen.add(pt.name);
+        let p = portEls.get(pt.name);
+        if (!p) {
+          const v = el('span', { class: 'v' }), sc = el('span', { class: 'sc' }), g = el('div', { class: 'g' }, sc);
+          const box = el('div', { class: 'cs-port' }, el('div', { class: 't' }, el('span', {}, pt.label), pt.speed ? el('span', { class: 'tag' }, pt.speed >= 1000 ? pt.speed / 1000 + 'G' : pt.speed + 'M') : null, el('span', { class: 'grow' }), v), g, el('div', { class: 'ax' }, el('span', {}, '60 s'), el('span', {}, '30'), el('span', {}, 'now')));
+          p = { box, v, gr: CS.graph(g, { scale: sc, fmt: (t) => CS.bits(t), min: 8e3 }) };
+          portEls.set(pt.name, p); ports.append(box);
+        }
+        p.v.replaceChildren(el('span', { class: 'cs-in' }, CS.num(pt.in / 8, 'Mb')), ' ', el('span', { class: 'cs-out' }, CS.num(pt.out / 8, 'Mb')), el('span', { class: 'dim', style: 'font-weight:400' }, ' Mb/s'));
+        p.gr.set(pt.hist);
+      }
+      for (const [k, p] of portEls) if (!seen.has(k)) { p.box.remove(); portEls.delete(k); }
+      if (!(d.ports || []).length && !ports.firstChild) ports.append(el('div', { class: 'cs-port dim small' }, 'No network ports to show (the server is not Linux).'));
+    };
+    const poll = async () => {
+      clearTimeout(liveT);
+      if (location.hash !== '' && location.hash !== '#' && location.hash !== '#live') return;
+      if (document.visibilityState === 'visible') { try { paint(await api('GET', '/api/super/live')); } catch (e) { stamp.textContent = e.message; } }
+      liveT = setTimeout(poll, 2000);
+    };
+    poll();
+    return root;
+  }
+
   async function load(quiet) {
     clearTimeout(timer); timer = null;
+    document.body.classList.remove('wide');
     const y = window.scrollY;
     if (setToken) return setForm();
     const me = await api('GET', '/api/super/me').catch(() => ({}));
     if (!me.email) { $('who').replaceChildren(); if (quiet) return; return loginForm(); }
     $('who').replaceChildren(me.email + ' · ', el('a', { href: '#', onclick: async (e) => { e.preventDefault(); await api('POST', '/api/super/logout'); load(); } }, 'Sign out'));
-    const tab = location.hash === '#nas' ? 'nas' : location.hash === '#channels' ? 'channels' : location.hash === '#updates' ? 'updates' : location.hash.startsWith('#files') ? 'files' : 'overview';
+    const tab = location.hash === '#nas' ? 'nas' : location.hash === '#channels' ? 'channels' : location.hash === '#updates' ? 'updates' : location.hash.startsWith('#files') ? 'files' : location.hash === '#overview' ? 'overview' : 'live';
+    if (tab === 'live' && quiet && liveScr && liveScr.isConnected) return;          // it keeps itself up to date
+    clearTimeout(liveT);
     if (tab === 'files' && !quiet) filesPath = decodeURIComponent(location.hash.slice(7).replace(/^\//, ''));
-    const tabs = el('div', { class: 'tabs' }, [['overview', 'Overview'], ['channels', 'Channels'], ['nas', 'NAS'], ['files', 'Files'], ['updates', 'Updates']].map(([k, label]) => el('a', { href: k === 'overview' ? '#' : '#' + k, class: k === tab ? 'on' : '', onclick: (e) => { e.preventDefault(); history.replaceState(null, '', k === 'overview' ? location.pathname : '#' + k); load(); } }, label)));
+    const tabs = el('div', { class: 'tabs' }, [['live', 'Live'], ['overview', 'Overview'], ['channels', 'Channels'], ['nas', 'NAS'], ['files', 'Files'], ['updates', 'Updates']].map(([k, label]) => el('a', { href: k === 'live' ? '#' : '#' + k, class: k === tab ? 'on' : '', onclick: (e) => { e.preventDefault(); history.replaceState(null, '', k === 'live' ? location.pathname : '#' + k); load(); } }, label)));
     const stamp = el('span', { class: 'small dim' }, `Updated ${new Date().toLocaleTimeString('en-GB')}`);
     const autoBox = el('label', { class: 'small dim', style: 'display:flex;gap:6px;align-items:center;cursor:pointer' }, el('input', { type: 'checkbox', checked: auto ? '' : null, style: 'width:auto;margin:0', onchange: (e) => { auto = e.target.checked; try { localStorage.setItem('su-auto', auto ? '1' : '0'); } catch (x) { /* ignore */ } later(); } }), 'Auto refresh (30 s)');
     const head = (title) => el('div', { class: 'row', style: 'justify-content:space-between' }, el('h1', {}, title), el('div', { class: 'row' }, stamp, autoBox, el('button', { class: 'ghost', onclick: () => load() }, 'Refresh')));
@@ -389,6 +468,7 @@
       else if (tab === 'channels') { if (quiet && document.activeElement && document.activeElement.tagName === 'SELECT') return later(); const r = await api('GET', '/api/super/channels?days=' + chDays); show(tabs, head('Channels'), channelsCards(r, () => load(true))); }
       else if (tab === 'files') { if (uploading && quiet) return later(); show(tabs, head('Files'), await filesCard()); }
       else if (tab === 'nas') { const [n, u] = await Promise.all([api('GET', '/api/super/nas'), api('GET', '/api/super/nas/users').catch((e) => ({ ready: false, users: [], info: { error: e.message } }))]); show(tabs, head('NAS'), nasCards(n), usersCard(u)); if (n.measuring) setTimeout(() => { if (location.hash === '#nas') load(true); }, 8000); }
+      else if (tab === 'live') { liveScr = liveScreen(); show(tabs, liveScr); document.body.classList.add('wide'); return; }
       else { const o = await api('GET', '/api/super/overview'); show(tabs, head('RegemarkFP overview'), healthCard(o.health), companiesCard(o.companies)); }
     } catch (e) { if (!quiet) show(tabs, el('div', { class: 'card bad' }, e.message)); }
     if (quiet) window.scrollTo(0, y);

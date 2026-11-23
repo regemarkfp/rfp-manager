@@ -37,7 +37,7 @@
   const css = document.createElement('style');
   css.textContent = `
   .player { position: relative; }
-  .pbar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #1d1d1f; border-radius: 0 0 10px 10px; color: #d6d6d6; user-select: none; font: 13px/1 'Segoe UI', system-ui, sans-serif; }
+  .pbar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #1d1d1f; border-radius: 0 0 10px 10px; color: #d6d6d6; user-select: none; font: 13px/1 Barlow, 'Segoe UI', system-ui, sans-serif; }
   .pb-btn { background: none; border: 0; color: inherit; width: 34px; height: 30px; padding: 0; display: grid; place-items: center; border-radius: 6px; cursor: pointer; flex: none; }
   .pb-btn:hover, .pb-btn.on { color: #fff; background: #2c2c2e; }
   .pb-btn svg { width: 20px; height: 20px; }

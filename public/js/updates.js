@@ -27,7 +27,7 @@
     const wrap = document.createElement('div');
     wrap.id = 'rfp-update';
     wrap.setAttribute('role', 'dialog');
-    wrap.style.cssText = 'position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(0,0,0,.55);padding:16px;font:14px/1.45 "Segoe UI",system-ui,sans-serif';
+    wrap.style.cssText = 'position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(0,0,0,.55);padding:16px;font:14px/1.45 Barlow,"Segoe UI",system-ui,sans-serif';
     const card = document.createElement('div');
     card.style.cssText = 'max-width:420px;width:100%;background:#1e1e1e;color:#f1f1f1;border:1px solid #333;border-radius:12px;padding:20px 22px;box-shadow:0 10px 40px rgba(0,0,0,.6)';
     const h = document.createElement('h3'); h.textContent = title; h.style.cssText = 'margin:0 0 8px;font-size:18px';
