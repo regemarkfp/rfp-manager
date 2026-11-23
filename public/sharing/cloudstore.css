@@ -1,0 +1,46 @@
+/* 1.9.0 – the live look shared by the Universe and File Sharing (after Blackmagic's Cloud Store screen, RFP colours) */
+.cs-map { position: relative; width: 100%; height: 100%; min-height: 120px; }
+.cs-map canvas { display: block; }
+.cs-tip { position: absolute; z-index: 5; pointer-events: none; background: #050505; border: 1px solid #333; color: #eee; font-size: 12px; padding: 4px 8px; white-space: nowrap; transform: translateX(-10%); }
+.cs-graph { display: block; width: 100%; height: 100%; }
+.cs-spark { display: inline-block; width: 74px; height: 24px; vertical-align: middle; background: #0c0c0c; border: 1px solid #262626; }
+.cs-in { color: #33d6ff; } .cs-out { color: #ffc83d; }
+
+/* panels: dark boxes with a title strip, rows inside a darker well */
+.cs-panel { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 4px; padding: 10px 12px 12px; margin-bottom: 10px; }
+.cs-panel > h4 { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: #f2f2f2; letter-spacing: .01em; display: flex; align-items: center; gap: 8px; }
+.cs-panel > h4::before { content: ''; width: 10px; height: 12px; background: var(--acc, var(--accent, #00ff82)); clip-path: polygon(35% 0, 100% 0, 65% 100%, 0 100%); flex: none; }
+.cs-panel > h4 .grow { flex: 1; }
+.cs-panel > h4 small { font-weight: 500; color: #8a8a8a; font-size: 11px; }
+.cs-well { background: #111; border: 1px solid #232323; border-radius: 3px; }
+.cs-row { display: grid; grid-template-columns: 26px 1fr auto 76px; gap: 8px; align-items: center; padding: 7px 8px; border-bottom: 1px solid #1f1f1f; font-size: 12.5px; }
+.cs-row:last-child { border-bottom: 0; }
+.cs-row .ico { width: 24px; height: 20px; display: grid; place-items: center; background: #262626; border-radius: 2px; color: #bbb; font-size: 12px; }
+.cs-row .who { min-width: 0; } .cs-row .who b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #eee; }
+.cs-row .who small { color: #8a8a8a; font-size: 10.5px; }
+.cs-row .tag { display: inline-block; font-size: 9.5px; font-weight: 700; padding: 0 5px; margin-right: 4px; background: #2b2b2b; color: #cfcfcf; border-radius: 2px; letter-spacing: .04em; }
+.cs-row .sp { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 12px; text-align: right; }
+.cs-row.total { background: #151515; font-weight: 700; }
+.cs-empty { color: #777; font-size: 12.5px; padding: 12px 8px; }
+.cs-big { font-size: 40px; font-weight: 300; letter-spacing: -.01em; line-height: 1.05; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cs-big b { font-weight: 300; color: var(--acc, var(--accent, #00ff82)); }
+.cs-big i { font-style: normal; color: #666; margin: 0 4px; }
+.cs-big sup { font-size: 13px; font-weight: 600; color: #aaa; vertical-align: top; margin-left: 2px; }
+.cs-kv { display: flex; flex-wrap: wrap; gap: 6px; }
+.cs-kv > span { flex: 1 1 28%; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #111; border: 1px solid #262626; border-radius: 3px; padding: 5px 8px; font-size: 11px; color: #9a9a9a; }
+.cs-kv > span b { display: block; color: #eee; font-size: 13px; font-weight: 600; }
+.cs-kv > span.ok b { color: var(--acc, var(--accent, #00ff82)); } .cs-kv > span.bad b { color: #ff5c5c; } .cs-kv > span.warn b { color: #ffb648; }
+.cs-bar { height: 5px; background: #262626; margin-top: 8px; border-radius: 2px; overflow: hidden; } .cs-bar > span { display: block; height: 100%; background: var(--acc, var(--accent, #00ff82)); }
+
+/* the port graphs under the map */
+.cs-ports { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.cs-port { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 4px; padding: 8px 10px 6px; }
+.cs-port .t { display: flex; align-items: baseline; gap: 8px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.cs-port .t .tag { font-size: 10px; background: #2b2b2b; padding: 0 5px; color: #cfcfcf; border-radius: 2px; }
+.cs-port .t .grow { flex: 1; }
+.cs-port .t .v { font-variant-numeric: tabular-nums; font-weight: 600; }
+.cs-port .g { position: relative; height: 92px; margin-top: 6px; background: #0e0e0e; border: 1px solid #222; }
+.cs-port .g .sc { position: absolute; left: 4px; top: 2px; font-size: 10px; color: #777; }
+.cs-port .ax { display: flex; justify-content: space-between; font-size: 9.5px; color: #666; margin-top: 2px; }
+.cs-legend { display: flex; gap: 14px; font-size: 11.5px; color: #9a9a9a; align-items: center; flex-wrap: wrap; }
+.cs-legend i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; vertical-align: -1px; clip-path: polygon(35% 0, 100% 0, 65% 100%, 0 100%); height: 12px; }

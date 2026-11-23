@@ -286,7 +286,10 @@
       [['1', 'Add files', 'Press the green + or drag files here'], ['2', 'Choose a folder', 'and tick who should know'], ['3', 'Send', 'They get an email with a link']].map(([n, t, d]) => h('div', { class: 'help-step' }, h('span', { class: 'n' }, n), h('div', {}, h('b', {}, t), h('div', { class: 'dim small' }, d))))),
       h('button', { class: 'sm ghost', title: 'Hide this', onclick: (e) => { try { localStorage.setItem('rfp-share-intro', '1'); } catch { /* fine */ } e.currentTarget.parentNode.remove(); } }, '✕'));
     paintRight();
-    fill(main, intro, h('div', { class: targets.length ? 'two' : '' }, targets.length ? xferPanel({ targets, after: async () => { try { tx = await api('GET', '/api/share-transfers'); paintRight(); } catch { /* later */ } } }).el : null, right));
+    // Admins: the storage of all their shared folders, live (others get nothing: the server says no)
+    const isAdmin = await api('GET', '/api/share-live').then(() => true).catch(() => false);
+    const store = isAdmin ? liveBox((it) => go('/f/' + it.key + '/')) : null;
+    fill(main, intro, store, h('div', { class: targets.length ? 'two' : '' }, targets.length ? xferPanel({ targets, after: async () => { try { tx = await api('GET', '/api/share-transfers'); paintRight(); } catch { /* later */ } } }).el : null, right));
   }
 
   // ---------------------------------------------------------------- a folder
@@ -408,6 +411,45 @@
       bar, body, r.free != null && canEdit ? h('p', { class: 'dim small', style: { marginTop: '14px' } }, `${size(r.free)} of space left.`) : null);
     paintBar();
   }
+  // ---------------------------------------------------------------- the storage panel (1.9.0, Cloud Store look)
+  // On the home page, for Admins only: every shared folder of their teams on one map (a shade per folder; hover names
+  // it, click opens it; new files arrive in the free cells), the space they take next to the free space, and who is
+  // sending or getting files right now (MB per second, the last minute). Not shown inside the folders.
+  function liveBox(onPick) {
+    const CS = window.RFPCS;
+    if (!CS) return null;
+    const big = h('div', { class: 'cs-big' }), sub = h('div', { class: 'dim small' }), ppl = h('div', { class: 'cs-well' }), mapBox = h('div', { class: 'sh-mapbox' }), legend = h('div', { class: 'cs-legend' });
+    const map = CS.hexMap(mapBox, { r: innerWidth < 700 ? 5 : 6, onPick });
+    const box = h('div', { class: 'sh-live' },
+      h('div', { class: 'cs-panel sh-map' }, h('div', { class: 'spread', style: { alignItems: 'flex-end', marginBottom: '8px' } }, h('div', {}, big, sub), legend), mapBox),
+      h('div', { class: 'cs-panel sh-people' }, h('h4', {}, 'Live now', h('span', { class: 'grow' }), h('small', {}, h('span', { class: 'cs-in' }, '▼ up'), ' ', h('span', { class: 'cs-out' }, '▲ down'), ' MB/s')), ppl));
+    const paint = (d) => {
+      const tot = d.folder.size, free = d.disk ? d.disk.free : 0;
+      const one = (n) => { const t = CS.bytes(n).split(' '); return [h('b', {}, t[0]), h('sup', {}, t[1])]; };
+      fill(big, one(tot), free ? [h('i', {}, '/'), CS.bytes(free).split(' ')[0], h('sup', {}, CS.bytes(free).split(' ')[1] + ' free')] : null);
+      sub.textContent = `${d.folder.files} file${d.folder.files === 1 ? '' : 's'} in ${d.folder.folders} shared folder${d.folder.folders === 1 ? '' : 's'} · only Admins see this`;
+      const items = d.items.filter((x) => x.size > 0);
+      const here = items.reduce((a, x) => a + x.size, 0);
+      // the map: the shared folders by size; free cells only as a thin edge (the whole disk is on the Universe)
+      map.set({ total: here ? here * 1.08 : 1, used: here, segments: items.map((x) => ({ key: x.path, name: x.name, size: x.size, sub: `${x.files} file${x.files === 1 ? '' : 's'}` })),
+        hot: d.hot.map((x) => ({ key: x.path, path: x.path, kind: x.kind })) });
+      fill(legend, h('span', {}, h('i', { style: { background: CS.colors.used[0] } }), 'Files'), h('span', {}, h('i', { style: { background: CS.colors.in } }), 'Arriving'), h('span', {}, h('i', { style: { background: CS.colors.out } }), 'Downloading'));
+      fill(ppl, d.people.length ? d.people.map((x) => h('div', { class: 'cs-row' }, h('span', { class: 'ico' }, /^Link:/.test(x.name) ? '🔗' : '👤'),
+        h('div', { class: 'who' }, h('b', { title: x.name }, x.name || 'Someone'), h('small', {}, `${CS.bytes(x.total[0])} up · ${CS.bytes(x.total[1])} down`)),
+        h('span', { class: 'sp' }, h('span', { class: 'cs-in' }, CS.num(x.in)), ' ', h('span', { class: 'cs-out' }, CS.num(x.out))), CS.spark(x.hist)))
+        : h('div', { class: 'cs-empty' }, 'Nobody is sending or downloading right now.'));
+    };
+    const poll = async () => {
+      if (!box.isConnected && polled) return;
+      polled = true;
+      if (document.visibilityState === 'visible') { try { paint(await api('GET', '/api/share-live')); } catch (e) { if (e.status === 403 || e.status === 401) { box.remove(); return; } } }
+      setTimeout(poll, 2000);            // its own timer: it stops when the folder page is gone (not with a preview's polls)
+    };
+    let polled = false;
+    setTimeout(poll, 0);
+    return box;
+  }
+
   // choose a folder inside a shared folder (for Move to…): walk in, go back, "Move here"
   function folderPicker(id, rootName, start, moving) {
     let at = start;
