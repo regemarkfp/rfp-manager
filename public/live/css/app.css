@@ -1,4 +1,5 @@
 /* CricketCG operator UI – dark, dense, broadcast-desk style */
+@import url("/fonts/fonts.css");   /* Saira headings, Barlow text (1.9.1) */
 :root {
   /* Same palette as the RFP Manager app. --accent follows the production team's accent colour. */
   --bg: #262626;
@@ -22,7 +23,7 @@
   --cyan: #39c5cf;
   --radius: 6px;
   --mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
-  --sans: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --sans: Barlow, 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
