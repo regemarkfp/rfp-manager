@@ -6,19 +6,27 @@
   <meta name="robots" content="noindex, nofollow">
   <title>RegemarkFP · Universe</title>
   <link rel="icon" type="image/png" href="/icons/favicon-64.png">
+  <link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/sharing/cloudstore.css">
   <style>
-    :root { --bg: #0f0f0f; --card: #1a1a1a; --line: #2c2c2c; --txt: #ececec; --dim: #9a9a9a; --acc: #00ff82; --bad: #ff5c5c; --warn: #ffb648; }
+    :root { --bg: #0b0b0b; --card: #1a1a1a; --line: #2a2a2a; --txt: #ececec; --dim: #9a9a9a; --acc: #00ff82; --bad: #ff5c5c; --warn: #ffb648; }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--txt); font: 15px/1.45 "Segoe UI", Roboto, Arial, sans-serif; }
-    header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); }
-    header img { height: 30px; }
-    header .grow { flex: 1; font-weight: 600; }
-    main { max-width: 1200px; margin: 0 auto; padding: 20px 16px 60px; }
+    body { margin: 0; background: var(--bg); color: var(--txt); font: 15px/1.45 Barlow, "Segoe UI", Roboto, Arial, sans-serif; }
+    /* 1.9.0: the Cloud Store look – a dark title bar with a thin name, the logo on the right, panels with title strips */
+    header { display: flex; align-items: center; gap: 14px; padding: 12px 22px; background: linear-gradient(#202020, #161616); border-bottom: 1px solid #000; box-shadow: 0 1px 0 #2a2a2a; }
+    header img { height: 30px; order: 3; }
+    header .grow { flex: 1; font-weight: 300; font-size: 24px; letter-spacing: .01em; color: #f0f0f0; }
+    header .grow b { font-weight: 700; font-style: italic; color: var(--acc); margin-right: 6px; }
+    header #who { order: 2; }
+    main { max-width: 1200px; margin: 0 auto; padding: 16px 16px 60px; }
+    body.wide main { max-width: none; padding: 12px 14px 30px; }
     h1 { font-size: 30px; margin: 0 0 18px; color: var(--acc); } h2 { font-size: 21px; margin: 0 0 14px; color: var(--acc); } h3 { color: var(--acc); }
-    .card { background: var(--card); border: 1px solid var(--line); padding: 16px 18px; margin-bottom: 16px; clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 14px 16px; margin-bottom: 12px; }
+    .card > h2:first-child, .card > h3:first-child { display: flex; align-items: center; gap: 9px; font-size: 16px; color: #f2f2f2; margin-bottom: 12px; }
+    .card > h2:first-child::before, .card > h3:first-child::before { content: ''; width: 11px; height: 14px; background: var(--acc); clip-path: polygon(35% 0, 100% 0, 65% 100%, 0 100%); }
     .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
-    .tile { background: #222; padding: 10px 14px; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
-    .tile b { display: block; font-size: 20px; } .tile span { color: var(--dim); font-size: 13px; }
+    .tile { background: #111; border: 1px solid #262626; border-radius: 3px; padding: 10px 14px; }
+    .tile b { display: block; font-size: 26px; font-weight: 300; font-variant-numeric: tabular-nums; } .tile span { color: var(--dim); font-size: 12px; }
     .ok { color: var(--acc); } .bad { color: var(--bad); } .warn { color: var(--warn); } .dim { color: var(--dim); } .small { font-size: 13px; }
     input { width: 100%; padding: 10px 12px; margin: 4px 0 12px; background: #111; color: var(--txt); border: 1px solid var(--line); font: inherit; clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
     button, .btn { display: inline-block; padding: 9px 20px; background: var(--acc); color: #000; border: 0; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
@@ -27,12 +35,13 @@
     .login { max-width: 380px; margin: 60px auto; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tbody tr:hover td { background: #151515; }
     th { color: var(--dim); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
     td.n, th.n { text-align: right; white-space: nowrap; }
     .scroll { overflow-x: auto; }
     .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .msg { margin: 8px 0; } a { color: var(--acc); }
-    .tabs { display: flex; gap: 8px; margin: 0 0 16px; }
+    .tabs { display: flex; gap: 6px; margin: 0 0 14px; flex-wrap: wrap; }
     .tabs a { padding: 8px 18px; background: #222; color: var(--txt); text-decoration: none; font-weight: 600; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
     .tabs a.on { background: var(--acc); color: #000; }
     .meter { height: 10px; background: #2a2a2a; margin-top: 14px; overflow: hidden; } .meter.thin { height: 8px; margin: 0; } .meter span { display: block; height: 100%; }
@@ -50,12 +59,20 @@
     .acc-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 5px 0; border-bottom: 1px solid #222; font-size: 14px; } .acc-row.sub { padding-left: 18px; color: var(--dim); }
     button.on { background: var(--acc); color: #000; }
     .pill { display: inline-block; padding: 1px 8px; background: #2a2a2a; font-size: 12px; margin: 0 4px 4px 0; }
+    /* the Live screen: panels on the left, the storage map and the network ports on the right */
+    .cs-screen { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 12px; align-items: start; }
+    .cs-right { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    .cs-mappanel { padding: 8px; margin: 0; }
+    .cs-mapbox { height: max(300px, calc(100vh - 380px)); background: #0d0d0d; border: 1px solid #222; }
+    .cs-mappanel .cs-legend { margin-top: 8px; }
+    @media (max-width: 900px) { .cs-screen { grid-template-columns: 1fr; } .cs-right { order: -1; } .cs-mapbox { height: 260px; } header .grow { font-size: 19px; } }
   </style>
 </head>
 <body>
-  <header><img src="/brand/rfp-logo-sm.png" alt="RFP"><div class="grow">Universe</div><div id="who" class="small dim"></div></header>
+  <header><img src="/brand/rfp-logo-sm.png" alt="RFP"><div class="grow"><b>RFP</b>Universe</div><div id="who" class="small dim"></div></header>
   <main id="main"><p class="dim">Loading…</p></main>
   <footer id="foot" class="small dim" style="text-align:center;padding:10px 16px 30px"></footer>
+  <script src="/sharing/cloudstore.js"></script>
   <script src="/js/super.js"></script>
 </body>
 </html>

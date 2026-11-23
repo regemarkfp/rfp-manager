@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Watch</title>
   <link rel="icon" type="image/png" href="/icons/favicon-64.png">
-  <style>
+  <link rel="stylesheet" href="/fonts/fonts.css">
+<style>
     :root { --bg: #111; --panel: #1b1b1b; --line: #333; --text: #f2f2f2; --dim: #a3a3a3; --live: #ff3b3b; --accent: #00ff82; }
     * { box-sizing: border-box; }
-    html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 Barlow, 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif; }
     main { max-width: 1800px; margin: 0 auto; padding: 16px; }
     /* the player as large as fits the screen (never taller), the chat on the right, the rest underneath */
     .wgrid { display: grid; grid-template-columns: minmax(0, calc((100vh - 170px) * 16 / 9)) minmax(300px, 380px); gap: 22px; justify-content: center; align-items: start; }
