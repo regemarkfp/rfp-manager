@@ -33,6 +33,18 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 
 ## What's new
 
+### 1.8.3
+
+- **File Sharing: anyone with the link.** Share a folder, a sub-folder or a single file (that final video for the client's people) with a link that opens without an account or signing in. People with the link can look, play and download – never upload, change, delete, comment or see who has access.
+  - Make one with **🔗 Share a link** in a folder, or **Get a link to this file / folder…** in a file's ⋯ menu (editors and managers).
+  - Each link can have a **password** and an **end date** (1, 7 or 30 days, or a date), and can be **switched off**, given a **new address** (the old one stops) or deleted.
+  - **Views and downloads** are counted on each link, and opening or downloading through a link shows in the folder's History.
+  - The link page works on phones, plays video in the browser (with a preview copy for camera formats when the server has ffmpeg), and downloads files or everything as a ZIP.
+
+### 1.8.2
+
+- **Scrubbing recordings works.** Recorded streams come from the media server as one continuous MP4 with no byte ranges, so browsers could not jump around in them (on desktop or phones). The player now jumps by asking the server for the recording from that moment: clicking or dragging the bar, ← / →, double-tapping on a phone and `?at=` links all work across the whole recording, and the bar always shows the full length.
+
 ### 1.8.1
 
 - **Audio tracks moved to the stream settings:** Content → Live streams → **Settings** now has three tabs: **Stream**, **Audio tracks** and **Restream**. On a production, the **Live stream** card has an **Audio tracks** box with **+ Set up audio tracks / Change**, which opens the stream settings on that tab. The production's own Live stream tab no longer lists them, and saving the production never overwrites tracks changed in the stream settings.
