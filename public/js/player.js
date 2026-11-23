@@ -1,7 +1,7 @@
 /* The watch page's player controls: a slim bar under the picture.
  *   ⏮ ▶ ⏭   time   [ progress ]   length   🔈 [volume]   audio tracks   settings   list   full screen
  * Live: a LIVE marker instead of the progress, and "Back to live" when behind. Keys: space / k play, ← → 10 s,
- * m mute, f full screen. RFPPlayer.mount(video, { live, prev, next, tracks, onList }) → { el, setTracks, destroy } */
+ * m mute, f full screen. RFPPlayer.mount(video, { live, vod: { url, duration }, prev, next, tracks, onList }) → { el, seek, time, setTracks, … } */
 'use strict';
 (() => {
   const NS = 'http://www.w3.org/2000/svg';
@@ -121,12 +121,43 @@
     const edge = () => { const s = video.seekable; return s && s.length ? s.end(s.length - 1) : video.duration; };
     const behind = () => opts.live && Number.isFinite(edge()) && edge() - video.currentTime > 12;
     liveTag.addEventListener('click', () => { if (behind()) video.currentTime = Math.max(0, edge() - 3); });
+    // a recording from the media server (opts.vod: { url, duration }) streams as one MP4 without byte ranges, so the
+    // browser cannot jump in it: a jump past what has loaded asks the server again from that moment (start= moves on,
+    // duration= shrinks) and the bar keeps showing the whole recording (base = where this piece starts)
+    const V = opts.vod && opts.vod.url && Number(opts.vod.duration) > 0 ? { url: String(opts.vod.url), duration: Number(opts.vod.duration) } : null;
+    let base = 0, pending = null;
+    const pos = () => (pending != null ? pending : base + (video.currentTime || 0));
+    const total = () => (V ? V.duration : video.duration);
+    const loaded = (t) => { try { const b = video.buffered; for (let i = 0; i < b.length; i++) if (t >= b.start(i) && t <= b.end(i) - 0.3) return true; } catch (e) { /* none */ } return false; };
+    const srcAt = (sec) => {
+      const u = new URL(V.url, location.href), start = Date.parse(u.searchParams.get('start') || '');
+      if (!Number.isFinite(start)) return V.url;
+      u.searchParams.set('start', new Date(start + sec * 1000).toISOString());
+      u.searchParams.set('duration', String(Math.max(1, Math.ceil(V.duration - sec))));
+      return u.pathname + u.search;
+    };
+    const goTo = (t) => {
+      const d = total();
+      if (!Number.isFinite(d) || d <= 0) { if (Number.isFinite(t)) try { video.currentTime = Math.max(0, t); } catch (e) { /* not seekable */ } return; }
+      t = Math.min(Math.max(0, t), Math.max(0, d - 0.5));
+      if (!V) { video.currentTime = t; return; }
+      if (t >= base && loaded(t - base)) { video.currentTime = t - base; return; }
+      const wasPaused = video.paused && video.readyState > 0, rate = video.playbackRate;
+      base = Math.floor(t);
+      video.src = srcAt(base);
+      video.defaultPlaybackRate = rate; video.playbackRate = rate;
+      if (!wasPaused) video.play().catch(() => {});
+      paint();
+    };
     let dragging = false;
-    const seekTo = (x) => { const r = seek.getBoundingClientRect(); const f = Math.min(1, Math.max(0, (x - r.left) / r.width)); if (Number.isFinite(video.duration)) video.currentTime = f * video.duration; };
+    const frac = (x) => { const r = seek.getBoundingClientRect(); return Math.min(1, Math.max(0, (x - r.left) / r.width)); };
+    // while dragging a recording only the knob moves; it jumps when let go (each jump is a new request)
+    const seekTo = (x, done) => { const d = total(); if (!Number.isFinite(d)) return; const t = frac(x) * d; if (V && !done) { pending = t; paint(); return; } pending = null; goTo(t); };
     if (!opts.live) {
       seek.addEventListener('pointerdown', (e) => { dragging = true; seek.setPointerCapture(e.pointerId); seekTo(e.clientX); });
       seek.addEventListener('pointermove', (e) => { if (dragging) seekTo(e.clientX); });
-      seek.addEventListener('pointerup', () => { dragging = false; });
+      seek.addEventListener('pointerup', (e) => { if (dragging) seekTo(e.clientX, true); dragging = false; });
+      seek.addEventListener('pointercancel', () => { dragging = false; if (pending != null) { const t = pending; pending = null; goTo(t); } });
     }
     // the sound the bar controls: the video, or what plays instead of it for a while (an advert in master control)
     let aud = null;
@@ -168,7 +199,7 @@
     let lastCue = '';
     function paintSubs() {
       if (subOn < 0 || !cues.length) { if (lastCue) { subBox.replaceChildren(); lastCue = ''; } return; }
-      const t = video.currentTime;
+      const t = pos();
       const now = cues.filter((c) => t >= c.start && t < c.end).map((c) => c.text);
       const key = now.join('\n');
       if (key === lastCue) return;
@@ -225,12 +256,12 @@
         liveTag.lastChild.textContent = b ? (bar.offsetWidth < 520 ? 'GO LIVE' : 'BACK TO LIVE') : 'LIVE';
         cur.textContent = opts.since ? clock((Date.now() - opts.since) / 1000) : clock(video.currentTime);
       } else {
-        const d = video.duration;
-        cur.textContent = clock(video.currentTime);
+        const d = total();
+        cur.textContent = clock(pos());
         len.textContent = Number.isFinite(d) ? clock(d) : '';
-        const f = Number.isFinite(d) && d > 0 ? video.currentTime / d : 0;
+        const f = Number.isFinite(d) && d > 0 ? Math.min(1, pos() / d) : 0;
         fill.style.width = f * 100 + '%'; knob.style.left = f * 100 + '%';
-        try { const bf = video.buffered; if (bf.length && Number.isFinite(d) && d > 0) buf.style.width = (bf.end(bf.length - 1) / d) * 100 + '%'; } catch (e) { /* none */ }
+        try { const bf = video.buffered; if (bf.length && Number.isFinite(d) && d > 0) { buf.style.left = (base / d) * 100 + '%'; buf.style.width = (Math.min(d - base, bf.end(bf.length - 1)) / d) * 100 + '%'; } } catch (e) { /* none */ }
       }
     }
     for (const ev of ['play', 'pause', 'timeupdate', 'volumechange', 'durationchange', 'progress', 'loadedmetadata']) video.addEventListener(ev, paint);
@@ -250,9 +281,10 @@
     if (tapEl && tapEl.append) tapEl.append(fx.l, fx.r);
     let lastTap = null, single = null, streak = null;
     const seekBy = (sec) => {
-      const d = video.duration, end = opts.live ? edge() : d;
+      if (!opts.live) { goTo(pos() + sec); paint(); return; }
+      const end = edge();
       let t = (video.currentTime || 0) + sec;
-      if (Number.isFinite(end) && end > 0) t = Math.min(end - (opts.live ? 2 : 0.2), t);
+      if (Number.isFinite(end) && end > 0) t = Math.min(end - 2, t);
       video.currentTime = Math.max(0, t);
       paint();
     };
@@ -285,13 +317,13 @@
       if (e.key === ' ' || e.key === 'k') { e.preventDefault(); if (video.paused) video.play().catch(() => {}); else video.pause(); }
       else if (e.key === 'f') toggleFull();
       else if (e.key === 'm') { const a = A(); a.muted = !a.muted; if (!a.muted && opts.onUnmute) opts.onUnmute(); keep(); paint(); }
-      else if (e.key === 'ArrowLeft') video.currentTime = Math.max(0, video.currentTime - 10);
-      else if (e.key === 'ArrowRight' && !opts.live) video.currentTime = Math.min(video.duration || 0, video.currentTime + 10);
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); seekBy(-10); }
+      else if (e.key === 'ArrowRight' && !opts.live) { e.preventDefault(); seekBy(10); }
     };
     document.addEventListener('keydown', onKey);
     paint();
     const setAudio = (el2) => { if (aud) aud.removeEventListener('volumechange', paint); aud = el2 || null; if (aud) aud.addEventListener('volumechange', paint); paint(); };
-    return { el: bar, setTracks: (t) => { tracks = t; paint(); }, setSubtitles: (l) => { subs = l || []; subOn = -1; cues = []; subBox.replaceChildren(); startSub(); paint(); }, paint, setAudio };
+    return { el: bar, seek: goTo, time: pos, setTracks: (t) => { tracks = t; paint(); }, setSubtitles: (l) => { subs = l || []; subOn = -1; cues = []; subBox.replaceChildren(); startSub(); paint(); }, paint, setAudio };
   }
   // subtitles: a small WebVTT (and SRT) reader → [{ start, end, text }]
   function parseVtt(text) {

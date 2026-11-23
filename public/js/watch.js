@@ -85,7 +85,7 @@
     const i = items.indexOf(here);
     const go = (q) => () => { location.search = q; };
     const live = !!opts.live;
-    const b = window.RFPPlayer.mount(video, { player: $('player'), live, color: (info.channel || {}).color || '', since: live ? info.since : 0, tracks: opts.tracks || null, onUnmute: opts.onUnmute,
+    const b = window.RFPPlayer.mount(video, { player: $('player'), live, vod: opts.vod || null, color: (info.channel || {}).color || '', since: live ? info.since : 0, tracks: opts.tracks || null, onUnmute: opts.onUnmute,
       prev: live ? null : i > 0 ? go(items[i - 1]) : null, next: live ? (items.length ? go(items[0]) : null) : i >= 0 && i < items.length - 1 ? go(items[i + 1]) : null,
       prevLabel: 'Previous video', nextLabel: live ? 'Recordings' : 'Next video',
       onList: (items.length || (info.matches || []).length) ? () => $('vids').scrollIntoView({ behavior: 'smooth' }) : null });
@@ -133,12 +133,12 @@
     const video = el('video', { playsinline: '', preload: 'auto', src: info.vod.url, poster: info.poster ? '/media/' + encodeURIComponent(info.poster) : null });
     const unmute = el('button', { class: 'unmute', onclick: (e) => { e.stopPropagation(); video.muted = false; window.RFPPlayer.saveSound(video); video.play().catch(() => {}); unmute.remove(); } }, '🔊 Tap for sound');
     $('stage').replaceChildren(video);
-    bar(video, { live: false, onUnmute: () => unmute.remove() });
+    const pb = bar(video, { live: false, vod: { url: info.vod.url, duration: info.vod.duration }, onUnmute: () => unmute.remove() });
     playing = true;
     // with the viewer's sound settings; muted only when the browser will not start it with sound (then: tap for sound)
     // a replay of one moment (?at=<seconds>, from the match centre): start there
     const at = Number(new URLSearchParams(location.search).get('at')) || 0;
-    if (at > 0) video.addEventListener('loadedmetadata', () => { try { video.currentTime = Math.min(at, Math.max(0, (video.duration || at) - 1)); } catch { /* not seekable */ } }, { once: true });
+    if (at > 0) pb.seek(at);
     window.RFPPlayer.playWithSound(video, () => blocked(video));
     beats(video, matchId ? { kind: 'match', match: matchId, title: info.vod.title || '' } : { kind: 'vod', start: info.vod.start });
   }
