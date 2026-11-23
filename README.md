@@ -33,6 +33,10 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 
 ## What's new
 
+### 1.9.6
+
+- **RFP Scopes 1.0.2**: starting up it waits for the NDI sources and opens the first one (it no longer tries a camera on its own – that gave "Timeout starting video source"); a camera you chose and then left no longer shows an error later. While an NDI source has not shown a picture, the screen says what is happening (connecting, nothing arriving after n seconds, sound only …). RFP Scopes has its own icon (a scope screen with a trace, in the RFP Manager / Regemark Replay style: `tools/scopes/scopes-icon.svg`). RFP Scopes now keeps a log (`%LOCALAPPDATA%\RFP Scopes\scopes.log`: the NDI runtime, each source opened, pictures and sound received, any error) for finding problems.
+
 ### 1.9.5
 
 - **Universe → NAS** shows the storage map too (RFP slants: a shade per NAS folder, free space dark, files lighting up while written and read), with the used / total space above the Space, Mirror and folder cards.
