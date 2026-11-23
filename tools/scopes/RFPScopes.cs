@@ -242,15 +242,18 @@ class NdiReceiver
             int w = v.xres, h = v.yres;
             CoreWebView2SharedBuffer old = buf;
             CoreWebView2SharedBuffer nb = null;
+            IntPtr np = IntPtr.Zero;
             Exception err = null;
+            // a shared buffer may only be touched on the UI thread: make it, post it and read its address there
             win.OnUiWait(delegate
             {
                 try { if (old != null) old.Close(); } catch (Exception) { }
-                try { nb = win.NewBuffer(w, h); } catch (Exception ex) { err = ex; }
+                try { nb = win.NewBuffer(w, h); if (nb != null) np = nb.Buffer; } catch (Exception ex) { err = ex; }
             });
             if (nb == null) { buf = null; if (err != null) throw new Exception("the picture buffer could not be made (" + err.Message + "); update the Microsoft Edge WebView2 Runtime", err); return; }
             Program.Log("NDI \"" + name + "\": picture buffer " + w + "x" + h);
-            buf = nb; bufPtr = nb.Buffer; bufW = w; bufH = h;
+            buf = nb; bufPtr = np; bufW = w; bufH = h;
+            if (bufPtr == IntPtr.Zero) throw new Exception("the picture buffer has no memory");
         }
         int row = v.xres * 4;
         if (v.stride == row) Ndi.Copy(bufPtr, v.data, (UIntPtr)(ulong)((long)row * v.yres));
