@@ -103,7 +103,8 @@
       stream = await navigator.mediaDevices.getUserMedia({
         video: vd === 'none' ? false : { deviceId: vd ? { exact: vd } : undefined, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 50 } },
         audio: ad === 'none' ? false : { deviceId: ad ? { exact: ad } : undefined, echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 }, sampleRate: 48000 } });
-    } catch (e) { return say('The capture input did not open: ' + e.message, 'bad'); }
+    } catch (e) { if (current === 'cap') say('The capture input did not open: ' + e.message, 'bad'); return; }
+    if (current !== 'cap') { stream.getTracks().forEach((t) => t.stop()); stream = null; return; }   // another source was chosen meanwhile
     await devices();
     video.srcObject = stream; video.muted = true; video.play().catch(() => {});
     const vt = stream.getVideoTracks()[0], st = vt && vt.getSettings ? vt.getSettings() : {};
@@ -131,8 +132,9 @@
     if (!ndi.ready) { try { await ctx.audioWorklet.addModule('/js/scopes-worklet.js'); ndi.ready = true; } catch (e) { say('The NDI sound could not start: ' + e.message, 'warn'); } }
     if (ndi.ready && !ndi.node) ndi.node = new AudioWorkletNode(ctx, 'rfp-feed', { numberOfInputs: 0, outputChannelCount: [2] });
     if (ndi.node) ndi.node.connect(chain.inp);
-    ndi.name = name; ndi.at = 0; ndi.channels = 0;
+    ndi.name = name; ndi.at = 0; ndi.channels = 0; ndi.frames = 0; ndi.audioMsgs = 0;
     setName(name, '');
+    ndiWait('Connecting to ' + name + ' …');
     post({ ndi: 'open', name, bandwidth: Number($('ndibw').value), pair: Number($('ndipair').value) || 0 });
   }
   if (WV) {
@@ -145,12 +147,14 @@
       const m = e.data || {};
       if (m.app === 'got') { const w = waiting.get(m.id); if (w) { waiting.delete(m.id); if (m.status >= 200 && m.status < 300) { try { w.resolve(JSON.parse(m.body)); } catch (x) { w.reject(x); } } else w.reject(new Error(m.error || 'HTTP ' + m.status)); } return; }
       if (m.ndi === 'sources') { const before = ndi.list.join('|'); ndi.list = m.list || []; if (before !== ndi.list.join('|')) sources(); return; }
-      if (m.ndi === 'error') { say(m.text, 'bad'); return; }
+      if (m.ndi === 'error') { if (!current) ndi.problem = m.text; say(m.text, 'bad'); return; }
+      if (m.ndi === 'status') { ndi.status = m.text; if (current.startsWith('ndi:') && !ndi.at) ndiWait(m.text); return; }
       if (!current.startsWith('ndi:')) return;
       if (m.ndi === 'frame') { drawNdi(m); return; }
       if (m.ndi === 'audio') {
         if (m.ch !== ndi.channels) { ndi.channels = m.ch; const p = $('ndipair'), keep = p.value; p.replaceChildren(...Array.from({ length: Math.max(1, Math.ceil(m.ch / 2)) }, (_, i) => new Option(m.ch < 2 ? 'Mono' : `Ch ${i * 2 + 1}+${i * 2 + 2}`, i * 2))); if ([...p.options].some((o) => o.value === keep)) p.value = keep; }
-        if (!ndi.node) return;
+        ndi.audioMsgs++;
+        if (!ndi.node) { if (ndi.audioMsgs === 1) say('NDI sound is arriving, but the sound engine did not start (the meters stay empty). Restart RFP Scopes.', 'warn'); return; }
         const bin = atob(m.d), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
         const f = new Float32Array(u8.buffer), g = Math.pow(10, -(Number($('ndiref').value) || 0) / 20);
         if (g !== 1) for (let i = 0; i < f.length; i++) f[i] *= g;
@@ -166,7 +170,8 @@
     if (!ndi.buf || m.w !== ndi.w || m.h !== ndi.h) { post({ ndi: 'ack' }); return; }
     if (ndiC.width !== m.w || ndiC.height !== m.h) { ndiC.width = m.w; ndiC.height = m.h; aspect(m.w, m.h); }
     nctx.putImageData(new ImageData(new Uint8ClampedArray(ndi.buf, 0, m.w * m.h * 4), m.w, m.h), 0, 0);
-    ndi.at = performance.now();
+    if (!ndi.at) $('idle').hidden = true;
+    ndi.at = performance.now(); ndi.frames++;
     const fps = m.fpsD ? m.fpsN / m.fpsD : 0;
     ndi.fps = `${m.w}×${m.h} ${fps ? (Math.round(fps * 100) / 100) + (m.progressive === false ? 'i' : 'p') : ''}`;
     $('nameF').textContent = ndi.fps;
@@ -426,6 +431,8 @@
     const worst = C.some((x) => x[1] === 'bad') ? 'bad' : C.some((x) => x[1] === 'warn') ? 'warn' : 'ok';
     const vEl = $('verdict'); vEl.className = started ? worst : ''; vEl.textContent = !started ? 'PRESS START' : worst === 'ok' ? 'READY TO GO LIVE' : worst === 'warn' ? 'ALMOST: CHECK THE AMBER' : 'NOT READY';
   }
+  // while an NDI source has not shown a picture yet: what the app says it is doing (stays on screen)
+  function ndiWait(text) { const el = $('idle'); clearTimeout(msgT); el.hidden = false; el.style.color = ''; el.textContent = text; }
   let msgT = null;
   function say(text, kind) { const el = $('idle'); el.hidden = false; el.textContent = text; el.style.color = kind === 'bad' ? '#ff7a7a' : kind === 'warn' ? '#ffb648' : ''; clearTimeout(msgT); msgT = setTimeout(() => { el.hidden = true; }, kind === 'bad' ? 20000 : 8000); }
 
@@ -449,7 +456,14 @@
     if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) devices();
     const go = document.createElement('button'); go.className = 'on'; go.textContent = '▶ Start'; go.onclick = () => { go.remove(); start(); };
     $('status').insertBefore(go, $('checks'));
-    if (WV && q.get('autostart') === '1') { go.remove(); start(); }
+    if (WV && q.get('autostart') === '1') {
+      for (let i = 0; i < 40 && !ndi.list.length; i++) await new Promise((r) => setTimeout(r, 100));     // the first NDI list (≤ 4 s)
+      await sources();
+      if (!$('src').value.startsWith('ndi:') && ndi.list.length) $('src').value = 'ndi:' + ndi.list[0];
+      showOpts();
+      if ($('src').value.startsWith('ndi:')) { go.remove(); start(); }
+      else say(ndi.problem || 'No NDI sources found yet. They appear in "Watch" as they are found; pick one (or a capture input) and press Start.', ndi.problem ? 'bad' : 'warn');
+    }
     grat(); requestAnimationFrame(loop);
   })();
 })();
