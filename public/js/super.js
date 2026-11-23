@@ -103,13 +103,39 @@
   }
 
   // the NAS: space, the RAID 1 mirror (both disks working?), and what takes the room
+  // the NAS as a map of RFP slants (as on Live): used space in a shade per folder, free space dark, files lighting up
+  // while they are written (cyan) and read (yellow) – the lights come from /api/super/live every 2 seconds
+  function nasMap(n) {
+    const CS = window.RFPCS;
+    if (!CS || !n.total) return null;
+    const TB = n.total >= 1e12, f = (x) => (TB ? (x / 1e12).toFixed(1) : (x / 1e9).toFixed(0));
+    const box = el('div', { class: 'cs-mapbox', style: 'height:clamp(220px, 42vh, 460px)' });
+    const map = CS.hexMap(box);
+    const known = (n.folders || []).reduce((a, x) => a + x.bytes, 0);
+    const segs = (n.folders || []).map((x) => ({ key: x.name, name: x.name, size: x.bytes }));
+    map.set({ total: n.total, used: n.used, segments: segs, hot: [] });
+    const legend = el('div', { class: 'cs-legend', style: 'margin-top:8px' }, (n.folders || []).slice(0, 10).map((x, i) => el('span', {}, el('i', { style: 'background:' + CS.colors.used[i % CS.colors.used.length] }), `${x.name} ${CS.bytes(x.bytes)}`)),
+      n.used > known * 1.02 && known ? el('span', {}, el('i', { style: 'background:#0d7a43' }), 'Other ' + CS.bytes(n.used - known)) : null,
+      el('span', {}, el('i', { style: 'background:#232323;outline:1px solid #333' }), 'Free ' + CS.bytes(n.free)),
+      el('span', {}, el('i', { style: 'background:' + CS.colors.in }), 'Writing'), el('span', {}, el('i', { style: 'background:' + CS.colors.out }), 'Reading'));
+    const card = el('div', { class: 'card' }, el('div', { class: 'row', style: 'justify-content:space-between;align-items:flex-end;margin-bottom:10px' },
+      el('div', { class: 'cs-big' }, el('b', {}, f(n.used)), el('i', {}, '/'), f(n.total), el('sup', {}, TB ? 'TB' : 'GB')), el('span', { class: 'small dim' }, n.path + (n.device ? ' · ' + n.device : ''))), box, legend);
+    const poll = async () => {
+      if (!card.isConnected) { if (card.dataset.seen) return; setTimeout(poll, 500); return; }
+      card.dataset.seen = '1';
+      if (document.visibilityState === 'visible') { try { const d = await api('GET', '/api/super/live'); map.set({ total: n.total, used: n.used, segments: segs, hot: d.hot }); } catch (e) { /* next time */ } }
+      setTimeout(poll, 2000);
+    };
+    poll();
+    return card;
+  }
   function nasCards(n) {
     if (!n.exists) return el('div', { class: 'card' }, el('p', {}, `No NAS folder at ${n.path}. Set NAS_DIR on the server if it is somewhere else.`));
     const usedPct = n.total ? Math.round((n.used / n.total) * 100) : 0;
     const r = n.raid;
     const bar = el('div', { class: 'meter' }, el('span', { style: `width:${usedPct}%;background:${usedPct > 90 ? 'var(--bad)' : usedPct > 80 ? 'var(--warn)' : 'var(--acc)'}` }));
     const max = Math.max(1, ...(n.folders || []).map((f) => f.bytes));
-    return [
+    return [nasMap(n),
       el('div', { class: 'card' }, el('h2', {}, 'Space'),
         el('div', { class: 'tiles' },
           el('div', { class: 'tile' }, el('b', { class: usedPct > 90 ? 'bad' : usedPct > 80 ? 'warn' : '' }, bytes(n.free || 0)), el('span', {}, `free of ${bytes(n.total || 0)}`)),

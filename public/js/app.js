@@ -234,7 +234,7 @@ function shell(content) {
   const on = navOn;
   const root = h('div', { class: 'shell' + (navStore.get('rfp-side-min') === '1' && window.innerWidth > 860 ? ' side-min' : '') },
     h('aside', { class: 'side' },
-      h('div', { class: 'brand', style: { display: 'flex', alignItems: 'center', gap: '10px' } }, h('img', { class: 'logo', src: '/brand/rfp-logo-sm.png', alt: 'RFP', style: { height: '28px', width: 'auto' } }), h('span', { class: 'brand-name', style: { flex: 1 } }, App.cfg.name), h('button', { class: 'ghost sm no-print side-toggle', title: 'Make the menu narrow or wide', onclick: () => { const n = !root.classList.contains('side-min'); root.classList.toggle('side-min', n); navStore.set('rfp-side-min', n ? '1' : '0'); } }, '«')),
+      h('div', { class: 'brand', style: { display: 'flex', alignItems: 'center', gap: '10px' } }, h('img', { class: 'logo', src: '/brand/rfp-logo-sm.png', alt: 'RFP', style: { height: '28px', width: 'auto' } }), h('span', { class: 'brand-name', style: { flex: 1 } }, String(App.cfg.name || '').replace(/^RFP\s+/i, '') || App.cfg.name), h('button', { class: 'ghost sm no-print side-toggle', title: 'Make the menu narrow or wide', onclick: () => { const n = !root.classList.contains('side-min'); root.classList.toggle('side-min', n); navStore.set('rfp-side-min', n ? '1' : '0'); } }, '«')),
       h('select', { 'aria-label': 'Production team', onchange: async (e) => {
         if (e.target.value === '+') { e.target.value = App.team; return newTeam(); }
         await App.selectTeam(e.target.value); location.hash = '#/'; route();
