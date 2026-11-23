@@ -33,6 +33,14 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 
 ## What's new
 
+### 1.9.2 (includes 1.9.0 and 1.9.1)
+
+- **New fonts everywhere:** headings in **Saira**, everything else in **Barlow** – squarer, broadcast-style (both from Google Fonts, kept on the server in `public/fonts` so production PCs and the apps work offline too) – the website, the Studio, File Sharing, the Universe, the watch page, the live operator pages and screens, and the Android app (which shows the website). On-air outputs and graphics templates keep their own fonts.
+- **A live look for the Universe and File Sharing**, after Blackmagic's Cloud Store screen, in RFP colours.
+  - **Universe → Live** (the new first tab, updates every 2 seconds): the NAS as a map of **RFP slants** – used space in shades of green per NAS folder, free space dark on the right, and files lighting up cyan while they are written and yellow while they are read. The used / total space as a big number. **Connected**: everyone sending or downloading right now (name or address, Sharing / Studio / Website / Universe, MB/s in and out, a one-minute graph each, and the total). A graph for **every network port** (Mb/s in and out, Tailscale too). **Hardware**: processor, memory, temperature, load, RAID and uptime. Live streams, viewers, version and database time.
+  - **File Sharing**: on the main page, **for Admins only**, the storage of all their team's shared folders on one map (hover names a folder, click opens it; new files arrive in the free cells), the space they take next to the free space, and who is uploading or downloading right now and how fast. Not shown inside the folders. Thin title bar, panels with title strips, the rest restyled to match.
+  - The speeds are measured by RFP Manager itself (every request and upload, per person) and from the server's network ports; nothing is stored, only the last minute.
+
 ### 1.8.3
 
 - **File Sharing: anyone with the link.** Share a folder, a sub-folder or a single file (that final video for the client's people) with a link that opens without an account or signing in. People with the link can look, play and download – never upload, change, delete, comment or see who has access.
