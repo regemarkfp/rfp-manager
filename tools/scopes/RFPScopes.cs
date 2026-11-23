@@ -26,9 +26,27 @@ static class Program
     public static readonly string Version = ReadVersion();
     static string ReadVersion() { try { return File.ReadAllText(Path.Combine(Dir, "VERSION")).Trim(); } catch (Exception) { return "1"; } }
 
+    // what happened, for finding problems: %LOCALAPPDATA%\RFP Scopes\scopes.log (kept small)
+    static readonly object logGate = new object();
+    public static readonly string LogFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RFP Scopes", "scopes.log");
+    public static void Log(string text)
+    {
+        try
+        {
+            lock (logGate)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(LogFile));
+                if (File.Exists(LogFile) && new FileInfo(LogFile).Length > 512 * 1024) File.Delete(LogFile);
+                File.AppendAllText(LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + "  " + text + Environment.NewLine);
+            }
+        }
+        catch (Exception) { }
+    }
+
     [STAThread]
     static void Main()
     {
+        Log("RFP Scopes " + Version + " starting (" + (Environment.Is64BitProcess ? "64-bit" : "32-bit") + ", " + Environment.OSVersion + ")");
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         string arch = (Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE") ?? "").ToUpperInvariant();
@@ -42,6 +60,7 @@ static class Program
             return;
         }
         Ndi.Start();
+        Log(Ndi.Ready ? "NDI ready: " + Ndi.Path : "NDI not ready: " + Ndi.Problem);
         ScopesWindow.Open();
         Application.Run(ScopesWindow.Context);
         Ndi.Stop();
@@ -76,7 +95,7 @@ static class Ndi
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] [return: MarshalAs(UnmanagedType.U1)] public static extern bool NDIlib_recv_set_tally(IntPtr recv, ref NdiTally tally);
 
     public static bool Ready;
-    public static string Problem = "";
+    public static string Problem = "", Path = "";
     static IntPtr finder = IntPtr.Zero;
     static readonly object gate = new object();
 
@@ -88,10 +107,11 @@ static class Ndi
             foreach (string v in new[] { "NDI_RUNTIME_DIR_V6", "NDI_RUNTIME_DIR_V5", "NDI_RUNTIME_DIR_V4" })
             {
                 string d = Environment.GetEnvironmentVariable(v);
-                if (!string.IsNullOrEmpty(d) && File.Exists(Path.Combine(d, Lib))) { dll = Path.Combine(d, Lib); break; }
+                if (!string.IsNullOrEmpty(d) && File.Exists(System.IO.Path.Combine(d, Lib))) { dll = System.IO.Path.Combine(d, Lib); break; }
             }
-            if (dll == null && File.Exists(Path.Combine(Program.Dir, Lib))) dll = Path.Combine(Program.Dir, Lib);
+            if (dll == null && File.Exists(System.IO.Path.Combine(Program.Dir, Lib))) dll = System.IO.Path.Combine(Program.Dir, Lib);
             if (dll == null) { Problem = "The NDI Runtime is not installed on this PC. Install NDI Tools (free) from ndi.video/tools, then start RFP Scopes again. Capture inputs work without it."; return; }
+            Path = dll;
             if (LoadLibrary(dll) == IntPtr.Zero) { Problem = "The NDI Runtime could not be loaded (" + Marshal.GetLastWin32Error() + "). Reinstall NDI Tools."; return; }
             if (!NDIlib_initialize()) { Problem = "NDI does not start on this processor."; return; }
             NdiFindCreate fc = new NdiFindCreate(); fc.showLocal = true;
@@ -161,6 +181,14 @@ class NdiReceiver
         thread.Start();
     }
     public void Stop() { running = false; }
+    int videoFrames, audioFrames, otherFrames, skipped;
+    string lastFormat = "", lastAudio = "";
+    int failures;
+    void Status(string text) { win.Post("{\"ndi\":\"status\",\"text\":" + Js(text) + "}"); }
+    void Fail(string what, Exception ex)
+    {
+        if (failures++ < 5) { Program.Log("NDI " + what + " failed: " + ex); win.Post("{\"ndi\":\"error\",\"text\":" + Js("The " + what + " from " + name + " could not be shown: " + ex.Message + " (details in " + Program.LogFile + ")") + "}"); }
+    }
     public void Ack() { waiting = false; }
     public void Tally(bool program, bool preview) { tallyWant = (program ? 1 : 0) | (preview ? 2 : 0); }
 
@@ -172,19 +200,29 @@ class NdiReceiver
             NdiRecvCreate rc = new NdiRecvCreate();
             rc.source.name = nameMem; rc.colorFormat = 2 /* RGBX_RGBA */; rc.bandwidth = bandwidth; rc.allowFields = false; rc.recvName = recvName;
             recv = Ndi.NDIlib_recv_create_v3(ref rc);
+            Program.Log("NDI receiver for \"" + name + "\" (bandwidth " + bandwidth + ", channels " + (pair + 1) + "+" + (pair + 2) + "): " + (recv == IntPtr.Zero ? "FAILED" : "created"));
             if (recv == IntPtr.Zero) { win.Post("{\"ndi\":\"error\",\"text\":" + Js("Could not connect to " + name) + "}"); return; }
+            Status("Connected to " + name + ": waiting for the first picture …");
+            int lastNote = Environment.TickCount, started = Environment.TickCount;
             while (running)
             {
+                if (Environment.TickCount - lastNote > 3000)
+                {
+                    lastNote = Environment.TickCount;
+                    if (videoFrames == 0) Status((audioFrames > 0 ? "Sound is arriving from " : "Nothing has arrived yet from ") + name + " after " + (Environment.TickCount - started) / 1000 + " s (" + videoFrames + " pictures, " + audioFrames + " sound blocks, " + otherFrames + " other). Is the source sending, and is the network letting NDI through (firewall)?");
+                    Program.Log("NDI \"" + name + "\": " + videoFrames + " video (" + lastFormat + "), " + audioFrames + " audio (" + lastAudio + "), " + skipped + " skipped, " + otherFrames + " other");
+                }
                 if (tallyWant >= 0) { NdiTally t = new NdiTally(); t.program = (tallyWant & 1) != 0; t.preview = (tallyWant & 2) != 0; tallyWant = -1; Ndi.NDIlib_recv_set_tally(recv, ref t); }
                 NdiVideo v = new NdiVideo(); NdiAudio a = new NdiAudio(); NdiMeta m = new NdiMeta();
                 int type = Ndi.NDIlib_recv_capture_v2(recv, ref v, ref a, ref m, 100);
-                if (type == 1) { try { Video(v); } finally { Ndi.NDIlib_recv_free_video_v2(recv, ref v); } }
-                else if (type == 2) { try { Audio(a); } finally { Ndi.NDIlib_recv_free_audio_v2(recv, ref a); } }
-                else if (type == 3) Ndi.NDIlib_recv_free_metadata(recv, ref m);
-                else if (type == 4) { win.Post("{\"ndi\":\"error\",\"text\":" + Js("The NDI connection to " + name + " was lost") + "}"); Thread.Sleep(500); }
+                if (type == 1) { videoFrames++; try { Video(v); } catch (Exception ex) { Fail("picture", ex); } finally { Ndi.NDIlib_recv_free_video_v2(recv, ref v); } }
+                else if (type == 2) { audioFrames++; try { Audio(a); } catch (Exception ex) { Fail("sound", ex); } finally { Ndi.NDIlib_recv_free_audio_v2(recv, ref a); } }
+                else if (type == 3) { otherFrames++; Ndi.NDIlib_recv_free_metadata(recv, ref m); }
+                else if (type == 4) { Program.Log("NDI \"" + name + "\": connection lost"); win.Post("{\"ndi\":\"error\",\"text\":" + Js("The NDI connection to " + name + " was lost") + "}"); Thread.Sleep(500); }
+                else if (type == 100) otherFrames++;
             }
         }
-        catch (Exception e) { win.Post("{\"ndi\":\"error\",\"text\":" + Js("NDI: " + e.Message) + "}"); }
+        catch (Exception e) { Program.Log("NDI receiver stopped: " + e); win.Post("{\"ndi\":\"error\",\"text\":" + Js("NDI: " + e.Message) + "}"); }
         finally
         {
             try { if (recv != IntPtr.Zero) Ndi.NDIlib_recv_destroy(recv); } catch (Exception) { }
@@ -197,18 +235,21 @@ class NdiReceiver
     void Video(NdiVideo v)
     {
         if (v.data == IntPtr.Zero || v.xres <= 0 || v.yres <= 0) return;
-        if (waiting && Environment.TickCount - waitingSince < 1000) return;       // the page is still drawing the last one
+        lastFormat = v.xres + "x" + v.yres + " " + FourCC(v.fourCC) + " stride " + v.stride + " " + v.frN + "/" + v.frD;
+        if (waiting && Environment.TickCount - waitingSince < 1000) { skipped++; return; }       // the page is still drawing the last one
         if (buf == null || bufW != v.xres || bufH != v.yres)
         {
             int w = v.xres, h = v.yres;
             CoreWebView2SharedBuffer old = buf;
             CoreWebView2SharedBuffer nb = null;
+            Exception err = null;
             win.OnUiWait(delegate
             {
                 try { if (old != null) old.Close(); } catch (Exception) { }
-                nb = win.NewBuffer(w, h);
+                try { nb = win.NewBuffer(w, h); } catch (Exception ex) { err = ex; }
             });
-            if (nb == null) return;
+            if (nb == null) { buf = null; if (err != null) throw new Exception("the picture buffer could not be made (" + err.Message + "); update the Microsoft Edge WebView2 Runtime", err); return; }
+            Program.Log("NDI \"" + name + "\": picture buffer " + w + "x" + h);
             buf = nb; bufPtr = nb.Buffer; bufW = w; bufH = h;
         }
         int row = v.xres * 4;
@@ -226,6 +267,7 @@ class NdiReceiver
         if (a.data == IntPtr.Zero || a.samples <= 0 || a.channels <= 0) return;
         int n = a.samples, c = a.channels;
         int l = Math.Min(pair, c - 1), r = Math.Min(pair + 1, c - 1);
+        lastAudio = a.sampleRate + " Hz " + c + " ch " + n + " samples";
         float[] left = new float[n], right = new float[n], mix = new float[n * 2];
         Marshal.Copy(IntPtr.Add(a.data, l * a.channelStride), left, 0, n);
         Marshal.Copy(IntPtr.Add(a.data, r * a.channelStride), right, 0, n);
@@ -235,6 +277,7 @@ class NdiReceiver
         win.Post("{\"ndi\":\"audio\",\"sr\":" + a.sampleRate + ",\"ch\":" + c + ",\"n\":" + n + ",\"d\":\"" + Convert.ToBase64String(bytes) + "\"}");
     }
     public static string Js(string s) { return new JavaScriptSerializer().Serialize(s ?? ""); }
+    static string FourCC(uint f) { char[] c = new char[4]; for (int i = 0; i < 4; i++) { int b = (int)((f >> (8 * i)) & 0xFF); c[i] = b >= 32 && b < 127 ? (char)b : '?'; } return new string(c); }
 }
 
 // ---------------------------------------------------------------- the window
@@ -290,6 +333,7 @@ class ScopesWindow : Form
             if (a.PermissionKind == CoreWebView2PermissionKind.Camera || a.PermissionKind == CoreWebView2PermissionKind.Microphone ) a.State = CoreWebView2PermissionState.Allow;
         };
         cw.WebMessageReceived += OnMessage;
+        cw.NavigationCompleted += delegate (object s, CoreWebView2NavigationCompletedEventArgs a) { Program.Log("Screen loaded: " + (a.IsSuccess ? "ok" : "failed " + a.WebErrorStatus) + " (WebView2 " + web.CoreWebView2.Environment.BrowserVersionString + ")"); };
         cw.ContainsFullScreenElementChanged += delegate { SetFullScreen(cw.ContainsFullScreenElement); };
         cw.NewWindowRequested += delegate (object s, CoreWebView2NewWindowRequestedEventArgs a) { a.Handled = true; try { Process.Start(a.Uri); } catch (Exception) { } };
         cw.Navigate("https://scopes.rfp/scopes.html?app=1&autostart=1");
@@ -311,6 +355,7 @@ class ScopesWindow : Form
             StopRx();
             if (!Ndi.Ready) { Post("{\"ndi\":\"error\",\"text\":" + NdiReceiver.Js(Ndi.Problem) + "}"); return; }
             string n = Str(m, "name");
+            Program.Log("Open NDI source \"" + n + "\"");
             Text = "RFP Scopes · " + n;
             rx = new NdiReceiver(this, n, Int(m, "bandwidth", 100), Int(m, "pair", 0));
         }
