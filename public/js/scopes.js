@@ -224,7 +224,7 @@
     const c = sLL > 1e-9 && sRR > 1e-9 ? sLR / Math.sqrt(sLL * sRR) : (sLL > 1e-9 || sRR > 1e-9 ? 0 : NaN);
     if (Number.isFinite(c)) A.corr = Number.isFinite(A.corr) ? A.corr * 0.85 + c * 0.15 : c; else A.corr = NaN;
     A.balance = sLL > 1e-9 && sRR > 1e-9 ? 10 * Math.log10(sLL / sRR) : NaN;
-    for (let i = 0; i < 2; i++) { const d = db(pk[i]); A.peaks[i] = d; if (d >= A.hold[i][0] || now - A.hold[i][1] > 2000) A.hold[i] = [d, now]; if (d >= -0.1) A.clipAt = now; else if (d >= -1) A.nearAt = now; }
+    for (let i = 0; i < 2; i++) { const d = db(pk[i]); A.peaks[i] = d; if (d >= A.hold[i][0] || now - A.hold[i][1] > 2000) A.hold[i] = [d, now]; if (d >= TP) A.clipAt = now; else if (d >= STD[std].max) A.nearAt = now; }
     // loudness every 100 ms: the last ~0.34 s, K-weighted (momentary); 3 s of those (short-term); gated (integrated)
     if (now - A.lastBlock >= 100) {
       A.lastBlock = now;
@@ -397,15 +397,37 @@
   new ResizeObserver(() => { fit(); grat(); }).observe(document.querySelector('main'));
   new ResizeObserver(() => { fit(); overlay(); }).observe($('picbox'));
   // the meter scale beside the peak bars
-  $('scale').replaceChildren(...[0, -6, -12, -18, -24, -36, -48, -60].map((d) => { const s = document.createElement('span'); s.textContent = d; s.style.bottom = ((d + 60) / 60) * 100 + '%'; return s; }));
+  // the meter standard: where green ends (alignment / reference level) and red starts (highest permitted peak); the
+  // delivery limit for true peaks is −1 dBFS (EBU R128, streaming platforms)
+  const STD = { ebu: { ref: -18, max: -9 }, smpte: { ref: -20, max: -10 }, stream: { ref: -18, max: -6 } };
+  const TP = -1;
+  let std = STD[store('meterStd')] ? store('meterStd') : 'stream';
+  function meterScale() {
+    const z = STD[std], pos = (d) => ((d + 60) / 60) * 100;
+    for (const m of document.querySelectorAll('.mtr')) {
+      m.style.setProperty('--g', pos(z.ref) + '%'); m.style.setProperty('--y', pos(z.max) + '%');
+      m.querySelectorAll('i').forEach((x) => x.remove());
+      for (const d of [z.ref, z.max, TP]) { const l = document.createElement('i'); l.style.bottom = pos(d) + '%'; m.append(l); }
+    }
+    const marks = [...new Set([TP, z.max, -12, z.ref, -24, -36, -48, -60])].sort((a, b) => b - a).filter((d, i, a) => i === 0 || Math.abs(d - a[i - 1]) >= 3 || [TP, z.max, z.ref].includes(d));
+    $('scale').replaceChildren(...marks.map((d) => { const s = document.createElement('span'); s.textContent = d; s.className = d === z.ref ? 'ref' : d === z.max ? 'max' : d === TP ? 'tp' : ''; s.title = d === z.ref ? 'Alignment level (reference)' : d === z.max ? 'Highest permitted peak' : d === TP ? 'True-peak limit for delivery' : ''; s.style.bottom = pos(d) + '%'; return s; }));
+  }
+  $('meterStd').value = std;
+  $('meterStd').onchange = () => { std = $('meterStd').value; store('meterStd', std); meterScale(); };
+  meterScale();
+  const zone = (d) => (!Number.isFinite(d) ? '' : d >= STD[std].max ? 'lvl-bad' : d >= STD[std].ref ? 'lvl-warn' : 'lvl-ok');
+  // loudness against the target: within ±1 LU green, up to ±3 LU (or quieter by up to 5) yellow, beyond red
+  const lzone = (v, t) => { if (!Number.isFinite(v)) return ''; const d = v - t; return Math.abs(d) <= 1 ? 'lvl-ok' : (d > 0 ? d <= 3 : d >= -5) ? 'lvl-warn' : 'lvl-bad'; };
+  const setZone = (el, z) => { el.classList.remove('lvl-ok', 'lvl-warn', 'lvl-bad'); if (z) el.classList.add(z); };
 
   // ---------------------------------------------------------------- meters and the verdict
   const meterPos = (d) => clamp((d + 60) / 60, 0, 1);       // −60 … 0 dBFS
   function paint(now) {
     const t = Number($('target').value);
-    for (const [i, s] of [[0, 'L'], [1, 'R']]) { $('p' + s).style.height = meterPos(A.peaks[i]) * 100 + '%'; $('h' + s).style.bottom = meterPos(A.hold[i][0]) * 100 + '%'; $('d' + s).textContent = Number.isFinite(A.hold[i][0]) ? A.hold[i][0].toFixed(1) : '–'; }
+    for (const [i, s] of [[0, 'L'], [1, 'R']]) { $('p' + s).style.height = (1 - meterPos(A.peaks[i])) * 100 + '%'; setZone($('d' + s), zone(A.hold[i][0])); $('h' + s).style.bottom = meterPos(A.hold[i][0]) * 100 + '%'; $('d' + s).textContent = Number.isFinite(A.hold[i][0]) ? A.hold[i][0].toFixed(1) : '–'; }
     $('lM').textContent = Number.isFinite(A.M) ? A.M.toFixed(1) : '–';
     $('lS').textContent = Number.isFinite(A.S) ? A.S.toFixed(1) : '–'; $('lSv').textContent = Number.isFinite(A.S) ? fmt(A.S - t) + ' LU from target' : '';
+    setZone($('lS'), lzone(A.S, t)); setZone($('lI'), lzone(A.I, t));
     $('lI').textContent = Number.isFinite(A.I) ? A.I.toFixed(1) : '–'; $('lIv').textContent = Number.isFinite(A.I) ? fmt(A.I - t) + ' LU from target' : '';
     $('lra').textContent = Number.isFinite(A.LRA) ? A.LRA.toFixed(1) + ' LU' : '–';
     $('corrN').textContent = Number.isFinite(A.corr) ? (A.corr >= 0 ? '+' : '') + A.corr.toFixed(2) : '–';
@@ -423,7 +445,7 @@
     C.push(['Video levels', !hasV ? 'warn' : V.clip > 0.02 ? 'warn' : V.crush > 0.25 ? 'warn' : 'ok', !hasV ? '–' : V.clip > 0.02 ? `whites clipping (${Math.round(V.clip * 100)} %)` : V.crush > 0.25 ? `blacks crushed (${Math.round(V.crush * 100)} %)` : 'in range']);
     const silent = !hasA || (A.silentSince && now - A.silentSince > 3000);
     C.push(['Sound', silent ? 'bad' : 'ok', silent ? 'no sound' : 'present']);
-    C.push(['Peaks', now - A.clipAt < 3000 ? 'bad' : now - A.nearAt < 3000 ? 'warn' : 'ok', now - A.clipAt < 3000 ? 'clipping (0 dBFS)' : now - A.nearAt < 3000 ? 'near 0 dBFS' : 'headroom']);
+    C.push(['Peaks', now - A.clipAt < 3000 ? 'bad' : now - A.nearAt < 3000 ? 'warn' : 'ok', now - A.clipAt < 3000 ? `over ${TP} dBFS (limit)` : now - A.nearAt < 3000 ? `above ${STD[std].max} dBFS` : 'headroom']);
     const lv = Number.isFinite(A.S) && !silent ? A.S - t : NaN;
     C.push(['Loudness', !Number.isFinite(lv) ? 'warn' : lv > 2 ? 'warn' : lv < -5 ? 'warn' : 'ok', !Number.isFinite(lv) ? '–' : lv > 2 ? `too loud (${fmt(lv)} LU)` : lv < -5 ? `too quiet (${fmt(lv)} LU)` : `on target (${fmt(lv)} LU)`]);
     C.push(['Phase', A.phaseBadSince && now - A.phaseBadSince > 1000 ? 'bad' : Number.isFinite(avgCorr) && avgCorr < 0.15 ? 'warn' : 'ok', A.phaseBadSince && now - A.phaseBadSince > 1000 ? 'out of phase' : Number.isFinite(avgCorr) && avgCorr < 0.15 ? 'very wide' : mono ? 'mono' : Number.isFinite(A.corr) ? 'fine' : '–']);
