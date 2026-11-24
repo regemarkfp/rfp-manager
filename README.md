@@ -33,6 +33,10 @@ live scoring to each sport's federation rules, CasparCG graphics, advertising, a
 
 ## What's new
 
+### 1.9.7
+
+- **Scopes meters to broadcast standards** (RFP Manager's /scopes and RFP Scopes 1.0.4): the colours sit on the scale, so a level lights only the zones it reaches – green below the alignment level, yellow up to the highest permitted peak, red above it, with a line at −1 dBFS (the true-peak limit for delivery, EBU R128 / streaming). Choose the standard under the meters: **EBU R68** (−18 dBFS reference, −9 max), **SMPTE RP155** (−20 reference, −10 max) or **Streaming** (−18 reference, −6 max). The peak numbers take the colour of their zone, the short-term and integrated loudness turn green within ±1 LU of the target, yellow a little off and red far off, and the Peaks check warns above the permitted peak and fails over −1 dBFS.
+
 ### 1.9.6
 
 - **RFP Scopes 1.0.3**: NDI pictures show (1.0.2 read the picture buffer on the wrong thread: "CoreWebView2SharedBuffer members can only be accessed from the UI thread").
