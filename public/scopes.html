@@ -45,11 +45,18 @@
   #idle { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--dim); padding: 20px; }
   #side { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
   .meters { flex: 1; min-height: 120px; display: grid; grid-template-columns: 22px 22px 1fr; gap: 6px; background: #141414; border: 1px solid #242424; padding: 6px; }
-  .mtr { position: relative; background: #0a0a0a; border: 1px solid #262626; overflow: hidden; }
-  .mtr span { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(0deg, #00c86a 0 70%, #ffc83d 82%, #ff4d4d 95%); }
+  /* the peak meters: colour zones fixed on the scale (a level lights only the zones it reaches), like a broadcast meter:
+     green below the alignment level (−18 dBFS EBU R68 / −20 dBFS SMPTE RP155), yellow up to the permitted peak (−6 / −9),
+     red above it; the line at −1 dBFS is the highest true peak for delivery (EBU R128 / streaming) */
+  .mtr { position: relative; border: 1px solid #262626; overflow: hidden;
+    background: linear-gradient(0deg, #00c86a 0 var(--g, 70%), #ffc83d var(--g, 70%) var(--y, 90%), #ff3b3b var(--y, 90%) 100%); }
+  .mtr span { position: absolute; left: 0; right: 0; top: 0; background: rgba(8,8,8,.9); }      /* the part not reached (dims the zones) */
+  .mtr i { position: absolute; left: 0; right: 0; height: 1px; background: rgba(255,255,255,.55); pointer-events: none; }
   .mtr b { position: absolute; left: 0; right: 0; height: 2px; background: #fff; }
   .mtr em { position: absolute; bottom: 2px; width: 100%; text-align: center; font-size: 10px; font-style: normal; color: #ddd; }
   .scale { position: relative; font-size: 9.5px; color: #777; } .scale span { position: absolute; left: 0; transform: translateY(50%); }
+  .scale span.ref { color: #00c86a; font-weight: 700; } .scale span.max { color: #ffc83d; font-weight: 700; } .scale span.tp { color: #ff6b6b; font-weight: 700; }
+  .lvl-ok { color: #2fe08a !important; } .lvl-warn { color: #ffc83d !important; } .lvl-bad { color: #ff5c5c !important; }
   .nums { display: grid; gap: 6px; }
   .nums > div { background: #141414; border: 1px solid #242424; padding: 5px 8px; }
   .nums small { display: block; color: var(--dim); font-size: 10.5px; } .nums .v { font-family: var(--font-head); font-size: 19px; font-variant-numeric: tabular-nums; }
@@ -107,6 +114,7 @@
         <div><small>Momentary · LRA</small><div class="v" style="font-size:15px"><span id="lM">–</span> · <span id="lra">–</span></div></div>
         <div><small>Peak L / R</small><div class="v" style="font-size:15px"><span id="dL">–</span> / <span id="dR">–</span></div></div>
         <div class="tools"><select id="target" title="Loudness target"><option value="-14">−14 LUFS web</option><option value="-16">−16 LUFS</option><option value="-23">−23 EBU R128</option><option value="-24">−24 ATSC</option></select><button id="reset" class="sm" title="Start the integrated loudness again">Reset</button></div>
+        <div class="tools"><select id="meterStd" title="Meter colours: alignment level and permitted peak"><option value="ebu">EBU R68: −18 ref · −9 max</option><option value="smpte">SMPTE RP155: −20 ref · −10 max</option><option value="stream">Streaming: −18 ref · −6 max</option></select></div>
       </div>
     </div>
   </div>
